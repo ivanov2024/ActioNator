@@ -28,5 +28,14 @@
             public const int NotesMinLength = 0;
             public const int NotesMaxLength = 500;
         }
+
+        public static class Workout
+        {
+            public const int TitleMinLength = 3;
+            public const int TitleMaxLength = 200;
+
+            public const int NotesMinLength = 0;
+            public const int NotesMaxLength = 500;
+        }
     }
 }
