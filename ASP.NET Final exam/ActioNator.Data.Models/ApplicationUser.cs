@@ -5,7 +5,7 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ActioNator.Data.Models
 {
-    public class User : IdentityUser
+    public class ApplicationUser : IdentityUser<Guid>
     {
         public Role Role { get; set; }
 
