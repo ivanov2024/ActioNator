@@ -58,5 +58,14 @@
             public const int MoodTagMinLength = 0;
             public const int MoodTagMaxLength = 50;
         }
+
+        public static class Achievement
+        {
+            public const int TitleMinLength = 3;
+            public const int TitleMaxLength = 20;
+
+            public const int DescriptionMinLength = 10;
+            public const int DescriptionMaxLength = 150;
+        }
     }
 }
