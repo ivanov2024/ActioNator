@@ -37,5 +37,14 @@
             public const int NotesMinLength = 0;
             public const int NotesMaxLength = 500;
         }
+
+        public static class Post
+        {
+            public const int TitleMinLength = 3;
+            public const int TitleMaxLength = 20;
+
+            public const int ContentMinLength = 0;
+            public const int ContentMaxLength = 150;
+        }
     }
 }

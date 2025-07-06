@@ -10,4 +10,8 @@
 		<PackageReference Include="Microsoft.Extensions.Identity.Stores" Version="8.0.16" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <ProjectReference Include="..\ActioNator.GCommon\ActioNator.GCommon.csproj" />
+	</ItemGroup>
+
 </Project>

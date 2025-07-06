@@ -32,5 +32,4 @@ namespace ActioNator.Data.Models
         public virtual ICollection<Exercise> Exercises { get; set; } 
             = new HashSet<Exercise>();
     }
-
 }
