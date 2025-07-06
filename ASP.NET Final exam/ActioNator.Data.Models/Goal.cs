@@ -32,5 +32,7 @@ namespace ActioNator.Data.Models
         public bool IsCompleted { get; set; }
 
         public DateTime? CompletedAt { get; set; } = null!;
+
+        public bool IsDeleted { get; set; }
     }
 }

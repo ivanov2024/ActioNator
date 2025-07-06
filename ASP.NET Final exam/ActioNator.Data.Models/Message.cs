@@ -32,8 +32,10 @@ namespace ActioNator.Data.Models
         [MaxLength(ContentMaxLength)]
         public string Content { get; set; } = null!;
 
-        public DateTime CreatedAt { get; set; }
+        public DateTime PostedAt { get; set; }
 
         public bool IsRead { get; set; }
+
+        public bool IsDeleted { get; set; }
     }
 }

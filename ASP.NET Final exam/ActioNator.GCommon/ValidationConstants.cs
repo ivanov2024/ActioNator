@@ -73,5 +73,11 @@
             public const int ContentMinLength = 1;
             public const int ContentMaxLength = 1000;
         }
+
+        public static class Comment
+        {
+            public const int ContentMinLength = 1;
+            public const int ContentMaxLength = 500;
+        }
     }
 }

@@ -29,6 +29,8 @@ namespace ActioNator.Data.Models
         [Required]
         public TimeSpan Duration { get; set; }
 
+        public bool IsDeleted { get; set; }
+
         public virtual ICollection<Exercise> Exercises { get; set; } 
             = new HashSet<Exercise>();
     }

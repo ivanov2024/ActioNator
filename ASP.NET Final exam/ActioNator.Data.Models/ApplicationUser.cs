@@ -18,5 +18,7 @@ namespace ActioNator.Data.Models
         public string ProfilePictureUrl { get; set; } = null!;
 
         public DateTime RegisteredAt { get; set; }
+
+        public bool IsDeleted { get; set; }
     }
 }

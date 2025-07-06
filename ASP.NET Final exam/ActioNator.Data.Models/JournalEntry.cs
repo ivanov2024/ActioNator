@@ -33,5 +33,7 @@ namespace ActioNator.Data.Models
         public string? ImageUrl { get; set; } = null!;
 
         public bool IsPublic { get; set; }
+
+        public bool IsDeleted { get; set; }
     }
 }

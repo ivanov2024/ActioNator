@@ -23,6 +23,8 @@ namespace ActioNator.Data.Models
 
         public DateTime LastMessageAt { get; set; }
 
+        public bool IsDeleted { get; set; }
+
         public virtual ICollection<Message> Messages { get; set; } 
          = new HashSet<Message>();
     }

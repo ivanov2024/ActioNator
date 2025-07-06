@@ -38,5 +38,7 @@ namespace ActioNator.Data.Models
 
         [Required]
         public TimeSpan Duration { get; set; }
+
+        public bool IsDeleted { get; set; }
     }
 }
