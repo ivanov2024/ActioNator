@@ -46,5 +46,17 @@
             public const int ContentMinLength = 0;
             public const int ContentMaxLength = 150;
         }
+
+        public static class JournalEntry
+        {
+            public const int TitleMinLength = 3;
+            public const int TitleMaxLength = 20;
+
+            public const int ContentMinLength = 0;
+            public const int ContentMaxLength = 150;
+
+            public const int MoodTagMinLength = 0;
+            public const int MoodTagMaxLength = 50;
+        }
     }
 }
