@@ -67,5 +67,11 @@
             public const int DescriptionMinLength = 10;
             public const int DescriptionMaxLength = 150;
         }
+
+        public static class Message
+        {
+            public const int ContentMinLength = 1;
+            public const int ContentMaxLength = 1000;
+        }
     }
 }

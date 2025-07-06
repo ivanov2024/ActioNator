@@ -16,4 +16,10 @@
     <PackageReference Include="Microsoft.VisualStudio.Web.CodeGeneration.Design" Version="8.0.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="wwwroot\images\achievement\" />
+    <Folder Include="wwwroot\images\logo\lightTheme\" />
+    <Folder Include="wwwroot\images\logo\blackTheme\" />
+  </ItemGroup>
+
 </Project>
