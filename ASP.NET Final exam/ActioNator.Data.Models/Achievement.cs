@@ -20,11 +20,12 @@ namespace ActioNator.Data.Models
         [MaxLength(TitleMaxLength)]
         public string Title { get; set; } = null!;
 
+        [Required]
         [MinLength(DescriptionMinLength)]
         [MaxLength(DescriptionMaxLength)]
-        public string? Description { get; set; } = null!;
+        public string Description { get; set; } = null!;
 
-        public DateTime AchievedAt { get; set; }
+        public DateTime? AchievedAt { get; set; }
 
         [Required]
         public string ImageUrl { get; set; } = null!;

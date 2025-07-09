@@ -13,6 +13,10 @@ namespace ActioNator.Data.EntityConfigurations
                 .HasDefaultValue(false);
 
             applicationUser
+                .Property(au => au.RegisteredAt)
+                .HasDefaultValue(DateTime.UtcNow);
+
+            applicationUser
                 .Property(au => au.IsDeleted)
                 .HasDefaultValue(false);
 
