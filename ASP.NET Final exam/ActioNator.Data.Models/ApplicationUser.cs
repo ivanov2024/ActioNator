@@ -38,10 +38,24 @@ namespace ActioNator.Data.Models
         public virtual ICollection<Achievement> Achievements { get; set; }
             = new HashSet<Achievement>();
 
-        public virtual ICollection<Chat> Chats { get; set; }
-            = new HashSet<Chat>();
+        /// <summary>
+        /// Gets or sets the collection of chats where the user is the first participant (initiator).
+        /// </summary>
+        public ICollection<Chat> ChatsInitiated { get; set; } = new HashSet<Chat>();
 
-        public virtual ICollection<Message> Messages { get; set; }
-            = new HashSet<Message>();
+        /// <summary>
+        /// Gets or sets the collection of chats where the user is the second participant (receiver).
+        /// </summary>
+        public ICollection<Chat> ChatsReceived { get; set; } = new HashSet<Chat>();
+
+        /// <summary>
+        /// Gets or sets the collection of messages sent by the user.
+        /// </summary>
+        public ICollection<Message> MessagesSent { get; set; } = new HashSet<Message>();
+
+        /// <summary>
+        /// Gets or sets the collection of messages received by the user.
+        /// </summary>
+        public ICollection<Message> MessagesReceived { get; set; } = new HashSet<Message>();
     }
 }
