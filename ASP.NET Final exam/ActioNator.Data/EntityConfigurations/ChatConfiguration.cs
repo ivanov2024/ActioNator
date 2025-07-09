@@ -24,6 +24,10 @@ namespace ActioNator.Data.EntityConfigurations
                 .OnDelete(DeleteBehavior.Restrict);
 
             chat
+                .Property(c => c.CreatedAt)
+                .HasDefaultValue(DateTime.UtcNow);
+
+            chat
                 .Property(c => c.IsDeleted)
                 .HasDefaultValue(false);
 
