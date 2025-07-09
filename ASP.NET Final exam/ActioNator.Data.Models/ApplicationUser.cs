@@ -9,7 +9,6 @@ namespace ActioNator.Data.Models
     {
         public Role Role { get; set; }
 
-        [Required]
         public bool IsVerifiedCoach { get; set; }
 
         public string? CoachDegreeFilePath { get; set; }
