@@ -13,9 +13,6 @@
 
         public static class Exercise
         {
-            public const int NameMinLength = 3;
-            public const int NameMaxLength = 300;
-
             public const int MinSets = 1;
             public const int MaxSets = 100;
 
@@ -27,6 +24,12 @@
 
             public const int NotesMinLength = 0;
             public const int NotesMaxLength = 500;
+        }
+
+        public static class ExerciseTemplate
+        {
+            public const int NameMinLength = 3;
+            public const int NameMaxLength = 300;
         }
 
         public static class Workout

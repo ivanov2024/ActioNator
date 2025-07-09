@@ -30,5 +30,8 @@ namespace ActioNator.Data.Models
         public bool IsPublic { get; set; }
 
         public bool IsDeleted { get; set; }
+
+        public virtual ICollection<Comment> Comments { get; set; }
+            = new HashSet<Comment>();
     }
 }

@@ -10,18 +10,16 @@ namespace ActioNator.Data.Models
         public Guid Id { get; set; }
 
         [Required]
-        public string ImageUrl { get; set; } = null!;
-
-        [Required]
         public Guid WorkoutId { get; set; }
 
         [Required]
         public virtual Workout Workout { get; set; } = null!;
 
         [Required]
-        [MinLength(NameMinLength)]
-        [MaxLength(NameMaxLength)]
-        public string Name { get; set; } = null!;
+        public Guid ExerciseTemplateId { get; set; }
+
+        [Required]
+        public ExerciseTemplate ExerciseTemplate { get; set; } = null!;
 
         [Range(MinSets, MaxSets)]
         public int Sets { get; set; }
