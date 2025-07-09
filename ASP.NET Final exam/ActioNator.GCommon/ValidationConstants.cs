@@ -15,10 +15,10 @@
         {
             public const int MinSets = 1;
             public const int MaxSets = 100;
-
+                         
             public const int MinReps = 1;
             public const int MaxReps = 100;
-
+                         
             public const int MinWeight = 0;
             public const int MaxWeight = 1000;
 
