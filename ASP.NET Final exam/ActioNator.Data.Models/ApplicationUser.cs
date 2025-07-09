@@ -20,5 +20,29 @@ namespace ActioNator.Data.Models
         public DateTime RegisteredAt { get; set; }
 
         public bool IsDeleted { get; set; }
+
+        public virtual ICollection<Goal> Goals { get; set; } 
+            = new HashSet<Goal>();
+
+        public virtual ICollection<Workout> Workouts { get; set; }
+            = new HashSet<Workout>();
+
+        public virtual ICollection<Post> Posts { get; set; }
+            = new HashSet<Post>();
+
+        public virtual ICollection<Comment> Comments { get; set; }
+            = new HashSet<Comment>();
+
+        public virtual ICollection<JournalEntry> JournalEntries { get; set; }
+            = new HashSet<JournalEntry>();
+
+        public virtual ICollection<Achievement> Achievements { get; set; }
+            = new HashSet<Achievement>();
+
+        public virtual ICollection<Chat> Chats { get; set; }
+            = new HashSet<Chat>();
+
+        public virtual ICollection<Message> Messages { get; set; }
+            = new HashSet<Message>();
     }
 }
