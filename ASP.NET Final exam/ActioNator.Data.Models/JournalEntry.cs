@@ -15,6 +15,7 @@ namespace ActioNator.Data.Models
         [Required]
         public virtual ApplicationUser ApplicationUser { get; set; } = null!;
 
+        [Required]
         [MinLength(TitleMinLength)]
         [MaxLength(TitleMaxLength)]
         public string Title { get; set; } = null!;
