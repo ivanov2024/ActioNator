@@ -18,6 +18,7 @@ namespace ActioNator.Data.Models
         [Required]
         public DateTime Date { get; set; }
 
+        [Required]
         [MinLength(TitleMinLength)]
         [MaxLength(TitleMaxLength)]
         public string Title { get; set; } = null!;
