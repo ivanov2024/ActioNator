@@ -15,11 +15,14 @@ namespace ActioNator.Data.EntityConfigurations
                 .HasOne(a => a.ApplicationUser)
                 .WithMany(ap => ap.Achievements)
                 .HasForeignKey(a => a.UserId)
+                .IsRequired(false)
                 .OnDelete(DeleteBehavior.Restrict);
 
             achievement
-                .Property(a => a.ImageUrl)
-                .HasDefaultValue("/images/achievement/medalLogo.png");
+                .HasOne(a => a.AchievementTemplate)
+                .WithMany(ap => ap.UserAchievements)
+                .HasForeignKey(a => a.AchievementTemplateId)
+                .OnDelete(DeleteBehavior.Restrict);
 
             achievement
                 .Property(a => a.IsActive)

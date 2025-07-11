@@ -62,10 +62,10 @@
             public const int MoodTagMaxLength = 50;
         }
 
-        public static class Achievement
+        public static class AchievementTemplate
         {
             public const int TitleMinLength = 3;
-            public const int TitleMaxLength = 20;
+            public const int TitleMaxLength = 100;
 
             public const int DescriptionMinLength = 10;
             public const int DescriptionMaxLength = 150;

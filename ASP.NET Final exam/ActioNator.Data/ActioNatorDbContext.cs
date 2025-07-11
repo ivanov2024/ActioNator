@@ -16,6 +16,8 @@ namespace ActioNator.Data
 
         public DbSet<Achievement> Achievements { get; set; } = null!;
 
+        public DbSet<AchievementTemplate> AchievementTemplates { get; set; } = null!;
+
         public DbSet<ApplicationUser> ApplicationUsers { get; set; } = null!;
 
         public DbSet<Chat> Chats { get; set; } = null!;
