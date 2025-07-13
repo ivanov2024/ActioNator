@@ -2,6 +2,15 @@
 {
     public static class ValidationConstants
     {
+        public static class ApplicationUser
+        {
+            public const int FirstNameMinLength = 3;
+            public const int FirstNameMaxLength = 200;
+
+            public const int LastNameMinLength = 3;
+            public const int LastNameMaxLength = 200;
+        }
+
         public static class Goal
         {
             public const int TitleMinLength = 3;

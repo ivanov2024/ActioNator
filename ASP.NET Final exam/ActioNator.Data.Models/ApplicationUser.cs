@@ -3,10 +3,22 @@
 using ActioNator.Data.Models.Enums;
 using System.ComponentModel.DataAnnotations;
 
+using static ActioNator.GCommon.ValidationConstants.ApplicationUser;
+
 namespace ActioNator.Data.Models
 {
     public class ApplicationUser : IdentityUser<Guid>
     {
+        [Required]
+        [MinLength(FirstNameMinLength)]
+        [MaxLength(FirstNameMaxLength)]
+        public string FirstName { get; set; } = null!;
+
+        [Required]
+        [MinLength(LastNameMinLength)]
+        [MaxLength(LastNameMaxLength)]
+        public string LastName { get; set; } = null!;
+
         public Role Role { get; set; }
 
         public bool IsVerifiedCoach { get; set; }
