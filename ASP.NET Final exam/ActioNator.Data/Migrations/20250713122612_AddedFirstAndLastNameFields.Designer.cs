@@ -4,6 +4,7 @@ using ActioNator.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ActioNator.Data.Migrations
 {
     [DbContext(typeof(ActioNatorDbContext))]
-    partial class ActioNatorDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250713122612_AddedFirstAndLastNameFields")]
+    partial class AddedFirstAndLastNameFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -231,12 +234,12 @@ namespace ActioNator.Data.Migrations
                         .HasColumnType("bit");
 
                     b.Property<string>("ProfilePictureUrl")
+                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTime>("RegisteredAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 7, 15, 13, 56, 20, 264, DateTimeKind.Utc).AddTicks(610))
                         .HasDefaultValue(new DateTime(2025, 7, 13, 12, 26, 8, 848, DateTimeKind.Utc).AddTicks(6319));
 
                     b.Property<int>("Role")
@@ -274,7 +277,6 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 7, 15, 13, 56, 20, 267, DateTimeKind.Utc).AddTicks(7822))
                         .HasDefaultValue(new DateTime(2025, 7, 13, 12, 26, 8, 850, DateTimeKind.Utc).AddTicks(7475));
 
                     b.Property<bool>("IsDeleted")
@@ -317,7 +319,6 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 7, 15, 13, 56, 20, 268, DateTimeKind.Utc).AddTicks(5861))
                         .HasDefaultValue(new DateTime(2025, 7, 13, 12, 26, 8, 851, DateTimeKind.Utc).AddTicks(1393));
 
                     b.Property<bool>("IsDeleted")
@@ -428,7 +429,6 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 7, 15, 13, 56, 20, 270, DateTimeKind.Utc).AddTicks(2556))
                         .HasDefaultValue(new DateTime(2025, 7, 13, 12, 26, 8, 851, DateTimeKind.Utc).AddTicks(7368));
 
                     b.Property<string>("Description")
@@ -475,7 +475,6 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 7, 15, 13, 56, 20, 271, DateTimeKind.Utc).AddTicks(5404))
                         .HasDefaultValue(new DateTime(2025, 7, 13, 12, 26, 8, 852, DateTimeKind.Utc).AddTicks(1035));
 
                     b.Property<string>("ImageUrl")
@@ -537,7 +536,6 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("PostedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 7, 15, 13, 56, 20, 276, DateTimeKind.Utc).AddTicks(1568))
                         .HasDefaultValue(new DateTime(2025, 7, 13, 12, 26, 8, 854, DateTimeKind.Utc).AddTicks(171));
 
                     b.Property<Guid>("ReceiverId")
@@ -570,7 +568,6 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 7, 15, 13, 56, 20, 276, DateTimeKind.Utc).AddTicks(9587))
                         .HasDefaultValue(new DateTime(2025, 7, 13, 12, 26, 8, 854, DateTimeKind.Utc).AddTicks(4502));
 
                     b.Property<string>("ImageUrl")

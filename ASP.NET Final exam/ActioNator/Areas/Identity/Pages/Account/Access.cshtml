@@ -1,0 +1,86 @@
+﻿@page
+@model AccessModel
+@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ActioNator Access</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/access-page.css" />
+</head>
+<body>
+    <div class="logo-container">
+        <img src="~/images/logo/lightTheme-logo.png" alt="ActioNator Logo" class="logo" />
+    </div>
+
+    <div asp-validation-summary="All" class="text-danger"></div>
+
+    <div class="container" id="container">
+        <div class="form-container sign-up-container">
+            <form method="post" asp-page-handler="Register">
+				@Html.AntiForgeryToken()
+                <h1>Create Account</h1>
+                <div class="social-container">
+                    <a href="#" class="social"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="social"><i class="fab fa-google-plus-g"></i></a>
+                    <a href="#" class="social"><i class="fab fa-linkedin-in"></i></a>
+                </div>
+                <span>or use your email for registration</span>
+                <input asp-for="RegisterInput.FirstName" type="text" placeholder="First Name" />
+                <input asp-for="RegisterInput.LastName" type="text" placeholder="Last Name" />
+                <input asp-for="RegisterInput.Email" type="email" placeholder="Email" />
+                <input asp-for="RegisterInput.Password" type="password" placeholder="Password" />
+                <input asp-for="RegisterInput.ConfirmPassword" type="password" placeholder="Confirm Password" />
+                <button type="submit">Sign Up</button>
+                <div class="mobile-toggle">
+                    Already have an account? <a href="#" class="toggle-form">Sign In</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="form-container sign-in-container">
+            <form method="post" asp-page-handler="Login">
+                @Html.AntiForgeryToken()
+                <h1>Sign in</h1>  
+                <div class="social-container">
+                    <a href="#" class="social"><i class="fab fa-facebook-f"></i></a>
+                    <a href="#" class="social"><i class="fab fa-google-plus-g"></i></a>
+                    <a href="#" class="social"><i class="fab fa-linkedin-in"></i></a>
+                </div>
+                <span>or use your account</span>
+                <input asp-for="LoginInput.Email" type="email" placeholder="Email" />
+                <input asp-for="LoginInput.Password" type="password" placeholder="Password" />
+                <a asp-page="./ForgotPassword">Forgot your password?</a>
+                <button type="submit">Sign In</button>
+                <div class="mobile-toggle">
+                    Don't have an account? <a href="#" class="toggle-form">Sign Up</a>
+                </div>
+            </form>
+        </div>
+
+        <div class="overlay-container">
+            <div class="overlay">
+                <div class="overlay-panel overlay-left">
+                    <h1>Welcome Back!</h1>
+                    <p>To keep connected with us please login with your personal info</p>
+                    <button class="ghost" id="signIn">Sign In</button>
+                </div>
+                <div class="overlay-panel overlay-right">
+                    <h1>Hello, Friend!</h1>
+                    <p>Enter your personal details and start journey with us</p>
+                    <button class="ghost" id="signUp">Sign Up</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="~/js/access-page.js"></script>
+
+    <partial name="_ValidationScriptsPartial" />
+
+</body>
+</html>
