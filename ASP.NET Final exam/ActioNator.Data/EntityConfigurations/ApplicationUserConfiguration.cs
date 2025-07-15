@@ -17,6 +17,10 @@ namespace ActioNator.Data.EntityConfigurations
                 .HasDefaultValue(DateTime.UtcNow);
 
             applicationUser
+                .Property(au => au.ProfilePictureUrl)
+                .IsRequired(false);
+
+            applicationUser
                 .Property(au => au.IsDeleted)
                 .HasDefaultValue(false);
 
