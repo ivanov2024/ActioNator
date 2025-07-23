@@ -1,0 +1,267 @@
+@{
+    ViewData["Title"] = "Verify Coach Status";
+    Layout = "_Layout";
+}
+
+<div class="container mx-auto px-4 py-8 max-w-4xl">
+    <div class="flex items-center mb-6">
+        <a href="/User/Home/Index" class="text-indigo-600 hover:text-indigo-800 mr-4">
+            <i class="fas fa-arrow-left"></i> Back
+        </a>
+        <h1 class="text-3xl font-bold text-center flex-grow">Verify that you are coach</h1>
+    </div>
+
+    <div class="bg-white rounded-lg shadow-md p-6" x-data="fileUploadHandler()">
+        <!-- Success message (hidden by default) -->
+        <div x-show="isSubmitted" class="text-center py-10" x-transition>
+            <div class="text-green-600 text-5xl mb-4">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-4">Successful submitting</h2>
+            <p class="text-gray-700 mb-6">
+                An admin will check the validation of the documents and you will get notified about the results.
+            </p>
+            <a href="/User/Home/Index" class="inline-block px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors">
+                Return to Home
+            </a>
+        </div>
+
+        <!-- Upload form (hidden when submitted) -->
+        <div x-show="!isSubmitted">
+            <!-- File upload area -->
+            <div class="mb-6">
+                <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:bg-gray-50 transition-colors"
+                     x-on:click="document.getElementById('fileInput').click()"
+                     x-on:dragover.prevent="dragover = true"
+                     x-on:dragleave.prevent="dragover = false"
+                     x-on:drop.prevent="handleDrop($event)"
+                     x-bind:class="{ 'bg-gray-50 border-indigo-300': dragover }">
+                    <input type="file" id="fileInput" class="hidden" multiple
+                           x-on:change="handleFileSelect($event)"
+                           accept=".png,.jpg,.jpeg,.gif,.webp,.pdf">
+                    <div class="text-gray-500">
+                        <i class="fas fa-cloud-upload-alt text-4xl mb-3"></i>
+                        <p class="text-lg font-medium">Drag files here or click to browse</p>
+                        <p class="text-sm mt-2">Accepted formats: Images (.png, .jpg, .jpeg, .gif, .webp) or PDFs (.pdf)</p>
+                        <p class="text-sm mt-1">Maximum upload size: 100MB</p>
+                        <p class="text-sm mt-1 font-medium text-indigo-600">Note: You can only upload either images OR PDFs in a single submission</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- File type error message -->
+            <div x-show="fileTypeError" class="mb-4 p-3 bg-red-100 text-red-700 rounded-md">
+                <p><i class="fas fa-exclamation-triangle mr-2"></i> You cannot mix file types. Please select either images or PDFs only.</p>
+            </div>
+
+            <!-- Image previews -->
+            <div x-show="hasImageFiles && !fileTypeError" class="mb-6">
+                <h3 class="text-lg font-medium mb-3">Selected Images</h3>
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <template x-for="(file, index) in files" :key="index">
+                        <div x-show="isImageFile(file)" class="relative rounded-lg overflow-hidden border border-gray-200 group">
+                            <img x-bind:src="getFilePreview(file)" class="w-full h-40 object-cover">
+                            <button type="button" 
+                                    x-on:click.stop="removeFile(index)" 
+                                    class="absolute top-2 right-2 bg-white rounded-full p-1 shadow-md text-red-500 hover:text-red-700 transition-colors">
+                                <i class="fas fa-times"></i>
+                            </button>
+                            <div class="p-2 bg-gray-50 text-xs truncate" x-text="file.name"></div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- PDF previews -->
+            <div x-show="hasPdfFiles && !fileTypeError" class="mb-6">
+                <h3 class="text-lg font-medium mb-3">Selected PDFs</h3>
+                <div class="space-y-3">
+                    <template x-for="(file, index) in files" :key="index">
+                        <div x-show="isPdfFile(file)" 
+                             class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+                             x-on:click="downloadFile(file)">
+                            <div class="flex items-start space-x-3">
+                                <div class="text-red-500 text-2xl">
+                                    <i class="far fa-file-pdf"></i>
+                                </div>
+                                <div>
+                                    <p class="font-medium" x-text="file.name"></p>
+                                    <p class="text-sm text-gray-500" x-text="formatFileSize(file.size)"></p>
+                                </div>
+                            </div>
+                            <button type="button" 
+                                    x-on:click.stop="removeFile(index)" 
+                                    class="text-gray-400 hover:text-red-500 transition-colors">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Upload progress bar (hidden until upload starts) -->
+            <div x-show="isUploading" class="mb-6">
+                <div class="flex items-center">
+                    <div class="flex-grow bg-gray-200 rounded-full h-4 mr-2">
+                        <div class="h-4 rounded-full transition-all duration-300"
+                             x-bind:class="{'bg-green-500': uploadComplete, 'bg-indigo-500': !uploadComplete}"
+                             x-bind:style="'width: ' + uploadProgress + '%'"></div>
+                    </div>
+                    <span class="text-sm font-medium" x-text="uploadProgress + '%'"></span>
+                </div>
+            </div>
+
+            <!-- Submit button -->
+            <div class="text-center">
+                <button type="button" 
+                        x-on:click="submitFiles"
+                        x-bind:disabled="!canSubmit"
+                        x-bind:class="{'bg-indigo-600 hover:bg-indigo-700': canSubmit, 'bg-gray-300 cursor-not-allowed': !canSubmit}"
+                        class="px-6 py-2 text-white rounded-md transition-colors">
+                    Submit
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function fileUploadHandler() {
+            return {
+                files: [],
+                dragover: false,
+                isUploading: false,
+                uploadProgress: 0,
+                uploadComplete: false,
+                isSubmitted: false,
+                fileTypeError: false,
+                
+                get hasFiles() {
+                    return this.files.length > 0;
+                },
+                
+                get hasImageFiles() {
+                    return this.files.some(file => this.isImageFile(file));
+                },
+                
+                get hasPdfFiles() {
+                    return this.files.some(file => this.isPdfFile(file));
+                },
+                
+                get canSubmit() {
+                    return this.hasFiles && !this.fileTypeError && !this.isUploading;
+                },
+                
+                isImageFile(file) {
+                    const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+                    return imageTypes.includes(file.type);
+                },
+                
+                isPdfFile(file) {
+                    return file.type === 'application/pdf';
+                },
+                
+                handleFileSelect(event) {
+                    const newFiles = Array.from(event.target.files);
+                    this.addFiles(newFiles);
+                    // Reset the input so the same file can be selected again if removed
+                    event.target.value = '';
+                },
+                
+                handleDrop(event) {
+                    this.dragover = false;
+                    const newFiles = Array.from(event.dataTransfer.files);
+                    this.addFiles(newFiles);
+                },
+                
+                addFiles(newFiles) {
+                    if (newFiles.length === 0) return;
+                    
+                    // Check file type consistency
+                    const hasImages = [...this.files, ...newFiles].some(file => this.isImageFile(file));
+                    const hasPdfs = [...this.files, ...newFiles].some(file => this.isPdfFile(file));
+                    
+                    if (hasImages && hasPdfs) {
+                        this.fileTypeError = true;
+                        return;
+                    }
+                    
+                    this.fileTypeError = false;
+                    
+                    // Check total file size
+                    const totalSize = [...this.files, ...newFiles].reduce((sum, file) => sum + file.size, 0);
+                    const maxSize = 100 * 1024 * 1024; // 100MB
+                    
+                    if (totalSize > maxSize) {
+                        alert('Total file size exceeds the maximum limit of 100MB');
+                        return;
+                    }
+                    
+                    // Add files to the list
+                    this.files = [...this.files, ...newFiles];
+                },
+                
+                removeFile(index) {
+                    this.files = this.files.filter((_, i) => i !== index);
+                    if (this.files.length === 0) {
+                        this.fileTypeError = false;
+                    }
+                },
+                
+                getFilePreview(file) {
+                    if (this.isImageFile(file)) {
+                        return URL.createObjectURL(file);
+                    }
+                    return null;
+                },
+                
+                formatFileSize(bytes) {
+                    if (bytes === 0) return '0 Bytes';
+                    
+                    const k = 1024;
+                    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                    const i = Math.floor(Math.log(bytes) / Math.log(k));
+                    
+                    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+                },
+                
+                downloadFile(file) {
+                    const url = URL.createObjectURL(file);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = file.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                },
+                
+                submitFiles() {
+                    if (!this.canSubmit) return;
+                    
+                    this.isUploading = true;
+                    this.uploadProgress = 0;
+                    
+                    // Simulate upload progress
+                    let startTime = Date.now();
+                    const totalDuration = 2000 + Math.random() * 1000; // 2–3 seconds
+                    const interval = setInterval(() => {
+                        const elapsed = Date.now() - startTime;
+                        const progress = Math.min((elapsed / totalDuration) * 100, 100);
+                        this.uploadProgress = Math.round(progress);
+
+                        if (progress >= 100) {
+                            clearInterval(interval);
+                            this.uploadComplete = true;
+
+                            setTimeout(() => {
+                                this.isSubmitted = true;
+                            }, 500);
+                        }
+                    }, 100);
+                }
+            };
+        }
+    </script>
+}
