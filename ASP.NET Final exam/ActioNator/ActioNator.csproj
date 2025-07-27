@@ -26,6 +26,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ActioNator.Data\ActioNator.Data.csproj" />
+    <ProjectReference Include="..\ActioNator.Services\ActioNator.Services.csproj" />
   </ItemGroup>
 
 </Project>

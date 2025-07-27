@@ -1,7 +1,14 @@
 using ActioNator.Data;
 using ActioNator.Data.Models;
+using ActioNator.Middleware;
+using ActioNator.Services;
+using ActioNator.Services.Configuration;
+using ActioNator.Services.ContentInspectors;
+using ActioNator.Services.Interfaces;
+using ActioNator.Services.Validators;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ActioNator
 {
@@ -24,6 +31,57 @@ namespace ActioNator
             builder.Services.AddControllersWithViews();
 
             builder.Services.AddRazorPages();
+
+            // Register configuration options
+            builder.Services.Configure<FileUploadOptions>(builder.Configuration.GetSection("FileUpload"));
+            
+            // Register file system and content inspectors
+            builder.Services.AddScoped<IFileSystem, FileSystemService>();
+            builder.Services.AddScoped<ImageContentInspector>();
+            builder.Services.AddScoped<PdfContentInspector>();
+            
+            // Register content inspectors as IFileContentInspector (last one wins for interface resolution)
+            builder.Services.AddScoped<IFileContentInspector>(sp => sp.GetRequiredService<ImageContentInspector>());
+            builder.Services.AddScoped<IFileContentInspector>(sp => sp.GetRequiredService<PdfContentInspector>());
+            
+            // Register validators with specific named registrations to avoid DI conflicts
+            builder.Services.AddScoped<ImageFileValidator>(sp => 
+                new ImageFileValidator(
+                    sp.GetRequiredService<IOptions<FileUploadOptions>>(),
+                    sp.GetRequiredService<ILogger<ImageFileValidator>>(),
+                    sp.GetRequiredService<IFileSystem>(),
+                    sp.GetRequiredService<ImageContentInspector>()
+                ));
+            
+            builder.Services.AddScoped<PdfFileValidator>(sp => 
+                new PdfFileValidator(
+                    sp.GetRequiredService<IOptions<FileUploadOptions>>(),
+                    sp.GetRequiredService<ILogger<PdfFileValidator>>(),
+                    sp.GetRequiredService<IFileSystem>(),
+                    sp.GetRequiredService<PdfContentInspector>()
+                ));
+                
+            // Register concrete validators as IFileValidator
+            builder.Services.AddScoped<IFileValidator>(sp => sp.GetRequiredService<ImageFileValidator>());
+            builder.Services.AddScoped<IFileValidator>(sp => sp.GetRequiredService<PdfFileValidator>());
+            
+            // Register factory and orchestrator using factory methods
+            builder.Services.AddScoped<IFileValidatorFactory>(sp => 
+                new ActioNator.Services.FileValidatorFactory(
+                    sp.GetServices<IFileValidator>().ToList(),
+                    sp.GetRequiredService<ILogger<ActioNator.Services.FileValidatorFactory>>()
+                ));
+                
+            builder.Services.AddScoped<IFileValidationOrchestrator>(sp => 
+                new ActioNator.Services.FileValidationOrchestrator(
+                    sp.GetRequiredService<IFileValidatorFactory>(),
+                    sp.GetRequiredService<IOptions<FileUploadOptions>>(),
+                    sp.GetRequiredService<ILogger<ActioNator.Services.FileValidationOrchestrator>>()
+                ));
+            
+            // Register services
+            builder.Services.AddScoped<IFileStorageService, FileStorageService>();
+            builder.Services.AddScoped<ICoachDocumentUploadService, CoachDocumentUploadService>();
 
             builder.Services
                 .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
@@ -64,6 +122,9 @@ namespace ActioNator
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
+            
+            // Register custom exception middleware
+            app.UseFileUploadExceptionHandler();
 
             app.UseRouting();
 

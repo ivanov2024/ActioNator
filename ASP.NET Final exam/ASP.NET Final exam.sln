@@ -13,6 +13,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActioNator.GCommon", "Actio
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActioNator.Data", "ActioNator.Data\ActioNator.Data.csproj", "{3BA4F808-023E-4EE8-950C-67C106154044}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Services", "Services", "{557CA099-CFF8-47B1-A328-8C5D60423573}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ActioNator.Services", "ActioNator.Services\ActioNator.Services.csproj", "{FDF2AB45-AD53-490A-90AF-CD5AADD8C877}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +39,10 @@ Global
 		{3BA4F808-023E-4EE8-950C-67C106154044}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{3BA4F808-023E-4EE8-950C-67C106154044}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{3BA4F808-023E-4EE8-950C-67C106154044}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FDF2AB45-AD53-490A-90AF-CD5AADD8C877}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FDF2AB45-AD53-490A-90AF-CD5AADD8C877}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FDF2AB45-AD53-490A-90AF-CD5AADD8C877}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FDF2AB45-AD53-490A-90AF-CD5AADD8C877}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -42,6 +50,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{DA8C4695-CFC8-4A48-905E-505CAB5CED20} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{3BA4F808-023E-4EE8-950C-67C106154044} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
+		{FDF2AB45-AD53-490A-90AF-CD5AADD8C877} = {557CA099-CFF8-47B1-A328-8C5D60423573}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A033CDFE-4051-497C-9AC6-2B79977959B2}
