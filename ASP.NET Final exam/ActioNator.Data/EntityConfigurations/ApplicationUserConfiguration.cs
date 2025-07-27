@@ -18,7 +18,7 @@ namespace ActioNator.Data.EntityConfigurations
 
             applicationUser
                 .Property(au => au.ProfilePictureUrl)
-                .IsRequired(false);
+                .HasDefaultValue("https://static.vecteezy.com/system/resources/thumbnails/020/765/399/small_2x/default-profile-account-unknown-icon-black-silhouette-free-vector.jpg");
 
             applicationUser
                 .Property(au => au.IsDeleted)

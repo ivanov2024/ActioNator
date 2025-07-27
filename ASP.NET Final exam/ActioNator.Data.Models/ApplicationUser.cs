@@ -25,7 +25,8 @@ namespace ActioNator.Data.Models
 
         public string? CoachDegreeFilePath { get; set; }
 
-        public string? ProfilePictureUrl { get; set; }
+        [Required]
+        public string ProfilePictureUrl { get; set; } = null!;
 
         public DateTime RegisteredAt { get; set; }
 
