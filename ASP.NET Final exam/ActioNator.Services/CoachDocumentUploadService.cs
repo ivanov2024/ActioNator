@@ -130,16 +130,19 @@ namespace ActioNator.Services
                 // Save files
                 // Combine base path with coach-verifications subfolder
                 string uploadDir = _fileSystem.CombinePaths(_options.BasePath, "coach-verifications");
-                var savedFilePaths = await _fileStorageService.SaveFilesAsync(files, uploadDir, userId, cancellationToken);
-                
+                IEnumerable<string> savedFilePaths 
+                    = await _fileStorageService.SaveFilesAsync(files, uploadDir, userId, cancellationToken);
+
                 // Create response with file details
-                var uploadedFiles = new List<UploadedFileInfo>();
+                List<UploadedFileInfoModel> uploadedFiles 
+                    = new ();
+
                 for (int i = 0; i < files.Count; i++)
                 {
                     var file = files[i];
                     var path = i < savedFilePaths.Count() ? savedFilePaths.ElementAt(i) : "unknown";
                     
-                    uploadedFiles.Add(new UploadedFileInfo
+                    uploadedFiles.Add(new UploadedFileInfoModel
                     {
                         OriginalFileName = file.FileName,
                         StoredFileName = _fileSystem.GetFileName(path),

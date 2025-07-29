@@ -8,8 +8,8 @@ namespace ActioNator.Services.Models
         /// <summary>
         /// List of uploaded file paths
         /// </summary>
-        public List<UploadedFileInfo> Files { get; set; } 
-            = new List<UploadedFileInfo>();
+        public List<UploadedFileInfoModel> Files { get; set; } 
+            = new List<UploadedFileInfoModel>();
         
         /// <summary>
         /// Error details if the operation failed
@@ -22,13 +22,13 @@ namespace ActioNator.Services.Models
         /// <param name="message">Success message</param>
         /// <param name="files">List of uploaded file information</param>
         /// <returns>FileUploadResponse instance</returns>
-        public static FileUploadResponseModel CreateSuccess(string message, List<UploadedFileInfo> files)
+        public static FileUploadResponseModel CreateSuccess(string message, List<UploadedFileInfoModel> files)
         {
             return new FileUploadResponseModel
             {
                 Success = true,
                 Message = message,
-                Files = files ?? new List<UploadedFileInfo>()
+                Files = files ?? new List<UploadedFileInfoModel>()
             };
         }
         

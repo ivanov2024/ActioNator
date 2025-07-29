@@ -3,7 +3,7 @@
     /// <summary>
     /// Information about an uploaded file
     /// </summary>
-    public class UploadedFileInfo
+    public class UploadedFileInfoModel
     {
         /// <summary>
         /// Original file name
