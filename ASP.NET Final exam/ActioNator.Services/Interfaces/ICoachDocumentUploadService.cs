@@ -1,7 +1,5 @@
 using ActioNator.Services.Models;
 using Microsoft.AspNetCore.Http;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace ActioNator.Services.Interfaces
 {
@@ -17,6 +15,6 @@ namespace ActioNator.Services.Interfaces
         /// <param name="userId">ID of the user uploading the documents</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Result of the upload operation with detailed information</returns>
-        Task<FileUploadResponse> ProcessUploadAsync(IFormFileCollection files, string userId, CancellationToken cancellationToken = default);
+        Task<FileUploadResponseModel> ProcessUploadAsync(IFormFileCollection files, string userId, CancellationToken cancellationToken = default);
     }
 }

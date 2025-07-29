@@ -3,7 +3,7 @@ namespace ActioNator.Services.Models
     /// <summary>
     /// Response model for file upload operations
     /// </summary>
-    public class FileUploadResponse : BaseResponseModel
+    public class FileUploadResponseModel : BaseResponseModel
     {
         /// <summary>
         /// List of uploaded file paths
@@ -22,9 +22,9 @@ namespace ActioNator.Services.Models
         /// <param name="message">Success message</param>
         /// <param name="files">List of uploaded file information</param>
         /// <returns>FileUploadResponse instance</returns>
-        public static FileUploadResponse CreateSuccess(string message, List<UploadedFileInfo> files)
+        public static FileUploadResponseModel CreateSuccess(string message, List<UploadedFileInfo> files)
         {
-            return new FileUploadResponse
+            return new FileUploadResponseModel
             {
                 Success = true,
                 Message = message,
@@ -38,9 +38,9 @@ namespace ActioNator.Services.Models
         /// <param name="message">Error message</param>
         /// <param name="errorDetails">Detailed error information</param>
         /// <returns>FileUploadResponse instance</returns>
-        public static FileUploadResponse CreateFailure(string message, ErrorDetailsModel? errorDetails = null)
+        public static FileUploadResponseModel CreateFailure(string message, ErrorDetailsModel? errorDetails = null)
         {
-            return new FileUploadResponse
+            return new FileUploadResponseModel
             {
                 Success = false,
                 Message = message,

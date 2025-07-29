@@ -55,7 +55,7 @@ namespace ActioNator.Services
         /// <param name="userId">ID of the user uploading the documents</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Result of the upload operation with detailed information</returns>
-        public async Task<FileUploadResponse> ProcessUploadAsync(
+        public async Task<FileUploadResponseModel> ProcessUploadAsync(
             IFormFileCollection files, 
             string userId, 
             CancellationToken cancellationToken = default)
@@ -67,7 +67,7 @@ namespace ActioNator.Services
                 if (string.IsNullOrEmpty(userId))
                 {
                     _logger.LogWarning("User identification failed for file upload");
-                    return FileUploadResponse.CreateFailure("User identification failed.");
+                    return FileUploadResponseModel.CreateFailure("User identification failed.");
                 }
 
                 // Check total file size
@@ -77,7 +77,7 @@ namespace ActioNator.Services
                     _logger.LogWarning("Total file size {Size} bytes exceeds the maximum limit of {MaxSize} bytes for user {UserId}", 
                         totalSize, _options.MaxFileSize, userId);
                     
-                    return FileUploadResponse.CreateFailure(
+                    return FileUploadResponseModel.CreateFailure(
                         $"Total file size exceeds the maximum limit of {_options.MaxFileSize / (1024 * 1024)}MB.",
                         new ErrorDetailsModel   
                         {
@@ -104,7 +104,7 @@ namespace ActioNator.Services
                     {
                         _logger.LogWarning("File validation failed: {ErrorMessage}", validationResult.ErrorMessage);
                         
-                        return FileUploadResponse.CreateFailure(
+                        return FileUploadResponseModel.CreateFailure(
                             $"File validation failed: {validationResult.ErrorMessage}",
                             new ErrorDetailsModel
                             {
@@ -122,7 +122,7 @@ namespace ActioNator.Services
                 catch (FileValidationException ex)
                 {
                     _logger.LogWarning(ex, "File validation error for user {UserId}: {Message}", userId, ex.Message);
-                    return FileUploadResponse.CreateFailure(
+                    return FileUploadResponseModel.CreateFailure(
                         $"File validation error: {ex.Message}",
                         ErrorDetailsModel.FromException(ex));
                 }
@@ -151,35 +151,35 @@ namespace ActioNator.Services
                 
                 _logger.LogInformation("Successfully processed {Count} files for user {UserId}", files.Count, userId);
                 
-                return FileUploadResponse.CreateSuccess(
+                return FileUploadResponseModel.CreateSuccess(
                     $"Successfully uploaded {files.Count} files.", 
                     uploadedFiles);
             }
             catch (OperationCanceledException)
             {
                 _logger.LogWarning("File upload operation was cancelled for user {UserId}", userId);
-                return FileUploadResponse.CreateFailure(
+                return FileUploadResponseModel.CreateFailure(
                     "The operation was cancelled.",
                     new ErrorDetailsModel { ErrorType = "OperationCancelled", ErrorMessage = "The operation was cancelled." });
             }
             catch (FileValidationException ex)
             {
                 _logger.LogWarning(ex, "File validation error for user {UserId}: {Message}", userId, ex.Message);
-                return FileUploadResponse.CreateFailure(
+                return FileUploadResponseModel.CreateFailure(
                     $"File validation error: {ex.Message}",
                     ErrorDetailsModel.FromException(ex));
             }
             catch (FileStorageException ex)
             {
                 _logger.LogError(ex, "File storage error for user {UserId}: {Message}", userId, ex.Message);
-                return FileUploadResponse.CreateFailure(
+                return FileUploadResponseModel.CreateFailure(
                     $"File storage error: {ex.Message}",
                     ErrorDetailsModel.FromException(ex));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error processing files for user {UserId}", userId);
-                return FileUploadResponse.CreateFailure(
+                return FileUploadResponseModel.CreateFailure(
                     "An unexpected error occurred while processing your request.",
                     ErrorDetailsModel.FromException(ex));
             }

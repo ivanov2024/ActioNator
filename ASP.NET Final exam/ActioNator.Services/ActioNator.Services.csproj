@@ -11,6 +11,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Models\FileUploadResponseModel.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ActioNator.GCommon\ActioNator.GCommon.csproj" />
   </ItemGroup>
 
