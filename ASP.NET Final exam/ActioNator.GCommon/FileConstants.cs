@@ -54,6 +54,27 @@ namespace ActioNator.GCommon
         }
         
         /// <summary>
+        /// Potentially dangerous file extensions that should be blocked
+        /// </summary>
+        public static class DangerousExtensions
+        {
+            public const string Exe = ".exe";
+            public const string Dll = ".dll";
+            public const string Bat = ".bat";
+            public const string Cmd = ".cmd";
+            public const string Com = ".com";
+            public const string Js = ".js";
+            public const string Vbs = ".vbs";
+            public const string Ps1 = ".ps1";
+            public const string Sh = ".sh";
+            public const string Php = ".php";
+            public const string Asp = ".asp";
+            public const string Aspx = ".aspx";
+            public const string Html = ".html";
+            public const string Htm = ".htm";
+        }
+        
+        /// <summary>
         /// Magic numbers for file content type detection
         /// </summary>
         public static class FileSignatures
