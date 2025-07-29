@@ -6,12 +6,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace ActioNator.Services
 {
@@ -78,38 +72,45 @@ namespace ActioNator.Services
             try
             {
                 // Create user-specific directory if it doesn't exist
-                string userBasedPath = _fileSystem.CombinePaths(relativePath, userId);
+                string userBasedPath 
+                    = _fileSystem.CombinePaths(relativePath, userId);
                 string uploadDir = _fileSystem.CombinePaths(_webHostEnvironment.ContentRootPath, userBasedPath);
                 
                 // Ensure the directory exists
                 _fileSystem.CreateDirectory(uploadDir);
                 
-                _logger.LogInformation("Saving {Count} files to {Path} for user {UserId}", 
+                _logger
+                    .LogInformation("Saving {Count} files to {Path} for user {UserId}", 
                     files.Count, userBasedPath, userId);
 
-                var savedFilePaths = new List<string>();
+                List<string> savedFilePaths = new();
 
                 // Save files
-                foreach (var file in files)
+                foreach (IFormFile file in files)
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    cancellationToken
+                        .ThrowIfCancellationRequested();
                     
                     // Generate safe filename with timestamp and random component to avoid collisions
-                    string safeFileName = GetSafeFileName(file.FileName);
-                    string filePath = _fileSystem.CombinePaths(uploadDir, safeFileName);
+                    string safeFileName 
+                        = GetSafeFileName(file.FileName);
+                    string filePath 
+                        = _fileSystem.CombinePaths(uploadDir, safeFileName);
                     
                     // Save file
-                    using (var stream = _fileSystem.Create(filePath))
+                    using (Stream stream = _fileSystem.Create(filePath))
                     {
                         await file.CopyToAsync(stream, cancellationToken);
                     }
 
                     // Store the relative path for return
-                    string relativeSavedPath = _fileSystem.CombinePaths(userBasedPath, safeFileName);
+                    string relativeSavedPath 
+                        = _fileSystem.CombinePaths(userBasedPath, safeFileName);
                     savedFilePaths.Add(relativeSavedPath);
                 }
 
-                _logger.LogInformation("Successfully saved {Count} files for user {UserId}", 
+                _logger
+                    .LogInformation("Successfully saved {Count} files for user {UserId}", 
                     savedFilePaths.Count, userId);
                     
                 return savedFilePaths;
@@ -121,7 +122,8 @@ namespace ActioNator.Services
             }
             catch (Exception ex) when (ex is not FileStorageException)
             {
-                _logger.LogError(ex, "Error saving files to {Path} for user {UserId}", relativePath, userId);
+                _logger
+                    .LogError(ex, "Error saving files to {Path} for user {UserId}", relativePath, userId);
                 throw new FileStorageException("Failed to save files", ex);
             }
         }
@@ -146,8 +148,10 @@ namespace ActioNator.Services
             }
             
             // Add timestamp and random component to prevent collisions
-            string timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-            string randomComponent = Guid.NewGuid().ToString().Substring(0, 8);
+            string timestamp 
+                = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+            string randomComponent 
+                = Guid.NewGuid().ToString().Substring(0, 8);
             
             return $"{safeFileName}_{timestamp}_{randomComponent}{extension}";
         }
@@ -164,10 +168,12 @@ namespace ActioNator.Services
                 
             // Replace invalid characters with underscores
             char[] invalidChars = Path.GetInvalidFileNameChars();
-            string sanitized = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
+            string sanitized 
+                = string.Join("_", fileName.Split(invalidChars, StringSplitOptions.RemoveEmptyEntries));
             
             // Remove potentially dangerous patterns (e.g., ../, .\, etc.)
-            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"(\.\.[\\/])|(\.[\\/])", "_");
+            sanitized 
+                = System.Text.RegularExpressions.Regex.Replace(sanitized, @"(\.\.[\\/])|(\.[\\/])", "_");
             
             // Limit length
             if (sanitized.Length > 50)
@@ -202,24 +208,29 @@ namespace ActioNator.Services
             bool isAuthorized = await IsUserAuthorizedForFileAsync(filePath, userId);
             if (!isAuthorized)
             {
-                _logger.LogWarning("User {UserId} attempted unauthorized access to file {FilePath}", userId, filePath);
+                _logger
+                    .LogWarning("User {UserId} attempted unauthorized access to file {FilePath}", userId, filePath);
                 throw new UnauthorizedAccessException("You are not authorized to access this file");
             }
             
             try
             {
                 // Get the full path
-                string fullPath = _fileSystem.CombinePaths(_webHostEnvironment.ContentRootPath, filePath);
+                string fullPath = _fileSystem
+                    .CombinePaths(_webHostEnvironment.ContentRootPath, filePath);
                 
                 // Check if file exists
                 if (!_fileSystem.FileExists(fullPath))
                 {
-                    _logger.LogWarning("File {FilePath} not found", fullPath);
+                    _logger
+                        .LogWarning("File {FilePath} not found", fullPath);
                     throw new FileNotFoundException(FileConstants.ErrorMessages.FileNotFound, fullPath);
                 }
                 
                 // Determine content type based on extension
-                string extension = _fileSystem.GetExtension(fullPath).ToLowerInvariant();
+                string extension = _fileSystem
+                    .GetExtension(fullPath).ToLowerInvariant();
+
                 string contentType = extension switch
                 {
                     FileConstants.FileExtensions.Pdf => FileConstants.ContentTypes.Pdf,
@@ -231,13 +242,14 @@ namespace ActioNator.Services
                 };
                 
                 // Open file stream
-                var fileStream = _fileSystem.OpenRead(fullPath);
+                Stream fileStream = _fileSystem.OpenRead(fullPath);
                 
                 return (fileStream, contentType);
             }
             catch (Exception ex) when (ex is not UnauthorizedAccessException && ex is not FileNotFoundException)
             {
-                _logger.LogError(ex, "Error retrieving file {FilePath} for user {UserId}", filePath, userId);
+                _logger
+                    .LogError(ex, "Error retrieving file {FilePath} for user {UserId}", filePath, userId);
                 throw new FileStorageException("Failed to retrieve file", ex);
             }
         }
@@ -259,19 +271,24 @@ namespace ActioNator.Services
             {
                 // Check if the file path contains the user's ID folder
                 // This ensures users can only access their own files
-                string userFolder = Path.DirectorySeparatorChar + userId + Path.DirectorySeparatorChar;
-                bool isAuthorized = filePath.Contains(userFolder, StringComparison.OrdinalIgnoreCase);
+                string userFolder 
+                    = Path.DirectorySeparatorChar + userId + Path.DirectorySeparatorChar;
+
+                bool isAuthorized 
+                    = filePath.Contains(userFolder, StringComparison.OrdinalIgnoreCase);
                 
                 if (!isAuthorized)
                 {
-                    _logger.LogWarning("User {UserId} is not authorized to access {FilePath}", userId, filePath);
+                    _logger
+                        .LogWarning("User {UserId} is not authorized to access {FilePath}", userId, filePath);
                 }
                 
                 return Task.FromResult(isAuthorized);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error checking authorization for file {FilePath} and user {UserId}", filePath, userId);
+                _logger
+                    .LogError(ex, "Error checking authorization for file {FilePath} and user {UserId}", filePath, userId);
                 return Task.FromResult(false);
             }
         }
