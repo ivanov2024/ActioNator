@@ -1,13 +1,7 @@
-using ActioNator.GCommon;
 using ActioNator.Services.Interfaces;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using ActioNator.GCommon;
 
 namespace ActioNator.Services.ContentInspectors
 {
@@ -33,14 +27,20 @@ namespace ActioNator.Services.ContentInspectors
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             
             // Initialize signature map for different image formats
-            _signatureMap = new Dictionary<string, byte[][]>(StringComparer.OrdinalIgnoreCase)
+            _signatureMap 
+                = new (StringComparer.OrdinalIgnoreCase)
             {
                 { FileConstants.ContentTypes.Jpeg, new[] { FileConstants.FileSignatures.Jpeg } },
                 { FileConstants.ContentTypes.Png, new[] { FileConstants.FileSignatures.Png } },
-                { FileConstants.ContentTypes.Gif, new[] { FileConstants.FileSignatures.Gif87a, FileConstants.FileSignatures.Gif89a } },
+
+                { FileConstants.ContentTypes.Gif, new[] 
+                { FileConstants.FileSignatures.Gif87a, FileConstants.FileSignatures.Gif89a } },
+
                 { FileConstants.ContentTypes.Webp, new[] { FileConstants.FileSignatures.WebP } },
                 { FileConstants.ContentTypes.Bmp, new[] { FileConstants.FileSignatures.Bmp } },
-                { FileConstants.ContentTypes.Tiff, new[] { FileConstants.FileSignatures.TiffI, FileConstants.FileSignatures.TiffM } }
+
+                { FileConstants.ContentTypes.Tiff, new[] 
+                { FileConstants.FileSignatures.TiffI, FileConstants.FileSignatures.TiffM } }
             };
         }
         
@@ -54,21 +54,27 @@ namespace ActioNator.Services.ContentInspectors
         {
             if (file == null)
             {
-                _logger.LogWarning("Cannot inspect null file");
+                _logger
+                    .LogWarning("Cannot inspect null file");
                 return false;
             }
             
             try
             {
-                using var stream = file.OpenReadStream();
+                using Stream stream = file.OpenReadStream();
                 
                 // Get the declared content type
-                string contentType = file.ContentType.ToLowerInvariant();
+                string contentType 
+                    = file
+                    .ContentType
+                    .ToLowerInvariant();
                 
                 // Get the appropriate signatures to check
-                if (!_signatureMap.TryGetValue(contentType, out var signatures))
+                if (!_signatureMap
+                    .TryGetValue(contentType, out byte[][]? signatures))
                 {
-                    _logger.LogWarning("No signature defined for content type {ContentType}", contentType);
+                    _logger
+                        .LogWarning("No signature defined for content type {ContentType}", contentType);
                     return false;
                 }
                 
@@ -77,14 +83,18 @@ namespace ActioNator.Services.ContentInspectors
                 byte[] header = new byte[maxSignatureLength];
                 
                 // Read the header
-                await stream.ReadAsync(header, 0, maxSignatureLength, cancellationToken);
+                await stream
+                    .ReadAsync(header, 0, maxSignatureLength, cancellationToken);
                 
                 // Check if the header matches any of the signatures
-                bool isValidHeader = signatures.Any(signature => ByteArrayStartsWith(header, signature));
+                bool isValidHeader 
+                    = signatures
+                    .Any(signature => ByteArrayStartsWith(header, signature));
                 
                 if (!isValidHeader)
                 {
-                    _logger.LogWarning("File {FileName} has invalid image header for content type {ContentType}", 
+                    _logger
+                        .LogWarning("File {FileName} has invalid image header for content type {ContentType}", 
                         file.FileName, contentType);
                     return false;
                 }
@@ -93,7 +103,8 @@ namespace ActioNator.Services.ContentInspectors
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error inspecting image content for file {FileName}", file.FileName);
+                _logger
+                    .LogError(ex, "Error inspecting image content for file {FileName}", file.FileName);
                 return false;
             }
         }
@@ -110,21 +121,20 @@ namespace ActioNator.Services.ContentInspectors
                 
             contentType = contentType.ToLowerInvariant();
             
-            // Check if it's a specific image type we support
-            if (_signatureMap.ContainsKey(contentType))
-                return true;
-                
-            // Check if it's a generic image type
-            return contentType.StartsWith("image/");
+            // Check if it's a specific image type we support 
+            // or if it's a generic image type
+            return _signatureMap.ContainsKey(contentType) || 
+            contentType.StartsWith("image/");
         }
-        
+
+        #region Private Helper Method
         /// <summary>
         /// Checks if a byte array starts with a specific signature
         /// </summary>
         /// <param name="array">The array to check</param>
         /// <param name="signature">The signature to look for</param>
         /// <returns>True if the array starts with the signature, false otherwise</returns>
-        private bool ByteArrayStartsWith(byte[] array, byte[] signature)
+        private static bool ByteArrayStartsWith(byte[] array, byte[] signature)
         {
             if (array.Length < signature.Length)
                 return false;
@@ -137,5 +147,7 @@ namespace ActioNator.Services.ContentInspectors
             
             return true;
         }
+
+        #endregion
     }
 }

@@ -79,6 +79,7 @@ namespace ActioNator.Services.Validators
             }
         }
 
+        #region Private Helper Method
         /// <summary>
         /// Verifies that the file content is a valid PDF
         /// </summary>
@@ -115,5 +116,7 @@ namespace ActioNator.Services.Validators
                 throw new FileValidationException(errorMessage, ex);
             }
         }
+
+        #endregion
     }
 }
