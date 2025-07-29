@@ -1,14 +1,8 @@
 using ActioNator.Services.Interfaces;
-using ActioNator.Services.Models;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using RecipeSharingPlatform.Web.Controllers;
-using System;
 using System.Security.Claims;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace ActioNator.Areas.User.Controllers
 {
@@ -62,8 +56,7 @@ namespace ActioNator.Areas.User.Controllers
         {
             try
             {
-                // Get user ID from claims
-                string? userId = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                string userId = this.GetUserId()!;
                 
                 if (string.IsNullOrEmpty(userId))
                 {
@@ -92,7 +85,9 @@ namespace ActioNator.Areas.User.Controllers
                 }
                 
                 // Process the upload using the service
-                var result = await _documentUploadService.ProcessUploadAsync(files, userId, cancellationToken);
+                var result 
+                    = await _documentUploadService
+                    .ProcessUploadAsync(files, userId, cancellationToken);
                 
                 // Return appropriate response based on the result
                 if (result.Success)
@@ -124,7 +119,7 @@ namespace ActioNator.Areas.User.Controllers
                     // Add additional details if available
                     if (result.Error?.AdditionalInfo != null)
                     {
-                        foreach (var info in result.Error.AdditionalInfo)
+                        foreach (KeyValuePair<string,object> info in result.Error.AdditionalInfo)
                         {
                             problemDetails.Extensions[info.Key] = info.Value;
                         }

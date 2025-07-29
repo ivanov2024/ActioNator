@@ -64,13 +64,6 @@ namespace ActioNator.Services
             
             try
             {
-                // Validate inputs
-                if (files == null || !files.Any())
-                {
-                    _logger.LogWarning("No files were uploaded by user {UserId}", userId);
-                    return FileUploadResponse.CreateFailure(FileConstants.ErrorMessages.NoFilesUploaded);
-                }
-
                 if (string.IsNullOrEmpty(userId))
                 {
                     _logger.LogWarning("User identification failed for file upload");
