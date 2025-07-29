@@ -1,9 +1,9 @@
-using ActioNator.Services.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using ActioNator.Services.ContentInspectors;
+using Microsoft.Extensions.Configuration;
+using ActioNator.Services.Configuration;
 using ActioNator.Services.Interfaces;
 using ActioNator.Services.Validators;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 
 namespace ActioNator.Services.Extensions
 {
@@ -21,30 +21,43 @@ namespace ActioNator.Services.Extensions
         public static IServiceCollection AddFileUploadServices(this IServiceCollection services, IConfiguration configuration)
         {
             // Register configuration options
-            services.Configure<FileUploadOptions>(configuration.GetSection("FileUpload"));
+            services
+                .Configure<FileUploadOptions>
+                (configuration.GetSection("FileUpload"));
 
             // Register file system abstraction
-            services.AddSingleton<IFileSystem, FileSystemService>();
+            services
+                .AddSingleton<IFileSystem, FileSystemService>();
 
             // Register content inspectors
-            services.AddSingleton<IFileContentInspector, ImageContentInspector>();
-            services.AddSingleton<IFileContentInspector, PdfContentInspector>();
+            services
+                .AddSingleton<IFileContentInspector, ImageContentInspector>();
+            services
+                .AddSingleton<IFileContentInspector, PdfContentInspector>();
 
             // Register validators
-            services.AddSingleton<ImageFileValidator>();
-            services.AddSingleton<PdfFileValidator>();
-            services.AddSingleton<IFileValidator, ImageFileValidator>();
-            services.AddSingleton<IFileValidator, PdfFileValidator>();
+            services
+                .AddSingleton<ImageFileValidator>();
+            services
+                .AddSingleton<PdfFileValidator>();
+            services
+                .AddSingleton<IFileValidator, ImageFileValidator>();
+            services
+                .AddSingleton<IFileValidator, PdfFileValidator>();
 
             // Register factory and orchestrator
-            services.AddSingleton<IFileValidatorFactory, FileValidatorFactory>();
-            services.AddSingleton<IFileValidationOrchestrator, FileValidationOrchestrator>();
+            services
+                .AddSingleton<IFileValidatorFactory, FileValidatorFactory>();
+            services
+                .AddSingleton<IFileValidationOrchestrator, FileValidationOrchestrator>();
 
             // Register storage service
-            services.AddSingleton<IFileStorageService, FileStorageService>();
+            services
+                .AddSingleton<IFileStorageService, FileStorageService>();
 
             // Register coach document upload service
-            services.AddScoped<ICoachDocumentUploadService, CoachDocumentUploadService>();
+            services
+                .AddScoped<ICoachDocumentUploadService, CoachDocumentUploadService>();
 
             return services;
         }
