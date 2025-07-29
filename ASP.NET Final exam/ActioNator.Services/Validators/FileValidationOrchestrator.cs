@@ -135,7 +135,7 @@ namespace ActioNator.Services.Validators
             catch (FileValidationException ex)
             {
                 _logger.LogWarning(ex, "File validation exception: {Message}", ex.Message);
-                return FileValidationResult.Failure(ex.Message, ErrorDetails.FromException(ex).AdditionalInfo);
+                return FileValidationResult.Failure(ex.Message, ErrorDetailsModel.FromException(ex).AdditionalInfo);
             }
             catch (Exception ex)
             {
@@ -218,7 +218,7 @@ namespace ActioNator.Services.Validators
             catch (FileValidationException ex)
             {
                 _logger.LogWarning(ex, "File validation exception: {Message}", ex.Message);
-                return FileValidationResult.Failure(ex.Message, ErrorDetails.FromException(ex).AdditionalInfo);
+                return FileValidationResult.Failure(ex.Message, ErrorDetailsModel.FromException(ex).AdditionalInfo);
             }
             catch (Exception ex)
             {

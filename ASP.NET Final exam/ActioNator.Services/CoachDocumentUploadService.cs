@@ -79,7 +79,7 @@ namespace ActioNator.Services
                     
                     return FileUploadResponse.CreateFailure(
                         $"Total file size exceeds the maximum limit of {_options.MaxFileSize / (1024 * 1024)}MB.",
-                        new ErrorDetails
+                        new ErrorDetailsModel   
                         {
                             ErrorType = "FileSizeExceeded",
                             ErrorMessage = "The total size of all files exceeds the allowed limit",
@@ -106,7 +106,7 @@ namespace ActioNator.Services
                         
                         return FileUploadResponse.CreateFailure(
                             $"File validation failed: {validationResult.ErrorMessage}",
-                            new ErrorDetails
+                            new ErrorDetailsModel
                             {
                                 ErrorType = "FileValidationFailed",
                                 ErrorMessage = validationResult.ErrorMessage,
@@ -124,7 +124,7 @@ namespace ActioNator.Services
                     _logger.LogWarning(ex, "File validation error for user {UserId}: {Message}", userId, ex.Message);
                     return FileUploadResponse.CreateFailure(
                         $"File validation error: {ex.Message}",
-                        ErrorDetails.FromException(ex));
+                        ErrorDetailsModel.FromException(ex));
                 }
 
                 // Save files
@@ -160,28 +160,28 @@ namespace ActioNator.Services
                 _logger.LogWarning("File upload operation was cancelled for user {UserId}", userId);
                 return FileUploadResponse.CreateFailure(
                     "The operation was cancelled.",
-                    new ErrorDetails { ErrorType = "OperationCancelled", ErrorMessage = "The operation was cancelled." });
+                    new ErrorDetailsModel { ErrorType = "OperationCancelled", ErrorMessage = "The operation was cancelled." });
             }
             catch (FileValidationException ex)
             {
                 _logger.LogWarning(ex, "File validation error for user {UserId}: {Message}", userId, ex.Message);
                 return FileUploadResponse.CreateFailure(
                     $"File validation error: {ex.Message}",
-                    ErrorDetails.FromException(ex));
+                    ErrorDetailsModel.FromException(ex));
             }
             catch (FileStorageException ex)
             {
                 _logger.LogError(ex, "File storage error for user {UserId}: {Message}", userId, ex.Message);
                 return FileUploadResponse.CreateFailure(
                     $"File storage error: {ex.Message}",
-                    ErrorDetails.FromException(ex));
+                    ErrorDetailsModel.FromException(ex));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Unexpected error processing files for user {UserId}", userId);
                 return FileUploadResponse.CreateFailure(
                     "An unexpected error occurred while processing your request.",
-                    ErrorDetails.FromException(ex));
+                    ErrorDetailsModel.FromException(ex));
             }
         }
     }
