@@ -1,9 +1,6 @@
-using ActioNator.GCommon;
+using Microsoft.Extensions.DependencyInjection;
 using ActioNator.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Linq;
 
 namespace ActioNator.Services.Validators
 {
@@ -39,17 +36,16 @@ namespace ActioNator.Services.Validators
             contentType = contentType.ToLowerInvariant();
 
             // Get all registered validators
-            var validators = _serviceProvider.GetServices<IFileValidator>();
+            IEnumerable<IFileValidator> validators 
+                = _serviceProvider.GetServices<IFileValidator>();
 
             // Find the first validator that can handle this content type
-            var validator = validators.FirstOrDefault(v => v.CanHandleFileType(contentType));
+            IFileValidator? validator 
+                = validators
+                .FirstOrDefault(v => v.CanHandleFileType(contentType));
 
-            if (validator == null)
-            {
+            return validator ?? 
                 throw new InvalidOperationException($"No validator found for content type: {contentType}");
-            }
-
-            return validator;
         }
 
         /// <summary>
@@ -59,13 +55,8 @@ namespace ActioNator.Services.Validators
         /// <returns>File validator that can handle the file</returns>
         /// <exception cref="InvalidOperationException">Thrown when no validator is found for the file</exception>
         public IFileValidator GetValidatorForFile(IFormFile file)
-        {
-            if (file == null)
-            {
-                throw new ArgumentNullException(nameof(file));
-            }
-
-            return GetValidatorForContentType(file.ContentType);
-        }
+            => file == null 
+                ? throw new ArgumentNullException(nameof(file)) 
+                : GetValidatorForContentType(file.ContentType);        
     }
 }
