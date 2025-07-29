@@ -1,10 +1,7 @@
 using ActioNator.Services.Exceptions;
 using ActioNator.Services.Interfaces;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
+using Microsoft.AspNetCore.Http;
 
 namespace ActioNator.Services
 {
@@ -38,14 +35,18 @@ namespace ActioNator.Services
         {
             if (string.IsNullOrEmpty(contentType))
             {
-                throw new ArgumentException("Content type cannot be null or empty", nameof(contentType));
+                throw new ArgumentException
+                    ("Content type cannot be null or empty", nameof(contentType));
             }
             
-            var validator = _validators.FirstOrDefault(v => v.CanHandleFileType(contentType));
+            IFileValidator? validator 
+                = _validators
+                .FirstOrDefault(v => v.CanHandleFileType(contentType));
             
             if (validator == null)
             {
-                _logger.LogWarning("No validator found for content type: {ContentType}", contentType);
+                _logger
+                    .LogWarning("No validator found for content type: {ContentType}", contentType);
                 throw new FileValidationException($"No validator found for content type: {contentType}");
             }
             
@@ -58,13 +59,9 @@ namespace ActioNator.Services
         /// <param name="file">File to get validator for</param>
         /// <returns>File validator that can handle the file</returns>
         public IFileValidator GetValidatorForFile(IFormFile file)
-        {
-            if (file == null)
-            {
-                throw new ArgumentNullException(nameof(file));
-            }
-            
-            return GetValidatorForContentType(file.ContentType);
-        }
+            => file == null 
+                ? throw new ArgumentNullException(nameof(file)) 
+                : GetValidatorForContentType(file.ContentType);
+        
     }
 }
