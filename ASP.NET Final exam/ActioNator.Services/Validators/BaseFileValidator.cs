@@ -1,17 +1,13 @@
-using ActioNator.GCommon;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.Exceptions;
 using ActioNator.Services.Interfaces;
-using Microsoft.AspNetCore.Http;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using ActioNator.GCommon;
+
+using static ActioNator.GCommon.FileConstants.DangerousExtensions;
 
 namespace ActioNator.Services.Validators
 {
@@ -26,10 +22,12 @@ namespace ActioNator.Services.Validators
         protected readonly IFileContentInspector _contentInspector;
         
         // Regex for detecting path traversal attempts
-        private static readonly Regex PathTraversalRegex = new Regex(@"\.{2,}|[/\\]", RegexOptions.Compiled);
+        private static readonly Regex PathTraversalRegex 
+            = new(@"\.{2,}|[/\\]", RegexOptions.Compiled);
         
         // Regex for sanitizing filenames - more comprehensive than the previous version
-        private static readonly Regex FilenameCleanupRegex = new Regex(@"[^\w\.-]|[\\/:*?""<>|]|\.\.", RegexOptions.Compiled);
+        private static readonly Regex FilenameCleanupRegex 
+            = new (@"[^\w\.-]|[\\/:*?""<>|]|\.\.", RegexOptions.Compiled);
 
         /// <summary>
         /// Initializes a new instance of the BaseFileValidator class
@@ -83,7 +81,7 @@ namespace ActioNator.Services.Validators
             }
 
             // Validate file names for security
-            foreach (var file in files)
+            foreach (IFormFile file in files)
             {
                 ValidateFileName(file.FileName);
             }
@@ -104,8 +102,10 @@ namespace ActioNator.Services.Validators
         {
             if (file == null)
             {
-                _logger.LogWarning("Null file provided for validation");
-                return FileValidationResult.Failure(FileConstants.ErrorMessages.NoFilesUploaded);
+                _logger
+                    .LogWarning("Null file provided for validation");
+                return FileValidationResult
+                    .Failure(FileConstants.ErrorMessages.NoFilesUploaded);
             }
             
             // Check file size
@@ -120,7 +120,7 @@ namespace ActioNator.Services.Validators
             ValidateFileName(file.FileName);
             
             // Create a temporary collection with just this file for the file type validation
-            var formFileCollection = new FormFileCollection { file };
+            FormFileCollection formFileCollection = [ file ];
             
             // Perform file type specific validation
             await PerformFileTypeValidationAsync(formFileCollection, cancellationToken);
@@ -140,10 +140,13 @@ namespace ActioNator.Services.Validators
             }
 
             // Check for path traversal attempts
-            if (PathTraversalRegex.IsMatch(Path.GetFileNameWithoutExtension(fileName)))
+            if (PathTraversalRegex
+                .IsMatch(Path.GetFileNameWithoutExtension(fileName)))
             {
-                string errorMessage = $"File name '{fileName}' contains invalid characters that could be used for path traversal.";
-                _logger.LogWarning(errorMessage);
+                string errorMessage 
+                    = $"File name '{fileName}' contains invalid characters that could be used for path traversal.";
+                _logger
+                    .LogWarning(errorMessage);
                 throw new FileNameValidationException(FileConstants.ErrorMessages.InvalidFileName);
             }
 
@@ -151,7 +154,8 @@ namespace ActioNator.Services.Validators
             string extension = Path.GetExtension(fileName).ToLowerInvariant();
             if (IsDangerousExtension(extension))
             {
-                string errorMessage = $"File with extension '{extension}' is not allowed for security reasons.";
+                string errorMessage 
+                    = $"File with extension '{extension}' is not allowed for security reasons.";
                 _logger.LogWarning(errorMessage);
                 throw new FileNameValidationException(FileConstants.ErrorMessages.InvalidFileType);
             }
@@ -165,14 +169,23 @@ namespace ActioNator.Services.Validators
         protected virtual bool IsDangerousExtension(string extension)
         {
             // Common dangerous extensions
-            string[] dangerousExtensions = {
-                ".exe", ".dll", ".bat", ".cmd", ".com", ".msi", ".js",
-                ".vbs", ".ps1", ".psm1", ".psd1", ".ps1xml", ".scf", ".lnk", ".inf",
-                ".reg", ".application", ".gadget", ".msc", ".hta", ".cpl", ".msp",
-                ".scr", ".ins", ".isp", ".pif", ".application", ".appref-ms", ".vbe",
-                ".wsf", ".wsc", ".wsh", ".ps2", ".ps2xml", ".psc1", ".psc2", ".msh",
-                ".msh1", ".msh2", ".mshxml", ".msh1xml", ".msh2xml", ".scpt", ".url"
-            };
+            string[] dangerousExtensions = 
+            [
+                Exe,
+                Dll,
+                Bat,
+                Cmd,
+                Com,
+                Js,
+                Vbs,
+                Ps1,
+                Sh,
+                Php,
+                Asp,
+                Aspx,
+                Html,
+                Htm
+            ];
 
             return dangerousExtensions.Contains(extension);
         }
@@ -190,7 +203,12 @@ namespace ActioNator.Services.Validators
             }
 
             // Remove any potentially dangerous characters
-            string safeName = FilenameCleanupRegex.Replace(_fileSystem.GetFileName(fileName).Replace(_fileSystem.GetExtension(fileName), ""), "_");
+            string safeName 
+                = FilenameCleanupRegex
+                .Replace(_fileSystem.GetFileName(fileName)
+                .Replace(_fileSystem
+                    .GetExtension(fileName), ""), "_");
+
             string extension = _fileSystem.GetExtension(fileName);
 
             // Ensure the filename isn't too long

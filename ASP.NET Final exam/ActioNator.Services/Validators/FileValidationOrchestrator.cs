@@ -1,14 +1,9 @@
-using ActioNator.GCommon;
 using ActioNator.Services.Exceptions;
 using ActioNator.Services.Interfaces;
+using Microsoft.Extensions.Logging;
 using ActioNator.Services.Models;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using ActioNator.GCommon;
 
 namespace ActioNator.Services.Validators
 {
@@ -52,39 +47,31 @@ namespace ActioNator.Services.Validators
             try
             {
                 // Determine file type from the first file
-                var firstFile = files.First();
+                IFormFile? firstFile = files.First();
                 string contentType = firstFile.ContentType.ToLowerInvariant();
 
                 // Get the appropriate validator
-                IFileValidator validator;
-                try
+                FileValidationResult? validatorResult = GetValidatorForContentType(contentType);
+                if (!validatorResult.IsValid)
                 {
-                    validator = _validatorFactory.GetValidatorForContentType(contentType);
+                    return validatorResult;
                 }
-                catch (InvalidOperationException ex)
-                {
-                    _logger.LogWarning(ex, "Unsupported file type: {ContentType}", contentType);
-                    return FileValidationResult.Failure(
-                        $"Unsupported file type: {contentType}. Only images and PDFs are allowed.",
-                        new Dictionary<string, object>
-                        {
-                            { "ContentType", contentType },
-                            { "AllowedTypes", "images, pdf" }
-                        });
-                }
+                
+                IFileValidator validator = (IFileValidator)((Dictionary<string, object>)validatorResult.ValidationMetadata)["validator"];
 
                 // Check if all files are of the same type
-                foreach (var file in files)
+                foreach (IFormFile file in files)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
                     if (!validator.CanHandleFileType(file.ContentType))
                     {
-                        _logger.LogWarning("Mixed file types detected. Expected {ExpectedType} but found {ActualType}",
+                        _logger
+                            .LogWarning("Mixed file types detected. Expected {ExpectedType} but found {ActualType}",
                             contentType, file.ContentType);
 
-                        return FileValidationResult.Failure(
-                            FileConstants.ErrorMessages.MixedFileTypes,
+                        return FileValidationResult
+                            .Failure(FileConstants.ErrorMessages.MixedFileTypes,
                             new Dictionary<string, object>
                             {
                                 { "ExpectedType", contentType },
@@ -94,52 +81,57 @@ namespace ActioNator.Services.Validators
                 }
 
                 // Validate each file
-                foreach (var file in files)
+                foreach (IFormFile file in files)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    _logger.LogInformation("Validating file {FileName} ({FileSize} bytes)",
+                    _logger
+                        .LogInformation("Validating file {FileName} ({FileSize} bytes)",
                         file.FileName, file.Length);
 
-                    var validationResult = await validator.ValidateAsync(file, cancellationToken);
+                    var validationResult 
+                        = await validator.ValidateAsync(file, cancellationToken);
                     if (!validationResult.IsValid)
                     {
-                        _logger.LogWarning("File validation failed for {FileName}: {ErrorMessage}",
+                        _logger
+                            .LogWarning("File validation failed for {FileName}: {ErrorMessage}",
                             file.FileName, validationResult.ErrorMessage);
 
                         // Create new validation result with file information
-                        var metadata = new Dictionary<string, object>
-                        {
-                            { "FileName", file.FileName },
-                            { "FileSize", file.Length }
-                        };
+                        Dictionary<string, object> metadata 
+                            = new()
+                            { 
+                                { "FileName", file.FileName },
+                                { "FileSize", file.Length }
+                            };
                         
-                        // If validation failed, return the failure result
-                        if (!validationResult.IsValid)
-                        {
-                            return FileValidationResult.Failure(validationResult.ErrorMessage, metadata);
-                        }
-
-                        return validationResult;
+                        // Return the failure result with additional metadata
+                        return FileValidationResult
+                            .Failure(validationResult.ErrorMessage, metadata);
                     }
                 }
 
-                _logger.LogInformation("All {Count} files validated successfully", files.Count);
+                _logger
+                    .LogInformation("All {Count} files validated successfully", files.Count);
                 return FileValidationResult.Success();
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation("File validation operation was canceled");
+                _logger
+                    .LogInformation("File validation operation was canceled");
                 throw;
             }
             catch (FileValidationException ex)
             {
-                _logger.LogWarning(ex, "File validation exception: {Message}", ex.Message);
-                return FileValidationResult.Failure(ex.Message, ErrorDetailsModel.FromException(ex).AdditionalInfo);
+                _logger
+                    .LogWarning(ex, "File validation exception: {Message}", ex.Message);
+                return FileValidationResult
+                    .Failure(ex.Message, ErrorDetailsModel.FromException(ex).AdditionalInfo);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during file validation");
+                _logger
+                    .LogError(ex, "Unexpected error during file validation");
                 throw new FileValidationException(FileConstants.ErrorMessages.ValidationFailed, ex);
             }
         }
@@ -156,8 +148,10 @@ namespace ActioNator.Services.Validators
         {
             if (file == null)
             {
-                _logger.LogWarning("No file was provided for validation");
-                return FileValidationResult.Failure(FileConstants.ErrorMessages.NoFilesUploaded);
+                _logger
+                    .LogWarning("No file was provided for validation");
+                return FileValidationResult
+                    .Failure(FileConstants.ErrorMessages.NoFilesUploaded);
             }
 
             try
@@ -165,64 +159,60 @@ namespace ActioNator.Services.Validators
                 string contentType = file.ContentType.ToLowerInvariant();
 
                 // Get the appropriate validator
-                IFileValidator validator;
-                try
+                FileValidationResult? validatorResult = GetValidatorForContentType(contentType);
+                if (!validatorResult.IsValid)
                 {
-                    validator = _validatorFactory.GetValidatorForContentType(contentType);
+                    return validatorResult;
                 }
-                catch (InvalidOperationException ex)
-                {
-                    _logger.LogWarning(ex, "Unsupported file type: {ContentType}", contentType);
-                    return FileValidationResult.Failure(
-                        $"Unsupported file type: {contentType}. Only images and PDFs are allowed.",
-                        new Dictionary<string, object>
-                        {
-                            { "ContentType", contentType },
-                            { "AllowedTypes", "images, pdf" }
-                        });
-                }
+                
+                IFileValidator validator = (IFileValidator)((Dictionary<string, object>)validatorResult.ValidationMetadata)["validator"];
 
-                _logger.LogInformation("Validating file {FileName} ({FileSize} bytes)",
+                _logger
+                    .LogInformation("Validating file {FileName} ({FileSize} bytes)",
                     file.FileName, file.Length);
 
-                var validationResult = await validator.ValidateAsync(file, cancellationToken);
+                FileValidationResult? validationResult 
+                    = await validator.ValidateAsync(file, cancellationToken);
                 if (!validationResult.IsValid)
                 {
-                    _logger.LogWarning("File validation failed for {FileName}: {ErrorMessage}",
+                    _logger
+                        .LogWarning("File validation failed for {FileName}: {ErrorMessage}",
                         file.FileName, validationResult.ErrorMessage);
 
                     // Create new validation result with file information
-                    var metadata = new Dictionary<string, object>
+                    Dictionary<string, object> metadata 
+                        = new ()
                     {
                         { "FileName", file.FileName },
                         { "FileSize", file.Length }
                     };
                     
-                    // If validation failed, return the failure result
-                    if (!validationResult.IsValid)
-                    {
-                        return FileValidationResult.Failure(validationResult.ErrorMessage, metadata);
-                    }
-
-                    return validationResult;
+                    // Return the failure result with additional metadata
+                    return FileValidationResult
+                        .Failure(validationResult.ErrorMessage, metadata);
                 }
 
-                _logger.LogInformation("File {FileName} validated successfully", file.FileName);
+                _logger
+                    .LogInformation("File {FileName} validated successfully", file.FileName);
                 return FileValidationResult.Success();
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation("File validation operation was canceled");
+                _logger
+                    .LogInformation("File validation operation was canceled");
                 throw;
             }
             catch (FileValidationException ex)
             {
-                _logger.LogWarning(ex, "File validation exception: {Message}", ex.Message);
-                return FileValidationResult.Failure(ex.Message, ErrorDetailsModel.FromException(ex).AdditionalInfo);
+                _logger
+                    .LogWarning(ex, "File validation exception: {Message}", ex.Message);
+                return FileValidationResult
+                    .Failure(ex.Message, ErrorDetailsModel.FromException(ex).AdditionalInfo);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during file validation");
+                _logger
+                    .LogError(ex, "Unexpected error during file validation");
                 throw new FileValidationException(FileConstants.ErrorMessages.ValidationFailed, ex);
             }
         }
@@ -244,7 +234,7 @@ namespace ActioNator.Services.Validators
                 return true; // Single file is always of the same type
             }
 
-            var firstFile = files.First();
+            IFormFile firstFile = files.First();
             string firstContentType = firstFile.ContentType.ToLowerInvariant();
 
             // Check if first file is an image or PDF
@@ -252,7 +242,7 @@ namespace ActioNator.Services.Validators
             bool isFirstPdf = firstContentType == FileConstants.ContentTypes.Pdf;
 
             // Check all other files
-            foreach (var file in files.Skip(1))
+            foreach (IFormFile file in files.Skip(1))
             {
                 string contentType = file.ContentType.ToLowerInvariant();
                 bool isImage = contentType.StartsWith("image/");
@@ -267,5 +257,41 @@ namespace ActioNator.Services.Validators
 
             return true;
         }
+
+        #region Private Helper Methods
+        
+        /// <summary>
+        /// Gets the appropriate validator for the specified content type
+        /// </summary>
+        /// <param name="contentType">Content type to get validator for</param>
+        /// <returns>Success result with validator or failure result with error details</returns>
+        private FileValidationResult GetValidatorForContentType(string contentType)
+        {
+            try
+            {
+                IFileValidator validator = _validatorFactory
+                    .GetValidatorForContentType(contentType);
+                    
+                return FileValidationResult.Success(new Dictionary<string, object>
+                {
+                    { "validator", validator }
+                });
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger
+                    .LogWarning(ex, "Unsupported file type: {ContentType}", contentType);
+                    
+                return FileValidationResult
+                    .Failure($"Unsupported file type: {contentType}. Only images and PDFs are allowed.",
+                    new Dictionary<string, object>
+                    {
+                        { "ContentType", contentType },
+                        { "AllowedTypes", "images, pdf" }
+                    });
+            }
+        }
+        
+        #endregion
     }
 }
