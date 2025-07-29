@@ -26,11 +26,13 @@
             },
             
             isImageFile(file) {
-                const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+                // Match the server's allowed image types from FileConstants/appsettings.json
+                const imageTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
                 return imageTypes.includes(file.type);
             },
             
             isPdfFile(file) {
+                // Match the server's allowed PDF type from FileConstants/appsettings.json
                 return file.type === 'application/pdf';
             },
             
@@ -50,7 +52,7 @@
             addFiles(newFiles) {
                 if (newFiles.length === 0) return;
                 
-                // Check file type consistency
+                // Just check for mixed types to provide immediate feedback
                 const hasImages = [...this.files, ...newFiles].some(file => this.isImageFile(file));
                 const hasPdfs = [...this.files, ...newFiles].some(file => this.isPdfFile(file));
                 
@@ -60,15 +62,6 @@
                 }
                 
                 this.fileTypeError = false;
-                
-                // Check total file size
-                const totalSize = [...this.files, ...newFiles].reduce((sum, file) => sum + file.size, 0);
-                const maxSize = 100 * 1024 * 1024; // 100MB
-                
-                if (totalSize > maxSize) {
-                    alert('Total file size exceeds the maximum limit of 100MB');
-                    return;
-                }
                 
                 // Add files to the list
                 this.files = [...this.files, ...newFiles];
@@ -133,15 +126,22 @@
                     body: formData,
                     credentials: 'include'
                 })
-                .then(response => {
+                .then(async response => {
+                    // Parse JSON regardless of status code to get detailed error info
+                    const data = await response.json();
+                    
                     if (!response.ok) {
-                        throw new Error('Network response was not ok');
+                        // Handle structured error response from backend
+                        const errorMessage = data.detail || data.message || 'Server validation failed';
+                        throw new Error(errorMessage);
                     }
-                    return response.json();
+                    
+                    return data;
                 })
                 .then(data => {
                     if (data.success) {
                         this.uploadComplete = true;
+                        this.uploadProgress = 100; // Set progress to 100% when complete
                         setTimeout(() => {
                             this.isSubmitted = true;
                         }, 500);
@@ -152,7 +152,7 @@
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('An error occurred while uploading files. Please try again.');
+                    alert('Upload failed: ' + error.message);
                     this.isUploading = false;
                 });
                 
