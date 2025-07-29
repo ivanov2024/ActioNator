@@ -1,16 +1,11 @@
-using ActioNator.GCommon;
-using ActioNator.Services.Configuration;
 using ActioNator.Services.ContentInspectors;
+using ActioNator.Services.Configuration;
 using ActioNator.Services.Exceptions;
 using ActioNator.Services.Interfaces;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Microsoft.AspNetCore.Http;
+using ActioNator.GCommon;
 
 namespace ActioNator.Services.Validators
 {
@@ -46,9 +41,7 @@ namespace ActioNator.Services.Validators
         /// <param name="contentType">Content type to check</param>
         /// <returns>True if this validator can handle the content type, false otherwise</returns>
         public override bool CanHandleFileType(string contentType)
-        {
-            return _contentInspector.CanHandleContentType(contentType);
-        }
+            => _contentInspector.CanHandleContentType(contentType);
 
         /// <summary>
         /// Performs image-specific validation
@@ -59,29 +52,37 @@ namespace ActioNator.Services.Validators
         protected override async Task PerformFileTypeValidationAsync(IFormFileCollection files, CancellationToken cancellationToken)
         {
             // Check if all files are images
-            foreach (var file in files)
+            foreach (IFormFile file in files)
             {
                 if (!CanHandleFileType(file.ContentType))
                 {
-                    string errorMessage = $"File '{file.FileName}' is not an image. All files must be images in a single upload.";
-                    _logger.LogWarning(errorMessage);
+                    string errorMessage 
+                        = $"File '{file.FileName}' is not an image. All files must be images in a single upload.";
+                    _logger
+                        .LogWarning(errorMessage);
                     throw new FileContentTypeException(errorMessage);
                 }
 
                 // Check if the image type is allowed
                 if (!_allowedMimeTypes.Contains(file.ContentType.ToLowerInvariant()))
                 {
-                    string errorMessage = $"Image type '{file.ContentType}' is not allowed. Allowed types are: {string.Join(", ", _allowedMimeTypes)}";
-                    _logger.LogWarning(errorMessage);
+                    string errorMessage 
+                        = $"Image type '{file.ContentType}' is not allowed. Allowed types are: {string.Join(", ", _allowedMimeTypes)}";
+                    _logger
+                        .LogWarning(errorMessage);
                     throw new FileContentTypeException(errorMessage);
                 }
 
                 // Check file extension
-                string extension = _fileSystem.GetExtension(file.FileName).ToLowerInvariant();
+                string extension 
+                    = _fileSystem.GetExtension(file.FileName).ToLowerInvariant();
+
                 if (!_allowedExtensions.Contains(extension))
                 {
-                    string errorMessage = $"File extension '{extension}' is not allowed for images. Allowed extensions are: {string.Join(", ", _allowedExtensions)}";
-                    _logger.LogWarning(errorMessage);
+                    string errorMessage 
+                        = $"File extension '{extension}' is not allowed for images. Allowed extensions are: {string.Join(", ", _allowedExtensions)}";
+                    _logger
+                        .LogWarning(errorMessage);
                     throw new FileContentTypeException(FileConstants.ErrorMessages.InvalidFileType);
                 }
 
@@ -100,13 +101,17 @@ namespace ActioNator.Services.Validators
         {
             try
             {
-                bool isValid = await _contentInspector.IsValidContentAsync(file, cancellationToken);
+                bool isValid 
+                    = await _contentInspector
+                    .IsValidContentAsync(file, cancellationToken);
                 
                 if (!isValid)
                 {
                     string contentType = file.ContentType.ToLowerInvariant();
-                    string errorMessage = $"File '{file.FileName}' content does not match its claimed type '{contentType}'.";
-                    _logger.LogWarning(errorMessage);
+                    string errorMessage 
+                        = $"File '{file.FileName}' content does not match its claimed type '{contentType}'.";
+                    _logger
+                        .LogWarning(errorMessage);
                     throw new FileContentTypeException(FileConstants.ErrorMessages.ContentTypeMismatch);
                 }
             }
@@ -116,8 +121,10 @@ namespace ActioNator.Services.Validators
             }
             catch (Exception ex)
             {
-                string errorMessage = $"Failed to verify content of file '{file.FileName}'.";
-                _logger.LogError(ex, errorMessage);
+                string errorMessage 
+                    = $"Failed to verify content of file '{file.FileName}'.";
+                _logger
+                    .LogError(ex, errorMessage);
                 throw new FileValidationException(errorMessage, ex);
             }
         }
