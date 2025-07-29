@@ -1,8 +1,4 @@
 using ActioNator.Services.Interfaces;
-using System;
-using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace ActioNator.Services
 {
@@ -59,8 +55,8 @@ namespace ActioNator.Services
         /// <param name="destination">Destination stream</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Task representing the asynchronous operation</returns>
-        public Task CopyToAsync(Stream source, Stream destination, CancellationToken cancellationToken) => 
-            source.CopyToAsync(destination, cancellationToken);
+        public Task CopyToAsync(Stream source, Stream destination, CancellationToken cancellationToken) 
+            => source.CopyToAsync(destination, cancellationToken);
         
         /// <summary>
         /// Gets the file name from a path

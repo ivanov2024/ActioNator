@@ -2,15 +2,9 @@ using ActioNator.GCommon;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.Exceptions;
 using ActioNator.Services.Interfaces;
-using ActioNator.Services.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace ActioNator.Services
 {
@@ -49,10 +43,10 @@ namespace ActioNator.Services
             IFormFileCollection files, 
             CancellationToken cancellationToken = default)
         {
-            if (files == null || !files.Any())
+            // Check if files collection is valid
+            if (IsEmptyFileCollection(files))
             {
-                _logger.LogWarning("No files provided for validation");
-                return FileValidationResult.Failure(FileConstants.ErrorMessages.NoFilesUploaded);
+                return CreateNoFilesResult();
             }
             
             try
@@ -61,41 +55,30 @@ namespace ActioNator.Services
                 long totalSize = files.Sum(f => f.Length);
                 if (totalSize > _options.MaxTotalSize)
                 {
-                    _logger.LogWarning("Total file size {Size} bytes exceeds the maximum limit of {MaxSize} bytes", 
-                        totalSize, _options.MaxTotalSize);
-                    
-                    return FileValidationResult.Failure(
-                        FileConstants.ErrorMessages.TotalSizeExceeded,
-                        new Dictionary<string, object>
-                        {
-                            { "TotalSize", totalSize },
-                            { "MaxAllowedSize", _options.MaxTotalSize }
-                        });
+                    return CreateTotalSizeExceededResult(totalSize);
                 }
                 
                 // Check if all files are of the same type
                 if (!AreAllFilesSameType(files))
                 {
-                    _logger.LogWarning("Files of different types were uploaded");
-                    return FileValidationResult.Failure("All files must be of the same type");
+                    _logger
+                        .LogWarning("Files of different types were uploaded");
+
+                    return FileValidationResult
+                        .Failure(FileConstants.ErrorMessages.MixedFileTypes);
                 }
                 
                 // Get the appropriate validator for the first file's content type
-                var firstFile = files.First();
-                var validator = _validatorFactory.GetValidatorForFile(firstFile);
+                IFormFile firstFile = files.First();
+                IFileValidator validator 
+                    = _validatorFactory.GetValidatorForFile(firstFile);
                 
                 // Validate all files using the selected validator
                 return await validator.ValidateAsync(files, cancellationToken);
             }
-            catch (FileValidationException ex)
-            {
-                _logger.LogWarning(ex, "File validation failed: {Message}", ex.Message);
-                return FileValidationResult.Failure(ex.Message);
-            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during file validation");
-                return FileValidationResult.Failure($"Unexpected error during validation: {ex.Message}");
+                return HandleValidationException(ex);
             }
         }
         
@@ -111,8 +94,7 @@ namespace ActioNator.Services
         {
             if (file == null)
             {
-                _logger.LogWarning("No file provided for validation");
-                return FileValidationResult.Failure(FileConstants.ErrorMessages.NoFilesUploaded);
+                return CreateNoFilesResult();
             }
             
             try
@@ -120,34 +102,18 @@ namespace ActioNator.Services
                 // Check file size
                 if (file.Length > _options.MaxFileSize)
                 {
-                    _logger.LogWarning("File size {Size} bytes exceeds the maximum limit of {MaxSize} bytes", 
-                        file.Length, _options.MaxFileSize);
-                    
-                    return FileValidationResult.Failure(
-                        FileConstants.ErrorMessages.FileSizeExceeded,
-                        new Dictionary<string, object>
-                        {
-                            { "FileSize", file.Length },
-                            { "MaxAllowedSize", _options.MaxFileSize },
-                            { "FileName", file.FileName }
-                        });
+                    return CreateFileSizeExceededResult(file);
                 }
                 
                 // Get the appropriate validator for the file's content type
-                var validator = _validatorFactory.GetValidatorForFile(file);
+                IFileValidator validator = _validatorFactory.GetValidatorForFile(file);
                 
                 // Validate the file using the selected validator
                 return await validator.ValidateAsync(file, cancellationToken);
             }
-            catch (FileValidationException ex)
-            {
-                _logger.LogWarning(ex, "File validation failed: {Message}", ex.Message);
-                return FileValidationResult.Failure(ex.Message);
-            }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unexpected error during file validation");
-                return FileValidationResult.Failure($"Unexpected error during validation: {ex.Message}");
+                return HandleValidationException(ex);
             }
         }
         
@@ -162,11 +128,100 @@ namespace ActioNator.Services
                 return true;
                 
             // Group files by content type category (image or pdf)
-            var imageFiles = files.Where(f => f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase));
-            var pdfFiles = files.Where(f => f.ContentType.Equals(FileConstants.ContentTypes.Pdf, StringComparison.OrdinalIgnoreCase));
+            IEnumerable<IFormFile> imageFiles 
+                = files
+                .Where(f => f.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase));
+
+            IEnumerable<IFormFile> pdfFiles 
+                = files
+                .Where(f => f.ContentType.Equals(FileConstants.ContentTypes.Pdf, StringComparison.OrdinalIgnoreCase));
             
             // Check if all files are either images or PDFs, but not mixed
             return imageFiles.Count() == files.Count || pdfFiles.Count() == files.Count;
         }
+
+        #region Private Helper Methods
+        
+        /// <summary>
+        /// Checks if the file collection is null or empty
+        /// </summary>
+        private bool IsEmptyFileCollection(IFormFileCollection files)
+            => files == null || !files.Any();
+        
+        
+        /// <summary>
+        /// Creates a validation result for when no files are provided
+        /// </summary>
+        private FileValidationResult CreateNoFilesResult()
+        {
+            _logger
+                .LogWarning("No files provided for validation");
+
+            return FileValidationResult
+                .Failure(FileConstants.ErrorMessages.NoFilesUploaded);
+        }
+        
+        /// <summary>
+        /// Creates a validation result for when total file size exceeds the limit
+        /// </summary>
+        private FileValidationResult CreateTotalSizeExceededResult(long totalSize)
+        {
+            _logger
+                .LogWarning("Total file size {Size} bytes exceeds the maximum limit of {MaxSize} bytes", 
+                totalSize, _options.MaxTotalSize);
+            
+            return FileValidationResult
+                .Failure(
+                FileConstants.ErrorMessages.TotalSizeExceeded,
+                new Dictionary<string, object>
+                {
+                    { "TotalSize", totalSize },
+                    { "MaxAllowedSize", _options.MaxTotalSize }
+                });
+        }
+        
+        /// <summary>
+        /// Creates a validation result for when a single file size exceeds the limit
+        /// </summary>
+        private FileValidationResult CreateFileSizeExceededResult(IFormFile file)
+        {
+            _logger
+                .LogWarning("File size {Size} bytes exceeds the maximum limit of {MaxSize} bytes", 
+                file.Length, _options.MaxFileSize);
+            
+            return FileValidationResult
+                .Failure(
+                FileConstants.ErrorMessages.FileSizeExceeded,
+                new Dictionary<string, object>
+                {
+                    { "FileSize", file.Length },
+                    { "MaxAllowedSize", _options.MaxFileSize },
+                    { "FileName", file.FileName }
+                });
+        }
+        
+        /// <summary>
+        /// Handles exceptions during validation and returns appropriate result
+        /// </summary>
+        private FileValidationResult HandleValidationException(Exception ex)
+        {
+            if (ex is FileValidationException fileValidationEx)
+            {
+                _logger
+                    .LogWarning(fileValidationEx, "File validation failed: {Message}", fileValidationEx.Message);
+
+                return FileValidationResult
+                    .Failure(fileValidationEx.Message);
+            }
+            else
+            {
+                _logger
+                    .LogError(ex, "Unexpected error during file validation");
+                return FileValidationResult
+                    .Failure($"Unexpected error during validation: {ex.Message}");
+            }
+        }
+        
+        #endregion
     }
 }
