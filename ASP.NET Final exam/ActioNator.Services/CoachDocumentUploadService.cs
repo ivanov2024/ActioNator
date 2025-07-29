@@ -1,17 +1,10 @@
-using ActioNator.GCommon;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.Exceptions;
 using ActioNator.Services.Interfaces;
 using ActioNator.Services.Models;
-using ActioNator.Services.Validators;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace ActioNator.Services
 {
