@@ -1,9 +1,9 @@
-using ActioNator.Data.Models;
+using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
-using System.ComponentModel.DataAnnotations;
+using ActioNator.Data.Models;
 
 using static ActioNator.GCommon.ValidationConstants.ApplicationUser;
 
@@ -100,8 +100,10 @@ namespace ActioNator.Areas.Identity.Pages.Account
                 return Page();
             }
 
-            var result = await _signInManager.PasswordSignInAsync(
-                user.UserName,
+            var result 
+                = await _signInManager
+                .PasswordSignInAsync(
+                    user.UserName!,
                 LoginInput.Password,
                 isPersistent: false,
                 lockoutOnFailure: false);

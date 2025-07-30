@@ -1,10 +1,6 @@
 using ActioNator.Services.Exceptions;
-using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Net;
 using System.Text.Json;
-using System.Threading.Tasks;
+using System.Net;
 
 namespace ActioNator.Middleware
 {
@@ -47,7 +43,8 @@ namespace ActioNator.Middleware
                 ex is FileSizeExceededException ||
                 ex is FileNameValidationException)
             {
-                _logger.LogError(ex, "File upload exception occurred: {Message}", ex.Message);
+                _logger
+                    .LogError(ex, "File upload exception occurred: {Message}", ex.Message);
                 await HandleFileExceptionAsync(context, ex);
             }
         }
@@ -64,11 +61,16 @@ namespace ActioNator.Middleware
             
             int statusCode = exception switch
             {
-                FileSizeExceededException => (int)HttpStatusCode.RequestEntityTooLarge, // 413
-                FileContentTypeException => (int)HttpStatusCode.UnsupportedMediaType, // 415
-                FileNameValidationException => (int)HttpStatusCode.BadRequest, // 400
-                FileValidationException => (int)HttpStatusCode.BadRequest, // 400
-                FileStorageException => (int)HttpStatusCode.InternalServerError, // 500
+                FileSizeExceededException 
+                    => (int)HttpStatusCode.RequestEntityTooLarge, // 413
+                FileContentTypeException 
+                    => (int)HttpStatusCode.UnsupportedMediaType, // 415
+                FileNameValidationException 
+                    => (int)HttpStatusCode.BadRequest, // 400
+                FileValidationException 
+                    => (int)HttpStatusCode.BadRequest, // 400
+                FileStorageException 
+                    => (int)HttpStatusCode.InternalServerError, // 500
                 _ => (int)HttpStatusCode.InternalServerError // 500
             };
             
@@ -83,7 +85,8 @@ namespace ActioNator.Middleware
                 instance = context.Request.Path
             };
 
-            var options = new JsonSerializerOptions
+            JsonSerializerOptions options 
+                = new ()
             {
                 PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
                 WriteIndented = true
@@ -100,11 +103,16 @@ namespace ActioNator.Middleware
         /// <returns>A user-friendly title</returns>
         private static string GetExceptionTitle(Exception exception) => exception switch
         {
-            FileSizeExceededException => "File Size Limit Exceeded",
-            FileContentTypeException => "Invalid File Type",
-            FileNameValidationException => "Invalid File Name",
-            FileValidationException => "File Validation Failed",
-            FileStorageException => "File Storage Error",
+            FileSizeExceededException 
+                => "File Size Limit Exceeded",
+            FileContentTypeException 
+                => "Invalid File Type",
+            FileNameValidationException 
+                => "Invalid File Name",
+            FileValidationException 
+                => "File Validation Failed",
+            FileStorageException 
+                => "File Storage Error",
             _ => "File Upload Error"
         };
     }
@@ -122,7 +130,8 @@ namespace ActioNator.Middleware
         public static IApplicationBuilder UseFileUploadExceptionHandler(
             this IApplicationBuilder builder)
         {
-            return builder.UseMiddleware<FileUploadExceptionMiddleware>();
+            return builder
+                .UseMiddleware<FileUploadExceptionMiddleware>();
         }
     }
 }
