@@ -1,4 +1,5 @@
 using ActioNator.Services.Interfaces;
+using ActioNator.Services.Interfaces.VerifyCoachServices;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using RecipeSharingPlatform.Web.Controllers;

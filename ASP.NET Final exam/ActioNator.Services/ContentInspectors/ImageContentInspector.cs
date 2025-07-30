@@ -1,7 +1,7 @@
-using ActioNator.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using ActioNator.GCommon;
+using ActioNator.Services.Interfaces.FileServices;
 
 namespace ActioNator.Services.ContentInspectors
 {

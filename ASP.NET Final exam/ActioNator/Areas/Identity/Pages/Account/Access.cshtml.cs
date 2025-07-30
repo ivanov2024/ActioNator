@@ -1,183 +1,263 @@
+using ActioNator.Services.Interfaces.AuthenticationServices;
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using ActioNator.Data.Models;
 
 using static ActioNator.GCommon.ValidationConstants.ApplicationUser;
+using static ActioNator.GCommon.RoleConstants;
 
 namespace ActioNator.Areas.Identity.Pages.Account
 {
+    /// <summary>
+    /// Razor Page model for handling user authentication (login and registration)
+    /// </summary>
     [AllowAnonymous]
     public class AccessModel : PageModel
     {
-        private readonly SignInManager<ApplicationUser> _signInManager;
-        private readonly UserManager<ApplicationUser> _userManager;
-        private readonly IUserStore<ApplicationUser> _userStore;
-        private readonly IUserEmailStore<ApplicationUser> _emailStore;
+        private readonly IAuthenticationService _authService;
+        private readonly ILogger<AccessModel> _logger;
 
-        public AccessModel(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, IUserStore<ApplicationUser> userStore)
+        /// <summary>
+        /// Initializes a new instance of the <see cref="AccessModel"/> class.
+        /// </summary>
+        /// <param name="authService">The authentication service</param>
+        /// <param name="logger">The logger</param>
+        public AccessModel(
+            IAuthenticationService authService,
+            ILogger<AccessModel> logger)
         {
-            _userManager = userManager;
-            _signInManager = signInManager;
-            _userStore = userStore;
-            _emailStore = GetEmailStore(userStore);
+            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
 
+        /// <summary>
+        /// Registration input model
+        /// </summary>
         [BindProperty]
-        public RegisterInputModel RegisterInput { get; set; }
+        public RegisterInputModel RegisterInput { get; set; } 
+            = new();
 
+        /// <summary>
+        /// Login input model
+        /// </summary>
         [BindProperty]
-        public LoginInputModel LoginInput { get; set; }
+        public LoginInputModel LoginInput { get; set; } 
+            = new();
 
-        public string ReturnUrl { get; set; } = "/Home/Index";
+        /// <summary>
+        /// Return URL after successful authentication
+        /// </summary>
+        public string ReturnUrl { get; set; } = "";
 
+        /// <summary>
+        /// Handles GET requests to the page
+        /// </summary>
+        /// <param name="returnUrl">URL to redirect to after authentication</param>
         public void OnGet(string returnUrl = null)
         {
+            // Redirect authenticated users
             if (User.Identity?.IsAuthenticated == true)
             {
+                string role 
+                    = User.IsInRole(Admin) ? "Admin" 
+                    : User.IsInRole(Coach) ? "Coach" 
+                    : "User";
+
+                ReturnUrl = role switch
+                {
+                    "Admin" => "~/Admin/Home/Index",
+                    "Coach" => "~/Coach/Home/Index",
+                    _ => "~/User/Home/Index"
+                };
+
                 Response.Redirect(ReturnUrl);
                 return;
             }
 
-            ReturnUrl = returnUrl ?? ReturnUrl;
+            // Validate and sanitize return URL
+            ReturnUrl = _authService.ValidateAndSanitizeReturnUrl(returnUrl, ReturnUrl);
         }
 
+        /// <summary>
+        /// Handles user registration
+        /// </summary>
+        /// <param name="returnUrl">URL to redirect to after successful registration</param>
+        /// <returns>IActionResult</returns>
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> OnPostRegisterAsync(string returnUrl = null)
         {
-            ReturnUrl = returnUrl ?? ReturnUrl;
-
-            if (TryValidateModel(RegisterInput, nameof(RegisterInput)))
+            try
             {
+                // Validate and sanitize return URL
+                ReturnUrl 
+                    = _authService
+                    .ValidateAndSanitizeReturnUrl(returnUrl, ReturnUrl);
+
+                // Validate model
+                if (!ModelState.IsValid)
+                {
+                    return Page();
+                }
+
+                // Register user
+                var (succeeded, redirectPath, errorMessages) 
+                    = await _authService
+                    .RegisterUserAsync(
+                    RegisterInput.FirstName,
+                    RegisterInput.LastName,
+                    RegisterInput.Email,
+                    RegisterInput.Password);
+
+                if (succeeded)
+                {
+                    _logger
+                        .LogInformation("User registered successfully");
+                    return LocalRedirect(redirectPath);
+                }
+
+                // Add errors to ModelState
+                foreach (var error in errorMessages)
+                {
+                    ModelState
+                        .AddModelError(string.Empty, error);
+                }
+
                 return Page();
             }
-
-            var user = CreateUser();
-
-            await _userStore.SetUserNameAsync(user, RegisterInput.FirstName + RegisterInput.LastName, CancellationToken.None);
-            await _emailStore.SetEmailAsync(user, RegisterInput.Email, CancellationToken.None);
-
-            user
-                .FirstName = RegisterInput.FirstName;
-            user
-                .LastName = RegisterInput.LastName;
-
-            var result = await _userManager.CreateAsync(user, RegisterInput.Password);
-
-            if (result.Succeeded)
+            catch (Exception ex)
             {
-                await _signInManager.SignInAsync(user, isPersistent: false);
-                return LocalRedirect(ReturnUrl);
+                _logger
+                    .LogError(ex, "Error during user registration");
+                ModelState
+                    .AddModelError(string.Empty, "An unexpected error occurred during registration.");
+                return Page();
             }
-
-            foreach (var error in result.Errors)
-            {
-                ModelState.AddModelError(string.Empty, error.Description);
-            }
-
-            return Page();
         }
 
+        /// <summary>
+        /// Handles user login
+        /// </summary>
+        /// <param name="returnUrl">URL to redirect to after successful login</param>
+        /// <returns>IActionResult</returns>
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> OnPostLoginAsync(string returnUrl = null)
         {
-            ReturnUrl = returnUrl ?? ReturnUrl;
-
-            if (TryValidateModel(LoginInput, nameof(LoginInput)))
-            {
-                return Page();
-            }
-
-            var user 
-                = await _userManager.FindByEmailAsync(LoginInput.Email);
-
-            if (user == null)
-            {
-                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-                return Page();
-            }
-
-            var result 
-                = await _signInManager
-                .PasswordSignInAsync(
-                    user.UserName!,
-                LoginInput.Password,
-                isPersistent: false,
-                lockoutOnFailure: false);
-
-            if (result.Succeeded)
-            {
-                return LocalRedirect(ReturnUrl);
-            }
-
-            ModelState.AddModelError(string.Empty, "Invalid login attempt.");
-            return Page();
-        }
-
-        private ApplicationUser CreateUser()
-        {
             try
             {
-                return Activator.CreateInstance<ApplicationUser>();
+                // Validate and sanitize return URL
+                ReturnUrl 
+                    = _authService
+                    .ValidateAndSanitizeReturnUrl(returnUrl, ReturnUrl);
+
+                // Validate model
+                if (!ModelState.IsValid)
+                {
+                    return Page();
+                }
+
+                // Authenticate user
+                var (succeeded, redirectPath, errorMessage) 
+                    = await _authService
+                    .AuthenticateUserAsync(
+                    LoginInput.Email,
+                    LoginInput.Password,
+                    isPersistent: false);
+
+                if (succeeded)
+                {
+                    _logger
+                        .LogInformation("User logged in successfully");
+                    return LocalRedirect(redirectPath);
+                }
+
+                // Add error to ModelState
+                ModelState
+                    .AddModelError(string.Empty, errorMessage);
+                return Page();
             }
-            catch
+            catch (Exception ex)
             {
-                throw new InvalidOperationException($"Can't create an instance of '{nameof(IdentityUser)}'. " +
-                    $"Ensure that '{nameof(IdentityUser)}' is not an abstract class and has a parameterless constructor, or alternatively " +
-                    $"override the register page in /Areas/Identity/Pages/Account/Register.cshtml");
+                _logger
+                    .LogError(ex, "Error during user login");
+                ModelState
+                    .AddModelError(string.Empty, "An unexpected error occurred during login.");
+                return Page();
             }
         }
 
-        private IUserEmailStore<ApplicationUser> GetEmailStore(IUserStore<ApplicationUser> store)
-        {
-            if (!_userManager.SupportsUserEmail)
-            {
-                throw new NotSupportedException("The user store does not support email.");
-            }
-
-            return (IUserEmailStore<ApplicationUser>)store;
-        }
-
-
+        /// <summary>
+        /// Model for user registration input
+        /// </summary>
         public class RegisterInputModel
         {
-            [Required]
+            /// <summary>
+            /// User's first name
+            /// </summary>
+            [Required(ErrorMessage = "First name is required.")]
             [Display(Name = "First Name")]
-            [MinLength(FirstNameMinLength)]
-            [MaxLength(FirstNameMaxLength)]
+            [MinLength(FirstNameMinLength, ErrorMessage = "First name must be at least {1} characters.")]
+            [MaxLength(FirstNameMaxLength, ErrorMessage = "First name cannot exceed {1} characters.")]
+            [RegularExpression(@"^[a-zA-Z]+$", ErrorMessage = "First name can only contain letters.")]
             public string FirstName { get; set; } = null!;
 
-            [Required]
+            /// <summary>
+            /// User's last name
+            /// </summary>
+            [Required(ErrorMessage = "Last name is required.")]
             [Display(Name = "Last Name")]
-            [MinLength(LastNameMinLength)]
-            [MaxLength(LastNameMaxLength)]
+            [MinLength(LastNameMinLength, ErrorMessage = "Last name must be at least {1} characters.")]
+            [MaxLength(LastNameMaxLength, ErrorMessage = "Last name cannot exceed {1} characters.")]
+            [RegularExpression(@"^[a-zA-Z]+$", ErrorMessage = "Last name can only contain letters.")]
             public string LastName { get; set; } = null!;
 
-            [Required]
-            [EmailAddress]
+            /// <summary>
+            /// User's email address
+            /// </summary>
+            [Required(ErrorMessage = "Email is required.")]
+            [EmailAddress(ErrorMessage = "Invalid email format.")]
+            [Display(Name = "Email")]
             public string Email { get; set; } = null!;
 
-            [Required]
+            /// <summary>
+            /// User's password
+            /// </summary>
+            [Required(ErrorMessage = "Password is required.")]
             [DataType(DataType.Password)]
+            [Display(Name = "Password")]
+            [StringLength(100, ErrorMessage = "The {0} must be at least {2} characters long.", MinimumLength = 6)]
             public string Password { get; set; } = null!;
 
-            [Required]
+            /// <summary>
+            /// Password confirmation
+            /// </summary>
+            [Required(ErrorMessage = "Password confirmation is required.")]
             [DataType(DataType.Password)]
-            [Compare("Password", ErrorMessage = "Passwords do not match.")]
+            [Display(Name = "Confirm Password")]
+            [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
             public string ConfirmPassword { get; set; } = null!;
         }
 
+        /// <summary>
+        /// Model for user login input
+        /// </summary>
         public class LoginInputModel
         {
-            [Required]
-            [EmailAddress]
+            /// <summary>
+            /// User's email address
+            /// </summary>
+            [Required(ErrorMessage = "Email is required.")]
+            [EmailAddress(ErrorMessage = "Invalid email format.")]
+            [Display(Name = "Email")]
             public string Email { get; set; } = null!;
 
-            [Required]
+            /// <summary>
+            /// User's password
+            /// </summary>
+            [Required(ErrorMessage = "Password is required.")]
             [DataType(DataType.Password)]
+            [Display(Name = "Password")]
             public string Password { get; set; } = null!;
         }
     }

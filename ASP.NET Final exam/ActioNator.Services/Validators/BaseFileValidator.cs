@@ -1,6 +1,5 @@
 using ActioNator.Services.Configuration;
 using ActioNator.Services.Exceptions;
-using ActioNator.Services.Interfaces;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -8,6 +7,7 @@ using Microsoft.AspNetCore.Http;
 using ActioNator.GCommon;
 
 using static ActioNator.GCommon.FileConstants.DangerousExtensions;
+using ActioNator.Services.Interfaces.FileServices;
 
 namespace ActioNator.Services.Validators
 {

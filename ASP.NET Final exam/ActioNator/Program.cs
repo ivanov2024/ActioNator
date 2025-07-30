@@ -1,10 +1,14 @@
 using ActioNator.Data;
 using ActioNator.Data.Models;
 using ActioNator.Middleware;
-using ActioNator.Services;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.ContentInspectors;
-using ActioNator.Services.Interfaces;
+using ActioNator.Services.Implementations.AuthenticationService;
+using ActioNator.Services.Implementations.FileServices;
+using ActioNator.Services.Implementations.VerifyCoach;
+using ActioNator.Services.Interfaces.AuthenticationServices;
+using ActioNator.Services.Interfaces.FileServices;
+using ActioNator.Services.Interfaces.VerifyCoachServices;
 using ActioNator.Services.Validators;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -67,21 +71,21 @@ namespace ActioNator
             
             // Register factory and orchestrator using factory methods
             builder.Services.AddScoped<IFileValidatorFactory>(sp => 
-                new ActioNator.Services.FileValidatorFactory(
-                    sp.GetServices<IFileValidator>().ToList(),
-                    sp.GetRequiredService<ILogger<ActioNator.Services.FileValidatorFactory>>()
-                ));
+                new FileValidatorFactory(sp)
+            );
                 
             builder.Services.AddScoped<IFileValidationOrchestrator>(sp => 
-                new ActioNator.Services.FileValidationOrchestrator(
+                new FileValidationOrchestrator(
                     sp.GetRequiredService<IFileValidatorFactory>(),
-                    sp.GetRequiredService<IOptions<FileUploadOptions>>(),
-                    sp.GetRequiredService<ILogger<ActioNator.Services.FileValidationOrchestrator>>()
+                    sp.GetRequiredService<ILogger<FileValidationOrchestrator>>()
                 ));
             
             // Register services
             builder.Services.AddScoped<IFileStorageService, FileStorageService>();
             builder.Services.AddScoped<ICoachDocumentUploadService, CoachDocumentUploadService>();
+            
+            // Register authentication service
+            builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
             builder.Services
                 .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>

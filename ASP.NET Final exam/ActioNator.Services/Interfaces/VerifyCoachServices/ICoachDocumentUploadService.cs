@@ -1,7 +1,7 @@
 using ActioNator.Services.Models;
 using Microsoft.AspNetCore.Http;
 
-namespace ActioNator.Services.Interfaces
+namespace ActioNator.Services.Interfaces.VerifyCoachServices
 {
     /// <summary>
     /// Interface for handling coach verification document uploads with enterprise-grade security and validation

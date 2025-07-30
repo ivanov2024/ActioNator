@@ -1,6 +1,6 @@
 using Microsoft.AspNetCore.Http;
 
-namespace ActioNator.Services.Interfaces
+namespace ActioNator.Services.Interfaces.FileServices
 {
     /// <summary>
     /// Interface for a factory that provides appropriate file validators based on content type

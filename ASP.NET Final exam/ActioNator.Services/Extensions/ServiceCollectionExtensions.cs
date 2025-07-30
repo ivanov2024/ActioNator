@@ -1,8 +1,11 @@
+using ActioNator.Services.Interfaces.VerifyCoachServices;
+using ActioNator.Services.Implementations.FileServices;
+using ActioNator.Services.Implementations.VerifyCoach;
+using ActioNator.Services.Interfaces.FileServices;
 using Microsoft.Extensions.DependencyInjection;
 using ActioNator.Services.ContentInspectors;
 using Microsoft.Extensions.Configuration;
 using ActioNator.Services.Configuration;
-using ActioNator.Services.Interfaces;
 using ActioNator.Services.Validators;
 
 namespace ActioNator.Services.Extensions
@@ -47,9 +50,9 @@ namespace ActioNator.Services.Extensions
 
             // Register factory and orchestrator
             services
-                .AddSingleton<IFileValidatorFactory, FileValidatorFactory>();
+                .AddSingleton<IFileValidatorFactory,FileValidatorFactory>();
             services
-                .AddSingleton<IFileValidationOrchestrator, FileValidationOrchestrator>();
+                .AddSingleton<IFileValidationOrchestrator,FileValidationOrchestrator>();
 
             // Register storage service
             services

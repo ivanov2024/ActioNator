@@ -1,13 +1,13 @@
-using ActioNator.GCommon;
+using ActioNator.Services.Interfaces.FileServices;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.Exceptions;
-using ActioNator.Services.Interfaces;
 using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Http;
+using ActioNator.GCommon;
 
-namespace ActioNator.Services
+namespace ActioNator.Services.Implementations.FileServices
 {
     /// <summary>
     /// Service for storing files

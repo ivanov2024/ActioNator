@@ -1,12 +1,13 @@
+using ActioNator.Services.Interfaces.VerifyCoachServices;
+using ActioNator.Services.Interfaces.FileServices;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.Exceptions;
-using ActioNator.Services.Interfaces;
-using ActioNator.Services.Models;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using ActioNator.Services.Models;
+using Microsoft.AspNetCore.Http;
 
-namespace ActioNator.Services
+namespace ActioNator.Services.Implementations.VerifyCoach
 {
     /// <summary>
     /// Service for handling coach verification document uploads with enterprise-grade security and validation

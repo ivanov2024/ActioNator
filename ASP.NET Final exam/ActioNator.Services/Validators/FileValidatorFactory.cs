@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
-using ActioNator.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
+using ActioNator.Services.Interfaces.FileServices;
 
 namespace ActioNator.Services.Validators
 {

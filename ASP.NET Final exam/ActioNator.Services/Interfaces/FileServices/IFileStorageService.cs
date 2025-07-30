@@ -1,9 +1,6 @@
 using Microsoft.AspNetCore.Http;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace ActioNator.Services.Interfaces
+namespace ActioNator.Services.Interfaces.FileServices
 {
     /// <summary>
     /// Interface for storing files

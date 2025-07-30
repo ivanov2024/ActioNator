@@ -1,52 +1,50 @@
-using ActioNator.Services.Interfaces;
-
-namespace ActioNator.Services
+namespace ActioNator.Services.Interfaces.FileServices
 {
     /// <summary>
-    /// Implementation of IFileSystem that wraps System.IO operations
+    /// Interface for abstracting file system operations to improve testability
     /// </summary>
-    public class FileSystemService : IFileSystem
+    public interface IFileSystem
     {
         /// <summary>
         /// Checks if a file exists at the specified path
         /// </summary>
         /// <param name="path">Path to check</param>
         /// <returns>True if the file exists, false otherwise</returns>
-        public bool FileExists(string path) => File.Exists(path);
+        bool FileExists(string path);
         
         /// <summary>
         /// Checks if a directory exists at the specified path
         /// </summary>
         /// <param name="path">Path to check</param>
         /// <returns>True if the directory exists, false otherwise</returns>
-        public bool DirectoryExists(string path) => Directory.Exists(path);
+        bool DirectoryExists(string path);
         
         /// <summary>
         /// Creates a directory at the specified path if it doesn't exist
         /// </summary>
         /// <param name="path">Path where to create the directory</param>
-        public void CreateDirectory(string path) => Directory.CreateDirectory(path);
+        void CreateDirectory(string path);
         
         /// <summary>
         /// Opens a file for reading
         /// </summary>
         /// <param name="path">Path to the file</param>
         /// <returns>Stream for reading the file</returns>
-        public Stream OpenRead(string path) => File.OpenRead(path);
+        Stream OpenRead(string path);
         
         /// <summary>
         /// Opens a file for writing
         /// </summary>
         /// <param name="path">Path to the file</param>
         /// <returns>Stream for writing to the file</returns>
-        public Stream OpenWrite(string path) => File.OpenWrite(path);
+        Stream OpenWrite(string path);
         
         /// <summary>
         /// Creates a new file and opens it for writing
         /// </summary>
         /// <param name="path">Path to the file</param>
         /// <returns>Stream for writing to the file</returns>
-        public Stream Create(string path) => File.Create(path);
+        Stream Create(string path);
         
         /// <summary>
         /// Copies data from one stream to another asynchronously
@@ -55,28 +53,27 @@ namespace ActioNator.Services
         /// <param name="destination">Destination stream</param>
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>Task representing the asynchronous operation</returns>
-        public Task CopyToAsync(Stream source, Stream destination, CancellationToken cancellationToken) 
-            => source.CopyToAsync(destination, cancellationToken);
+        Task CopyToAsync(Stream source, Stream destination, CancellationToken cancellationToken);
         
         /// <summary>
         /// Gets the file name from a path
         /// </summary>
         /// <param name="path">Path to extract file name from</param>
         /// <returns>File name</returns>
-        public string GetFileName(string path) => Path.GetFileName(path);
+        string GetFileName(string path);
         
         /// <summary>
         /// Gets the file extension from a path
         /// </summary>
         /// <param name="path">Path to extract file extension from</param>
         /// <returns>File extension</returns>
-        public string GetExtension(string path) => Path.GetExtension(path);
+        string GetExtension(string path);
         
         /// <summary>
         /// Combines path segments into a single path
         /// </summary>
         /// <param name="paths">Path segments to combine</param>
         /// <returns>Combined path</returns>
-        public string CombinePaths(params string[] paths) => Path.Combine(paths);
+        string CombinePaths(params string[] paths);
     }
 }

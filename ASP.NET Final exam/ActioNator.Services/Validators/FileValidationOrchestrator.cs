@@ -1,9 +1,9 @@
 using ActioNator.Services.Exceptions;
-using ActioNator.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using ActioNator.Services.Models;
 using Microsoft.AspNetCore.Http;
 using ActioNator.GCommon;
+using ActioNator.Services.Interfaces.FileServices;
 
 namespace ActioNator.Services.Validators
 {

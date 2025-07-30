@@ -1,12 +1,10 @@
-using ActioNator.Services.Exceptions;
-using ActioNator.Services.Interfaces;
-using Microsoft.Extensions.Logging;
+using ActioNator.Services.Interfaces.FileServices;
 using Microsoft.AspNetCore.Http;
 
 using static ActioNator.GCommon.FileConstants.DangerousExtensions;
 using static ActioNator.GCommon.FileConstants.FileExtensions;
 
-namespace ActioNator.Services
+namespace ActioNator.Services.Validators
 {
     /// <summary>
     /// Service for validating uploaded files

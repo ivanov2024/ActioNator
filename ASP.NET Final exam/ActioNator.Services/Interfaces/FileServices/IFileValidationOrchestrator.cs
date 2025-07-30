@@ -1,9 +1,6 @@
-using ActioNator.Services.Models;
 using Microsoft.AspNetCore.Http;
-using System.Threading;
-using System.Threading.Tasks;
 
-namespace ActioNator.Services.Interfaces
+namespace ActioNator.Services.Interfaces.FileServices
 {
     /// <summary>
     /// Interface for orchestrating file validation across multiple validators
