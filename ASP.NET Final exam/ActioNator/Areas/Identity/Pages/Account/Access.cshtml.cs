@@ -67,9 +67,9 @@ namespace ActioNator.Areas.Identity.Pages.Account
 
                 ReturnUrl = role switch
                 {
-                    "Admin" => "~/Admin/Home/Index",
-                    "Coach" => "~/Coach/Home/Index",
-                    _ => "~/User/Home/Index"
+                    "Admin" => "/Admin/Home/Index",
+                    "Coach" => "/Coach/Home/Index",
+                    _ => "/User/Home/Index"
                 };
 
                 Response.Redirect(ReturnUrl);
