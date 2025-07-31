@@ -90,21 +90,20 @@ namespace ActioNator.Services.Implementations.AuthenticationService
             ArgumentNullException.ThrowIfNull(user);
 
             // Check for Administrator role
-            if (await _userManager
-                .IsInRoleAsync(user, RoleConstants.Admin))
+            string redirectPath = user switch
             {
-                return RedirectPathConstants.AdminHome;
-            }
+                _ when await _userManager
+                .IsInRoleAsync(user, RoleConstants.Admin)
+                    => RedirectPathConstants.AdminHome,
 
-            // Check for Coach role
-            if (await _userManager
-                .IsInRoleAsync(user, RoleConstants.Coach))
-            {
-                return RedirectPathConstants.CoachHome;
-            }
+                _ when await _userManager
+                .IsInRoleAsync(user, RoleConstants.Coach)
+                    => RedirectPathConstants.CoachHome,
 
-            // Default to User role
-            return RedirectPathConstants.UserHome;
+                _ => RedirectPathConstants.UserHome
+            };
+
+            return redirectPath;
         }
 
         public async Task<(bool Succeeded, string RedirectPath, IEnumerable<string> ErrorMessages)> RegisterUserAsync(
@@ -130,6 +129,9 @@ namespace ActioNator.Services.Implementations.AuthenticationService
                 IdentityResult result 
                     = await _userManager
                     .CreateAsync(user, password);
+
+                await _userManager
+                    .AddToRoleAsync(user, RoleConstants.User);
 
                 if (result.Succeeded)
                 {
