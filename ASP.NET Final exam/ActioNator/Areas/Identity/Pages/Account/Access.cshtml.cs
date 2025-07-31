@@ -4,8 +4,8 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using ActioNator.GCommon;
 using static ActioNator.GCommon.ValidationConstants.ApplicationUser;
-using static ActioNator.GCommon.RoleConstants;
 
 namespace ActioNator.Areas.Identity.Pages.Account
 {
@@ -61,8 +61,8 @@ namespace ActioNator.Areas.Identity.Pages.Account
             if (User.Identity?.IsAuthenticated == true)
             {
                 string role 
-                    = User.IsInRole(Admin) ? "Admin" 
-                    : User.IsInRole(Coach) ? "Coach" 
+                    = User.IsInRole(RoleConstants.Admin) ? "Admin" 
+                    : User.IsInRole(RoleConstants.Coach) ? "Coach" 
                     : "User";
 
                 ReturnUrl = role switch
@@ -88,6 +88,9 @@ namespace ActioNator.Areas.Identity.Pages.Account
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> OnPostRegisterAsync(string returnUrl = null)
         {
+            // Clear ModelState errors for the login form since we're processing registration
+            ClearModelStateForPrefix("LoginInput");
+
             try
             {
                 // Validate and sanitize return URL
@@ -144,6 +147,9 @@ namespace ActioNator.Areas.Identity.Pages.Account
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> OnPostLoginAsync(string returnUrl = null)
         {
+            // Clear ModelState errors for the registration form since we're processing login
+            ClearModelStateForPrefix("RegisterInput");
+
             try
             {
                 // Validate and sanitize return URL
@@ -260,5 +266,42 @@ namespace ActioNator.Areas.Identity.Pages.Account
             [Display(Name = "Password")]
             public string Password { get; set; } = null!;
         }
+
+        #region Private Helper Methods
+        /// <summary>
+        /// Clears ModelState errors for properties with a specific prefix
+        /// </summary>
+        /// <param name="prefix">The prefix to clear errors for</param>
+        private void ClearModelStateForPrefix(string prefix)
+        {
+            // Find all keys in ModelState that start with the given prefix
+            List<string>? keysToRemove = [];
+            
+            // Explicitly iterate through all keys to find matches
+            foreach (var key in ModelState.Keys)
+            {
+                if (key != null && key
+                    .StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    keysToRemove.Add(key);
+                }
+            }
+
+            // Remove each key from ModelState
+            foreach (var key in keysToRemove)
+            {
+                ModelState.Remove(key);
+            }
+            
+            // If somehow something goes wrong: directly clear ModelState.IsValid
+            if (!ModelState.IsValid && keysToRemove.Count == 0)
+            {
+                // We have to force ModelState
+                // to be valid for this handler
+                ModelState.Clear();
+            }
+        }
+
+        #endregion
     }
 }
