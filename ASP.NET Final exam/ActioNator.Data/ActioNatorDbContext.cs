@@ -3,6 +3,7 @@ using ActioNator.Data.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+
 using static ActioNator.Data.ActioNatorConnectionString;
 
 namespace ActioNator.Data
