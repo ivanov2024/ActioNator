@@ -34,5 +34,8 @@ namespace ActioNator.Data.Models
 
         public virtual ICollection<Comment> Comments { get; set; }
             = new HashSet<Comment>();
+
+        public virtual ICollection<PostImage> PostImages { get; set; }
+            = new HashSet<PostImage>();
     }
 }
