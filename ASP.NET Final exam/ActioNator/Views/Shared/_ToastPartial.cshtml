@@ -1,0 +1,133 @@
+﻿@* Reusable Toast Notification Component *@
+
+<div x-data="toastSystem"
+	 @@show-toast.window ="addToast($event.detail)"
+	 class="fixed top-4 right-4 z-50 w-72 space-y-2">
+
+	<template x-for="(toast, index) in toasts" :key="index">
+		<div :class="{
+                'bg-green-50 border-green-200': toast.type === 'success',
+                'bg-red-50 border-red-200': toast.type === 'error',
+                'toast-enter': toast.show,
+                'toast-leave': toast.removing
+            }"
+			 class="flex items-center p-4 border rounded-lg shadow-md"
+			 x-show="toast.show"
+			 @@animationend ="removeToast(index)">
+
+			<!-- Toast Icon -->
+			<div class="flex-shrink-0 mr-3">
+				<!-- Success Icon -->
+				<template x-if="toast.type === 'success'">
+					<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+					</svg>
+				</template>
+
+				<!-- Error Icon -->
+				<template x-if="toast.type === 'error'">
+					<svg class="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+						<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+					</svg>
+				</template>
+			</div>
+
+			<!-- Toast Message -->
+			<div class="flex-1">
+				<p :class="{
+                        'text-green-800': toast.type === 'success',
+                        'text-red-800': toast.type === 'error'
+                    }"
+				   class="text-sm font-medium"
+				   x-text="toast.message">
+				</p>
+			</div>
+
+			<!-- Close Button -->
+			<button @@click ="dismissToast(index)"
+					class="ml-3 text-gray-400 hover:text-gray-600">
+				<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+					<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+				</svg>
+			</button>
+		</div>
+	</template>
+</div>
+
+<script>
+	document.addEventListener('alpine:init', () => {
+		Alpine.data('toastSystem', () => ({
+			toasts: [],
+
+			addToast(config) {
+				const toast = {
+					type: config.type || 'success',
+					message: config.message || 'Operation completed',
+					show: true,
+					removing: false
+				};
+
+				this.toasts.push(toast);
+
+				// Auto-dismiss after 5 seconds
+				setTimeout(() => {
+					this.dismissToast(this.toasts.indexOf(toast));
+				}, 5000);
+			},
+
+			dismissToast(index) {
+				if (index !== -1 && this.toasts[index] && !this.toasts[index].removing) {
+					this.toasts[index].removing = true;
+				}
+			},
+
+			removeToast(index) {
+				if (index !== -1 && this.toasts[index] && this.toasts[index].removing) {
+					this.toasts.splice(index, 1);
+				}
+			}
+		}));
+	});
+
+	// Helper function to show toast from anywhere in the application
+	function showToast(type, message) {
+		window.dispatchEvent(new CustomEvent('show-toast', {
+			detail: {
+				type: type,
+				message: message
+			}
+		}));
+	}
+</script>
+
+<style>
+	.toast-enter {
+		animation: slideIn 0.3s ease-out forwards;
+	}
+
+	.toast-leave {
+		animation: fadeOut 0.5s ease-out forwards;
+	}
+
+	@@keyframes slideIn {
+		from {
+			transform: translateX(100%);
+			opacity: 0;
+		}
+
+		to {
+			transform: translateX(0);
+			opacity: 1;
+		}
+	}
+
+	@@keyframes fadeOut {
+		from {
+			opacity: 1;
+		}
+
+		to {
+			opacity: 0;
+		}
+	}
+</style>
