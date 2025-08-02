@@ -21,6 +21,8 @@ namespace ActioNator.Data
 
         public DbSet<ApplicationUser> ApplicationUsers { get; set; } = null!;
 
+        public DbSet<UserLoginHistory> UserLoginHistories { get; set; } = null!;
+
         public DbSet<Chat> Chats { get; set; } = null!;
 
         public DbSet<Comment> Comments { get; set; } = null!;

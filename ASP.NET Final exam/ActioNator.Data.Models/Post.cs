@@ -24,6 +24,10 @@ namespace ActioNator.Data.Models
         [MaxLength(ContentMaxLength)]
         public string? Content { get; set; }
 
+        public int LikesCount { get; set; }
+
+        public int SharesCount { get; set; }
+
         public DateTime CreatedAt { get; set; }
 
         public string? ImageUrl { get; set; } = null!;

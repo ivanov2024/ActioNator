@@ -5,9 +5,11 @@ using ActioNator.Services.Configuration;
 using ActioNator.Services.ContentInspectors;
 using ActioNator.Services.Implementations.AuthenticationService;
 using ActioNator.Services.Implementations.FileServices;
+using ActioNator.Services.Implementations.UserDashboard;
 using ActioNator.Services.Implementations.VerifyCoach;
 using ActioNator.Services.Interfaces.AuthenticationServices;
 using ActioNator.Services.Interfaces.FileServices;
+using ActioNator.Services.Interfaces.UserDashboard;
 using ActioNator.Services.Interfaces.VerifyCoachServices;
 using ActioNator.Services.Seeding;
 using ActioNator.Services.Validators;
@@ -119,7 +121,9 @@ namespace ActioNator
             builder.Services
                 .AddScoped<IAuthenticationService, AuthenticationService>();
 
-     
+            // Register user dashboard service
+            builder.Services
+                .AddScoped<IUserDashboardService, UserDashboardService>();
 
             builder.Services
                 .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>

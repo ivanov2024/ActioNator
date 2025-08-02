@@ -1,6 +1,8 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using ActioNator.Controllers;
+using ActioNator.Data.Models;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using RecipeSharingPlatform.Web.Controllers;
 
 namespace ActioNator.Areas.Admin.Controllers
 {
@@ -8,6 +10,11 @@ namespace ActioNator.Areas.Admin.Controllers
     [Area("Admin")]
     public class HomeController : BaseController
     {
+        public HomeController(UserManager<ApplicationUser> userManager) 
+            : base(userManager)
+        {
+        }
+
         [HttpGet]
         public IActionResult Index()
         {

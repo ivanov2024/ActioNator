@@ -27,6 +27,7 @@
   <ItemGroup>
     <ProjectReference Include="..\ActioNator.Data\ActioNator.Data.csproj" />
     <ProjectReference Include="..\ActioNator.Services\ActioNator.Services.csproj" />
+    <ProjectReference Include="..\ActioNator.ViewModels\ActioNator.ViewModels.csproj" />
   </ItemGroup>
 
 </Project>

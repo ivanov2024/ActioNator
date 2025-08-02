@@ -1,8 +1,10 @@
+using ActioNator.Controllers;
+using ActioNator.Data.Models;
 using ActioNator.Services.Interfaces;
 using ActioNator.Services.Interfaces.VerifyCoachServices;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using RecipeSharingPlatform.Web.Controllers;
 using System.Security.Claims;
 
 namespace ActioNator.Areas.User.Controllers
@@ -25,7 +27,9 @@ namespace ActioNator.Areas.User.Controllers
         /// <param name="logger">Logger instance</param>
         public CoachVerificationController(
             ICoachDocumentUploadService documentUploadService,
-            ILogger<CoachVerificationController> logger)
+            ILogger<CoachVerificationController> logger,
+            UserManager<ApplicationUser> userManager)
+            : base(userManager)
         {
             _documentUploadService = documentUploadService ?? throw new ArgumentNullException(nameof(documentUploadService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -57,9 +61,9 @@ namespace ActioNator.Areas.User.Controllers
         {
             try
             {
-                string userId = this.GetUserId()!;
+                Guid? userIdGuid = this.GetUserId();
                 
-                if (string.IsNullOrEmpty(userId))
+                if (!userIdGuid.HasValue)
                 {
                     _logger.LogWarning("User ID not found in claims for document upload");
                     return Unauthorized(new ProblemDetails
@@ -71,12 +75,12 @@ namespace ActioNator.Areas.User.Controllers
                 }
                 
                 _logger.LogInformation("Processing document upload request for user {UserId} with {Count} files", 
-                    userId, files?.Count ?? 0);
+                    userIdGuid.Value, files?.Count ?? 0);
                 
                 // Validate files collection is not null
                 if (files == null || files.Count == 0)
                 {
-                    _logger.LogWarning("No files provided for upload by user {UserId}", userId);
+                    _logger.LogWarning("No files provided for upload by user {UserId}", userIdGuid.Value);
                     return BadRequest(new ProblemDetails
                     {
                         Title = "No Files Provided",
@@ -88,7 +92,7 @@ namespace ActioNator.Areas.User.Controllers
                 // Process the upload using the service
                 var result 
                     = await _documentUploadService
-                    .ProcessUploadAsync(files, userId, cancellationToken);
+                    .ProcessUploadAsync(files, userIdGuid.Value.ToString(), cancellationToken);
                 
                 // Return appropriate response based on the result
                 if (result.Success)

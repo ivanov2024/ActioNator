@@ -1,8 +1,9 @@
-﻿using ActioNator.Services.Interfaces.AuthenticationServices;
+﻿using ActioNator.Data.Models;
+using ActioNator.GCommon;
+using ActioNator.Services.Interfaces.AuthenticationServices;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Logging;
-using ActioNator.Data.Models;
-using ActioNator.GCommon;
+using ActioNator.Data;
 
 namespace ActioNator.Services.Implementations.AuthenticationService
 {
@@ -16,18 +17,21 @@ namespace ActioNator.Services.Implementations.AuthenticationService
         private readonly IUserStore<ApplicationUser> _userStore;
         private readonly IUserEmailStore<ApplicationUser> _emailStore;
         private readonly ILogger<AuthenticationService> _logger;
+        private readonly ActioNatorDbContext _dbContext;
 
         public AuthenticationService(
             UserManager<ApplicationUser> userManager,
             SignInManager<ApplicationUser> signInManager,
             IUserStore<ApplicationUser> userStore,
-            ILogger<AuthenticationService> logger)
+            ILogger<AuthenticationService> logger,
+            ActioNatorDbContext dbContext)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _userStore = userStore;
             _emailStore = GetEmailStore(userStore);
             _logger = logger;
+            _dbContext = dbContext;
         }
 
         public async Task<(bool Succeeded, string RedirectPath, string ErrorMessage)> AuthenticateUserAsync(
@@ -118,7 +122,8 @@ namespace ActioNator.Services.Implementations.AuthenticationService
                 ApplicationUser user = CreateUser();
 
                 await _userStore
-                    .SetUserNameAsync(user, firstName + lastName, CancellationToken.None);
+                    .SetUserNameAsync
+                    (user, firstName + " " + lastName, CancellationToken.None);
                 await _emailStore
                     .SetEmailAsync(user, email, CancellationToken.None);
 
@@ -133,14 +138,21 @@ namespace ActioNator.Services.Implementations.AuthenticationService
                 await _userManager
                     .AddToRoleAsync(user, RoleConstants.User);
 
+                await _dbContext
+                    .UserLoginHistories
+                    .AddAsync
+                    (new UserLoginHistory
+                    {
+                        UserId = user.Id,
+                        LoginDate = DateTime.UtcNow
+                    });
+
+                await _dbContext.SaveChangesAsync();
+
                 if (result.Succeeded)
                 {
                     _logger
                         .LogInformation("User {UserName} created successfully", user.UserName);
-
-                    // Add default User role
-                    await _userManager
-                        .AddToRoleAsync(user, RoleConstants.User);
 
                     // Sign in the user
                     await _signInManager
