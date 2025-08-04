@@ -1,8 +1,8 @@
-﻿@* Reusable Modal Component *@
+@* Reusable Modal Component *@
 
 <div x-data="modal" x-cloak>
     <!-- Modal Backdrop -->
-    <div class="fixed inset-0 bg-black bg-opacity-50 z-40"
+    <div id="modalContainer" class="fixed inset-0 bg-black bg-opacity-50 z-40"
          x-show="isOpen"
          x-transition:enter="transition ease-out duration-300"
          x-transition:enter-start="opacity-0"
@@ -76,67 +76,129 @@
 </div>
 
 <script>
+    // Create a global object to store modal reference
+    window.modalSystem = {
+        instance: null,
+        initialized: false
+    };
+    
     document.addEventListener('alpine:init', () => {
-        Alpine.data('modal', () => ({
-            isOpen: false,
-            type: 'report', // 'report' or 'delete'
-            title: '',
-            message: '',
-            confirmText: 'Confirm',
-            cancelText: 'Cancel',
+        Alpine.data('modal', () => {
+            const modalData = {
+                isOpen: false,
+                type: 'report', // 'report' or 'delete'
+                title: '',
+                message: '',
+                confirmText: 'Confirm',
+                cancelText: 'Cancel',
 
-            open(config) {
-                this.type = config.type || 'report';
-                this.title = config.title || 'Confirmation';
-                this.message = config.message || 'Are you sure?';
-                this.confirmText = config.confirmText || 'Confirm';
-                this.cancelText = config.cancelText || 'Cancel';
-                this.isOpen = true;
-                document.body.style.overflow = 'hidden';
-            },
+                init() {
+                    // Store reference to this component instance globally
+                    window.modalSystem.instance = this;
+                    window.modalSystem.initialized = true;
+                    console.log('Modal component initialized and stored globally');
+                    
+                    // Dispatch an event to notify that the modal is ready
+                    setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('modal-ready', {
+                            detail: { modalInstance: this }
+                        }));
+                        console.log('Modal ready event dispatched');
+                    }, 100);
+                },
 
-            close() {
-                this.isOpen = false;
-                document.body.style.overflow = '';
-            },
+                close() {
+                    this.isOpen = false;
+                    document.body.style.overflow = '';
+                },
 
-            confirm() {
-                // Emit custom event with modal type
-                window.dispatchEvent(new CustomEvent('modal-confirmed', {
-                    detail: {
-                        type: this.type,
-                        title: this.title
+                confirm() {
+                    // For delete operations, directly call the Alpine component method if possible
+                    if (this.type === 'delete') {
+                        try {
+                            const alpineElement = document.querySelector('[x-data="editWorkoutPage()"]');
+                            if (alpineElement && alpineElement.__x && alpineElement.__x.$data && 
+                                typeof alpineElement.__x.$data.confirmDelete === 'function') {
+                                // Call the Alpine component's confirmDelete method directly
+                                alpineElement.__x.$data.confirmDelete();
+                                console.log('Called confirmDelete directly from modal');
+                            } else {
+                                // Fallback to event dispatch only if direct call fails
+                                console.log('Direct call failed, using event dispatch');
+                                window.dispatchEvent(new CustomEvent('modal-confirmed', {
+                                    detail: {
+                                        type: this.type,
+                                        title: this.title
+                                    }
+                                }));
+                            }
+                        } catch (error) {
+                            console.error('Error in direct confirmDelete call:', error);
+                        }
+                    } else {
+                        // For non-delete operations, use the event system
+                        window.dispatchEvent(new CustomEvent('modal-confirmed', {
+                            detail: {
+                                type: this.type,
+                                title: this.title
+                            }
+                        }));
+                        
+                        // Show toast for report type
+                        if (this.type === 'report') {
+                            window.dispatchEvent(new CustomEvent('show-toast', {
+                                detail: {
+                                    type: 'success',
+                                    message: 'Content has been reported successfully.'
+                                }
+                            }));
+                        }
                     }
-                }));
-
-                // Show appropriate toast based on modal type
-                if (this.type === 'report') {
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: {
-                            type: 'success',
-                            message: 'Content has been reported successfully.'
-                        }
-                    }));
-                } else if (this.type === 'delete') {
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: {
-                            type: 'success',
-                            message: 'Item has been deleted successfully.'
-                        }
-                    }));
+                    
+                    this.close();
                 }
-
-                this.close();
-            }
-        }));
+            };
+            return modalData;
+        });
     });
 
     // Helper function to open modal from anywhere in the application
-    function openModal(config) {
-        window.dispatchEvent(new CustomEvent('open-modal', {
-            detail: config
-        }));
-    }
+    window.openModal = function(config) {
+        try {
+            // Check if modal system is initialized
+            if (window.modalSystem && window.modalSystem.initialized && window.modalSystem.instance) {
+                const modalInstance = window.modalSystem.instance;
+                modalInstance.type = config.type || 'report';
+                modalInstance.title = config.title || 'Confirmation';
+                modalInstance.message = config.message || 'Are you sure?';
+                modalInstance.confirmText = config.confirmText || 'Confirm';
+                modalInstance.cancelText = config.cancelText || 'Cancel';
+                modalInstance.isOpen = true;
+                document.body.style.overflow = 'hidden';
+                console.log('Modal opened successfully using global reference');
+                return;
+            }
+
+            // Fallback: try to find the modal element directly
+            const modalElement = document.querySelector('[x-data="modal"]');
+            if (modalElement && modalElement.__x && modalElement.__x.$data) {
+                const modalData = modalElement.__x.$data;
+                modalData.type = config.type || 'report';
+                modalData.title = config.title || 'Confirmation';
+                modalData.message = config.message || 'Are you sure?';
+                modalData.confirmText = config.confirmText || 'Confirm';
+                modalData.cancelText = config.cancelText || 'Cancel';
+                modalData.isOpen = true;
+                document.body.style.overflow = 'hidden';
+                console.log('Modal opened using direct element reference');
+                return;
+            }
+            
+            console.error('Modal Alpine component not found or not initialized');
+        } catch (error) {
+            console.error('Error opening modal:', error);
+        }
+    };
 </script>
 
 <style>
@@ -144,3 +206,64 @@
         display: none !important;
     }
 </style>
+
+<!-- Direct modal initialization script -->
+<script>
+    // This script runs after the page is loaded to ensure the modal is accessible
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait for Alpine.js to initialize
+        setTimeout(function() {
+            try {
+                // Store direct reference to the modal element
+                const modalElement = document.querySelector('[x-data="modal"]');
+                if (modalElement && modalElement.__x && modalElement.__x.$data) {
+                    // Make the modal directly accessible from the window object
+                    window.directModalAccess = modalElement.__x.$data;
+                    console.log('Direct modal access established');
+                    
+                    // Define a reliable openModal function that doesn't rely on events
+                    window.openModalDirect = function(config) {
+                        try {
+                            if (window.directModalAccess) {
+                                window.directModalAccess.type = config.type || 'report';
+                                window.directModalAccess.title = config.title || 'Confirmation';
+                                window.directModalAccess.message = config.message || 'Are you sure?';
+                                window.directModalAccess.confirmText = config.confirmText || 'Confirm';
+                                window.directModalAccess.cancelText = config.cancelText || 'Cancel';
+                                window.directModalAccess.isOpen = true;
+                                document.body.style.overflow = 'hidden';
+                                console.log('Modal opened directly');
+                                return true;
+                            }
+                            return false;
+                        } catch (error) {
+                            console.error('Error in openModalDirect:', error);
+                            return false;
+                        }
+                    };
+                    
+                    // Override the existing openModal function with our more reliable version
+                    const originalOpenModal = window.openModal;
+                    window.openModal = function(config) {
+                        // Try the direct access first
+                        if (window.openModalDirect(config)) {
+                            return;
+                        }
+                        
+                        // Fall back to the original function if direct access fails
+                        if (typeof originalOpenModal === 'function') {
+                            originalOpenModal(config);
+                        } else {
+                            console.error('No modal opening method available');
+                        }
+                    };
+                    
+                    // Dispatch event that modal is ready
+                    window.dispatchEvent(new CustomEvent('modal-fully-ready'));
+                }
+            } catch (error) {
+                console.error('Error in direct modal initialization:', error);
+            }
+        }, 500);
+    });
+</script>

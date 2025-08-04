@@ -19,7 +19,7 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 }
 
-<div x-data="{ showToast: false }" x-cloak>
+<div>
     <!-- Main Content -->
     <main class="pt-20 pb-8 px-2 md:px-6 max-w-7xl mx-auto">
         <div class="flex flex-col md:flex-row gap-6">
@@ -51,7 +51,7 @@
                     </div>
                 </div>
                 <!-- Add New Goal Button -->
-                <button @@click ="showToast = true; setTimeout(() => showToast = false, 2000)"
+                <button @@click ="showToast('New goal feature coming soon!', 'success')"
                         class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow transition">
                     Add New Goal
                 </button>

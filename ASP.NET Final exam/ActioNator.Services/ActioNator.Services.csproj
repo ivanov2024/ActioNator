@@ -15,6 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="HtmlSanitizer" Version="9.0.886" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\ActioNator.Data.Models\ActioNator.Data.Models.csproj" />
     <ProjectReference Include="..\ActioNator.Data\ActioNator.Data.csproj" />
     <ProjectReference Include="..\ActioNator.GCommon\ActioNator.GCommon.csproj" />

@@ -5,12 +5,16 @@ using ActioNator.Services.Configuration;
 using ActioNator.Services.ContentInspectors;
 using ActioNator.Services.Implementations.AuthenticationService;
 using ActioNator.Services.Implementations.FileServices;
+using ActioNator.Services.Implementations.InputSanitization;
 using ActioNator.Services.Implementations.UserDashboard;
 using ActioNator.Services.Implementations.VerifyCoach;
+using ActioNator.Services.Implementations.WorkoutService;
 using ActioNator.Services.Interfaces.AuthenticationServices;
 using ActioNator.Services.Interfaces.FileServices;
+using ActioNator.Services.Interfaces.InputSanitizationService;
 using ActioNator.Services.Interfaces.UserDashboard;
 using ActioNator.Services.Interfaces.VerifyCoachServices;
+using ActioNator.Services.Interfaces.WorkoutService;
 using ActioNator.Services.Seeding;
 using ActioNator.Services.Validators;
 using Microsoft.AspNetCore.Identity;
@@ -124,6 +128,12 @@ namespace ActioNator
             // Register user dashboard service
             builder.Services
                 .AddScoped<IUserDashboardService, UserDashboardService>();
+
+            builder.Services
+                .AddScoped<IWorkoutService, WorkoutService>();
+
+            builder.Services
+                .AddScoped<IInputSanitizationService, InputSanitizationService>();
 
             builder.Services
                 .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>

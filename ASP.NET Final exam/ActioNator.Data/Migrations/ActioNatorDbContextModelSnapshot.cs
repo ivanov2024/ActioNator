@@ -205,7 +205,7 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime?>("LastLoginAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 0, 2, 52, 520, DateTimeKind.Utc).AddTicks(4730));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 9, 32, 43, 488, DateTimeKind.Utc).AddTicks(9847));
 
                     b.Property<string>("LastName")
                         .IsRequired()
@@ -244,7 +244,7 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("RegisteredAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 0, 2, 52, 520, DateTimeKind.Utc).AddTicks(4232));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 9, 32, 43, 488, DateTimeKind.Utc).AddTicks(9358));
 
                     b.Property<int>("Role")
                         .HasColumnType("int");
@@ -281,7 +281,7 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 0, 2, 52, 525, DateTimeKind.Utc).AddTicks(2431));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 9, 32, 43, 493, DateTimeKind.Utc).AddTicks(5458));
 
                     b.Property<bool>("IsDeleted")
                         .ValueGeneratedOnAdd()
@@ -323,7 +323,7 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 0, 2, 52, 526, DateTimeKind.Utc).AddTicks(1442));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 9, 32, 43, 494, DateTimeKind.Utc).AddTicks(4857));
 
                     b.Property<bool>("IsAuthor")
                         .HasColumnType("bit");
@@ -422,6 +422,162 @@ namespace ActioNator.Data.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("ExerciseTemplates");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("465f2a36-546b-4087-bda8-538d7fcfc11a"),
+                            ImageUrl = "~/images/exercise/pushUpImage.png",
+                            Name = "Push Up",
+                            TargetedMuscle = "Chest"
+                        },
+                        new
+                        {
+                            Id = new Guid("91c9b0bc-0c1d-48e8-adcf-1909e958df86"),
+                            ImageUrl = "~/images/exercise/pullUpImage.png",
+                            Name = "Pull Up",
+                            TargetedMuscle = "Back"
+                        },
+                        new
+                        {
+                            Id = new Guid("e4efbfad-aad5-42d6-815f-2dd612c7743e"),
+                            ImageUrl = "~/images/exercise/squatImage.webp",
+                            Name = "Squat",
+                            TargetedMuscle = "Legs"
+                        },
+                        new
+                        {
+                            Id = new Guid("35c5743e-9854-4e6d-ac9a-959965176fcd"),
+                            ImageUrl = "~/images/exercise/deadliftImage.png",
+                            Name = "Deadlift",
+                            TargetedMuscle = "Back"
+                        },
+                        new
+                        {
+                            Id = new Guid("cbbe5588-6435-4692-9bef-fd3958b2f943"),
+                            ImageUrl = "~/images/exercise/plankImage.png",
+                            Name = "Plank",
+                            TargetedMuscle = "Core"
+                        },
+                        new
+                        {
+                            Id = new Guid("32fc5f9f-bb15-4868-a119-76ec4a6893ed"),
+                            ImageUrl = "~/images/exercise/bicepCurlImage.webp",
+                            Name = "Bicep Curl",
+                            TargetedMuscle = "Biceps"
+                        },
+                        new
+                        {
+                            Id = new Guid("1b10fe06-748e-437f-8190-7dcc80d4223b"),
+                            ImageUrl = "~/images/exercise/tricepDipImage.png",
+                            Name = "Tricep Dip",
+                            TargetedMuscle = "Triceps"
+                        },
+                        new
+                        {
+                            Id = new Guid("887e3155-a526-4381-a673-2d4ac1825575"),
+                            ImageUrl = "~/images/exercise/shoulderPressImage.webp",
+                            Name = "Shoulder Press",
+                            TargetedMuscle = "Shoulders"
+                        },
+                        new
+                        {
+                            Id = new Guid("9b2e0dc9-9f7b-4b65-b8db-d14f2b6a23cb"),
+                            ImageUrl = "~/images/exercise/lungesImage.webp",
+                            Name = "Lunges",
+                            TargetedMuscle = "Legs"
+                        },
+                        new
+                        {
+                            Id = new Guid("652febc1-3742-48b0-b356-12444b88ff5b"),
+                            ImageUrl = "~/images/exercise/mountainClimbersImage.png",
+                            Name = "Mountain Climbers",
+                            TargetedMuscle = "Full Body"
+                        },
+                        new
+                        {
+                            Id = new Guid("86c4d55e-f577-4380-9485-152c40d89a92"),
+                            ImageUrl = "~/images/exercise/burpeesImage.webp",
+                            Name = "Burpees",
+                            TargetedMuscle = "Full Body"
+                        },
+                        new
+                        {
+                            Id = new Guid("b11cd880-a989-4da7-b5c3-5b3c68cd3a68"),
+                            ImageUrl = "~/images/exercise/russianTwistsImage.webp",
+                            Name = "Russian Twists",
+                            TargetedMuscle = "Obliques"
+                        },
+                        new
+                        {
+                            Id = new Guid("9d117e5e-204f-4223-843d-d103ec71dba4"),
+                            ImageUrl = "~/images/exercise/jumpingJacksImage.png",
+                            Name = "Jumping Jacks",
+                            TargetedMuscle = "Cardio"
+                        },
+                        new
+                        {
+                            Id = new Guid("1ab97f57-8902-4edb-9394-64e41d925d0b"),
+                            ImageUrl = "~/images/exercise/highKneesImage.webp",
+                            Name = "High Knees",
+                            TargetedMuscle = "Cardio"
+                        },
+                        new
+                        {
+                            Id = new Guid("3f9df2e6-a13e-40a4-bd08-485fb04f45bd"),
+                            ImageUrl = "~/images/exercise/legRaisesImage.webp",
+                            Name = "Leg Raises",
+                            TargetedMuscle = "Lower Abs"
+                        },
+                        new
+                        {
+                            Id = new Guid("11be10a7-ec4d-4455-8eab-ce777739991a"),
+                            ImageUrl = "~/images/exercise/gluteBridgeImage.webp",
+                            Name = "Glute Bridge",
+                            TargetedMuscle = "Glutes"
+                        },
+                        new
+                        {
+                            Id = new Guid("7f2b1df2-4470-4af6-9b62-6e5024ae1194"),
+                            ImageUrl = "~/images/exercise/sidePlankImage.png",
+                            Name = "Side Plank",
+                            TargetedMuscle = "Obliques"
+                        },
+                        new
+                        {
+                            Id = new Guid("97f56f43-4218-4c56-ae52-8d2e0ea31178"),
+                            ImageUrl = "~/images/exercise/wallSitImage.png",
+                            Name = "Wall Sit",
+                            TargetedMuscle = "Quadriceps"
+                        },
+                        new
+                        {
+                            Id = new Guid("a8f0c913-c562-4796-9c65-70c95a38f17a"),
+                            ImageUrl = "~/images/exercise/calfRaiseImage.jpeg",
+                            Name = "Calf Raise",
+                            TargetedMuscle = "Calves"
+                        },
+                        new
+                        {
+                            Id = new Guid("a55a054d-453c-4fbd-bbdd-463116ee7e86"),
+                            ImageUrl = "~/images/exercise/bentOverRowImage.webp",
+                            Name = "Bent Over Row",
+                            TargetedMuscle = "Upper Back"
+                        },
+                        new
+                        {
+                            Id = new Guid("ee6e57e2-df3e-4906-88bd-103880c39bcb"),
+                            ImageUrl = "~/images/exercise/chestFlyImage.webp",
+                            Name = "Chest Fly",
+                            TargetedMuscle = "Chest"
+                        },
+                        new
+                        {
+                            Id = new Guid("3f3ab4f1-15e5-4d1d-a954-87b6c2ea50c7"),
+                            ImageUrl = "~/images/exercise/toeTouchesImage.webp",
+                            Name = "Toe Touches",
+                            TargetedMuscle = "Hamstrings"
+                        });
                 });
 
             modelBuilder.Entity("ActioNator.Data.Models.Goal", b =>
@@ -439,7 +595,7 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 0, 2, 52, 527, DateTimeKind.Utc).AddTicks(9869));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 9, 32, 43, 495, DateTimeKind.Utc).AddTicks(7320));
 
                     b.Property<string>("Description")
                         .IsRequired()
@@ -485,7 +641,7 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 0, 2, 52, 529, DateTimeKind.Utc).AddTicks(4082));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 9, 32, 43, 497, DateTimeKind.Utc).AddTicks(207));
 
                     b.Property<string>("ImageUrl")
                         .HasColumnType("nvarchar(max)");
@@ -546,7 +702,7 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("PostedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 0, 2, 52, 534, DateTimeKind.Utc).AddTicks(2775));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 9, 32, 43, 501, DateTimeKind.Utc).AddTicks(4003));
 
                     b.Property<Guid>("ReceiverId")
                         .HasColumnType("uniqueidentifier");
@@ -578,7 +734,7 @@ namespace ActioNator.Data.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("datetime2")
-                        .HasDefaultValue(new DateTime(2025, 8, 2, 0, 2, 52, 535, DateTimeKind.Utc).AddTicks(2495));
+                        .HasDefaultValue(new DateTime(2025, 8, 2, 9, 32, 43, 502, DateTimeKind.Utc).AddTicks(2952));
 
                     b.Property<string>("ImageUrl")
                         .HasColumnType("nvarchar(max)");

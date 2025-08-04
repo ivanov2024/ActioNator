@@ -1,4 +1,4 @@
-﻿@* Reusable Toast Notification Component *@
+@* Reusable Toast Notification Component *@
 
 <div x-data="toastSystem"
 	 @@show-toast.window ="addToast($event.detail)"
@@ -60,19 +60,31 @@
 			toasts: [],
 
 			addToast(config) {
-				const toast = {
-					type: config.type || 'success',
-					message: config.message || 'Operation completed',
-					show: true,
-					removing: false
-				};
+				// Check for duplicate toasts with the same message and type
+				const isDuplicate = this.toasts.some(t => 
+					t.type === (config.type || 'success') && 
+					t.message === (config.message || 'Operation completed')
+				);
+				
+				// Only add if not a duplicate
+				if (!isDuplicate) {
+					const toast = {
+						type: config.type || 'success',
+						message: config.message || 'Operation completed',
+						show: true,
+						removing: false,
+						id: Date.now() // Add unique ID
+					};
 
-				this.toasts.push(toast);
+					this.toasts.push(toast);
 
-				// Auto-dismiss after 5 seconds
-				setTimeout(() => {
-					this.dismissToast(this.toasts.indexOf(toast));
-				}, 5000);
+					// Auto-dismiss after 5 seconds
+					setTimeout(() => {
+						this.dismissToast(this.toasts.indexOf(toast));
+					}, 5000);
+				} else {
+					console.log('Prevented duplicate toast:', config.message);
+				}
 			},
 
 			dismissToast(index) {

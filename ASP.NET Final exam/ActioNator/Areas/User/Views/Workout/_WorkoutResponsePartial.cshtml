@@ -1,0 +1,66 @@
+@using ActioNator.Services.Interfaces.InputSanitizationService
+@using ActioNator.Services.Interfaces
+
+@model ActioNator.ViewModels.Workouts.WorkoutCardViewModel
+
+@inject IInputSanitizationService SanitizationService
+
+@{
+    // This partial is used for AJAX responses to workout operations
+    // Add safety checks for all ViewData values to prevent null reference exceptions
+    var success = ViewData["Success"] as bool? ?? false;
+    var toastType = ViewData["ToastType"] as string ?? "info";
+    var toastMessage = SanitizationService.SanitizeString(ViewData["ToastMessage"] as string ?? "");
+    var errors = ViewData["Errors"] as Dictionary<string, string[]>;
+    var exerciseData = ViewData["ExerciseData"];
+    
+    // Add a unique response ID to help with debugging
+    var responseId = Guid.NewGuid().ToString();
+}
+
+<!-- Toast data container with data attributes for client-side processing -->
+<!-- Added response ID and safety attributes for debugging -->
+<div id="toast-data" 
+     data-success="@success.ToString().ToLower()" 
+     data-toast-type="@toastType" 
+     data-toast-message="@toastMessage"
+     data-response-id="@responseId"
+     data-timestamp="@DateTime.UtcNow.ToString("o")"
+     data-is-partial="true"
+     data-auto-toast="false">
+</div>
+
+<!-- Safety logging for debugging -->
+<script>
+    console.log('[WORKOUT_RESPONSE] Partial view rendered with ID: @responseId, success: @success, type: @toastType');
+</script>
+
+<!-- Exercise data container for client-side processing -->
+@if (exerciseData != null)
+{
+    // Sanitize the exercise data before serializing to prevent XSS
+    var sanitizedData = SanitizationService.SanitizeDictionary(
+        System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, string>>(
+            System.Text.Json.JsonSerializer.Serialize(exerciseData)
+        )
+    );
+    
+    <div data-exercise-data="@Html.Raw(Json.Serialize(sanitizedData))"></div>
+}
+
+<!-- Validation errors if any -->
+@if (errors != null && errors.Any())
+{
+    <div id="validationErrors">
+        @foreach (var error in errors)
+        {
+            var sanitizedKey = SanitizationService.SanitizeString(error.Key);
+            var sanitizedMessages = error.Value.Select(msg => SanitizationService.SanitizeString(msg));
+            
+            <div class="validation-error" 
+                 data-field="@sanitizedKey" 
+                 data-message="@string.Join(", ", sanitizedMessages)">
+            </div>
+        }
+    </div>
+}
