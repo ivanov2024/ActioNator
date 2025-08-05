@@ -5,13 +5,17 @@ using ActioNator.Services.Configuration;
 using ActioNator.Services.ContentInspectors;
 using ActioNator.Services.Implementations.AuthenticationService;
 using ActioNator.Services.Implementations.FileServices;
+using ActioNator.Services.Implementations.GoalService;
 using ActioNator.Services.Implementations.InputSanitization;
+using ActioNator.Services.Implementations.JournalService;
 using ActioNator.Services.Implementations.UserDashboard;
 using ActioNator.Services.Implementations.VerifyCoach;
 using ActioNator.Services.Implementations.WorkoutService;
 using ActioNator.Services.Interfaces.AuthenticationServices;
 using ActioNator.Services.Interfaces.FileServices;
+using ActioNator.Services.Interfaces.GoalService;
 using ActioNator.Services.Interfaces.InputSanitizationService;
+using ActioNator.Services.Interfaces.JournalService;
 using ActioNator.Services.Interfaces.UserDashboard;
 using ActioNator.Services.Interfaces.VerifyCoachServices;
 using ActioNator.Services.Interfaces.WorkoutService;
@@ -136,6 +140,13 @@ namespace ActioNator
                 .AddScoped<IInputSanitizationService, InputSanitizationService>();
 
             builder.Services
+                .AddScoped<IGoalService, GoalService>();
+
+            // Register Journal service
+            builder.Services
+                .AddScoped<IJournalService, JournalService>();
+
+            builder.Services
                 .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
                 {
                     options.SignIn.RequireConfirmedAccount = false;
@@ -148,6 +159,35 @@ namespace ActioNator
                 .AddRoles<IdentityRole<Guid>>()
                 .AddEntityFrameworkStores<ActioNatorDbContext>()
                 .AddDefaultTokenProviders();
+
+            builder.Services.AddAntiforgery(options => 
+            {
+                // Set the cookie name and header name
+                options.HeaderName = "X-CSRF-TOKEN";
+                options.Cookie.Name = "CSRF-TOKEN";
+                options.FormFieldName = "__RequestVerificationToken";
+            });
+
+            // Configure authorization options
+            builder.Services.ConfigureApplicationCookie(options =>
+            {
+                // Set the login path
+                options.LoginPath = "/Identity/Account/Access";
+                
+                // Set the access denied path
+                options.AccessDeniedPath = "/Identity/Account/AccessDenied";
+                
+                // Set cookie expiration
+                options.ExpireTimeSpan = TimeSpan.FromHours(2);
+                options.SlidingExpiration = true;
+            });
+
+            builder.Services
+            .AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+            });
 
             WebApplication app = builder.Build();
 

@@ -10,4 +10,8 @@
     <PackageReference Include="Microsoft.AspNetCore.Mvc.Abstractions" Version="2.3.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ActioNator.GCommon\ActioNator.GCommon.csproj" />
+  </ItemGroup>
+
 </Project>

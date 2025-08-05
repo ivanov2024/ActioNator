@@ -5,6 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-ActioNator-4a7d48d5-2dbe-42c3-84af-43e23c143db4</UserSecretsId>
+    <GenerateStaticWebAssetsPrecompressedFiles>false</GenerateStaticWebAssetsPrecompressedFiles>
   </PropertyGroup>
 
   <ItemGroup>

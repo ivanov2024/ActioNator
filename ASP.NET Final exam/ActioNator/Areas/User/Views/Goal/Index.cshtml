@@ -1,0 +1,246 @@
+@model List<ActioNator.ViewModels.Goal.GoalViewModel>
+
+@{
+    ViewData["Title"] = "My Goals - ActioNator";
+    Layout = "_Layout";
+}
+
+<div class="container mx-auto px-4 py-8">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
+            <div class="space-y-1">
+                <h1 class="text-3xl font-bold text-indigo-600">
+                    My Goals
+                </h1>
+                <p class="text-gray-600 text-sm">Track your progress and stay motivated.</p>
+            </div>
+            <button class="btn-primary whitespace-nowrap group rounded-full px-5 py-2" id="new-goal-btn">
+    <i class="fas fa-plus mr-2 transition-transform duration-300 group-hover:rotate-90"></i> New Goal
+</button>
+
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="mb-8">
+        <div class="inline-flex flex-wrap gap-2 items-center">
+            <span class="text-sm font-medium text-gray-500 mr-2">Filter by:</span>
+            <div class="filter-group">
+                <button class="filter-btn active" data-filter="all">
+                    <i class="fas fa-layer-group mr-2 text-xs opacity-70"></i>All
+                </button>
+                <button class="filter-btn" data-filter="active">
+                    <i class="fas fa-spinner mr-2 text-xs opacity-70"></i>Active
+                </button>
+                <button class="filter-btn" data-filter="completed">
+                    <i class="fas fa-check-circle mr-2 text-xs opacity-70"></i>Completed
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Goals Container (Flexbox) -->
+    <div id="goals-container" class="flex flex-wrap gap-6">
+        @await Html.PartialAsync("_GoalsPartial", Model)
+    </div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden text-center py-16">
+        <div class="mx-auto w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mb-4">
+            <i class="fas fa-bullseye text-2xl text-indigo-600"></i>
+        </div>
+        <h3 class="text-xl font-medium mb-2">No goals yet</h3>
+        <p class="text-gray-600 mb-4">Start by creating your first goal</p>
+        <button class="btn-primary" id="empty-state-cta">
+            <i class="fas fa-plus mr-2"></i> Create Goal
+        </button>
+    </div>
+
+    <!-- Goals are loaded directly without skeleton loaders -->
+</div>
+
+<!-- New Goal Modal -->
+<div id="goal-modal" class="modal" aria-labelledby="modal-title" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-overlay" aria-hidden="true"></div>
+
+    <!-- Modal Content -->
+    <div class="modal-content">
+        <!-- Modal Header -->
+        <div class="modal-header">
+            <div class="flex items-center justify-between w-full">
+                <h3 class="text-xl font-semibold text-gray-900" id="modal-title">
+                    Create a New Goal
+                </h3>
+                <button type="button" class="modal-close-btn p-2 rounded-full hover:bg-gray-100 transition-colors" aria-label="Close">
+                    <i class="fas fa-times w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Modal Body -->
+        <form id="goal-form" class="px-6 py-4">
+            @Html.AntiForgeryToken()
+            <!-- Title -->
+            <div class="mb-4">
+                <label for="goal-title" class="block text-sm font-medium text-gray-700 mb-1">
+                    Title <span class="text-red-500">*</span>
+                </label>
+                <input type="text" id="goal-title" name="title" required minlength="3" maxlength="300"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="Enter goal title">
+                <p class="mt-1 text-xs text-red-600 hidden" id="title-error">
+                    Title must be between 3 and 300 characters
+                </p>
+            </div>
+
+            <!-- Description -->
+            <div class="mb-4">
+                <label for="goal-description" class="block text-sm font-medium text-gray-700 mb-1">
+                    Description <span class="text-gray-500 text-xs">10-250 characters</span>
+                </label>
+                <textarea id="goal-description" name="description" rows="3" minlength="10" maxlength="250"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="Describe your goal in detail"></textarea>
+                <p class="mt-1 text-xs text-red-600 hidden" id="description-error">
+                    Description must be between 10 and 250 characters
+                </p>
+            </div>
+
+            <!-- Due Date -->
+            <div class="mb-4">
+                <label for="due-date" class="block text-sm font-medium text-gray-700 mb-1">
+                    Due Date <span class="text-red-500">*</span>
+                </label>
+                <input type="date" id="due-date" name="dueDate" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                       min="">
+                <p class="mt-1 text-xs text-red-600 hidden" id="due-date-error">
+                    Please select a future date
+                </p>
+            </div>
+
+            <!-- Form Error Message -->
+            <div id="form-error" class="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-md hidden">
+                Please fix the errors in the form before submitting.
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-actions flex flex-wrap justify-end gap-3 mt-6">
+                <button type="button" class="modal-cancel-btn px-4 sm:px-5 py-2.5 rounded-lg border border-gray-300 hover:bg-gray-100 transition-colors w-full sm:w-auto mb-2 sm:mb-0" id="cancel-goal-btn">
+                    Cancel
+                </button>
+                <button type="submit" id="create-goal-btn" class="btn-primary px-4 sm:px-5 py-2.5 rounded-lg w-full sm:w-auto">
+                    <span id="create-text">Create Goal</span>
+                    <span id="create-loading" class="hidden">
+                        <i class="fas fa-circle-notch fa-spin"></i> Creating...
+                    </span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Goal Modal -->
+<div id="edit-goal-modal" class="modal" aria-labelledby="edit-modal-title" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-overlay" aria-hidden="true"></div>
+
+    <!-- Modal Content -->
+    <div class="modal-content">
+        <!-- Modal Header -->
+        <div class="modal-header">
+            <div class="flex items-center justify-between">
+                <h3 class="text-xl font-semibold text-gray-900" id="edit-modal-title">
+                    Edit Goal
+                </h3>
+                <button type="button" class="modal-close-btn p-2 rounded-full hover:bg-gray-100 transition-colors" aria-label="Close">
+                    <i class="fas fa-times w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Modal Body -->
+        <form id="edit-goal-form" class="px-6 py-4">
+            @Html.AntiForgeryToken()
+            <input type="hidden" id="edit-goal-id" name="id">
+
+            <!-- Title -->
+            <div class="mb-4">
+                <label for="edit-goal-title" class="block text-sm font-medium text-gray-700 mb-1">
+                    Title <span class="text-red-500">*</span>
+                </label>
+                <input type="text" id="edit-goal-title" name="title" required minlength="3" maxlength="300"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                       placeholder="Enter goal title">
+                <p class="mt-1 text-xs text-red-600 hidden" id="edit-title-error">
+                    Title must be between 3 and 300 characters
+                </p>
+            </div>
+
+            <!-- Description -->
+            <div class="mb-4">
+                <label for="edit-goal-description" class="block text-sm font-medium text-gray-700 mb-1">
+                    Description <span class="text-gray-500 text-xs">10-250 characters</span>
+                </label>
+                <textarea id="edit-goal-description" name="description" rows="3" minlength="10" maxlength="250"
+                          class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                          placeholder="Describe your goal in detail"></textarea>
+                <p class="mt-1 text-xs text-red-600 hidden" id="edit-description-error">
+                    Description must be between 10 and 250 characters
+                </p>
+            </div>
+
+            <!-- Due Date -->
+            <div class="mb-6">
+                <label for="edit-due-date" class="block text-sm font-medium text-gray-700 mb-1">
+                    Due Date <span class="text-red-500">*</span>
+                </label>
+                <input type="date" id="edit-due-date" name="dueDate" required
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                       min="">
+                <p class="mt-1 text-xs text-red-600 hidden" id="edit-due-date-error">
+                    Please select a future date
+                </p>
+            </div>
+
+            <!-- Completed Toggle -->
+            <div class="mt-4 mb-6 flex items-center">
+                <label class="toggle-switch">
+                    <input type="checkbox" id="edit-goal-completed" name="completed">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="ml-3 text-sm font-medium text-gray-700">Mark as completed</span>
+            </div>
+
+            <!-- Form Error Message -->
+            <div id="edit-form-error" class="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-md hidden">
+                Please fix the errors in the form before submitting.
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-actions">
+                <button type="button" class="modal-cancel-btn" id="cancel-edit-btn">
+                    Cancel
+                </button>
+                <button type="submit" id="save-goal-btn" class="btn-primary">
+                    <span id="save-text">Save Changes</span>
+                    <span id="save-loading" class="hidden">
+                        <i class="fas fa-circle-notch fa-spin"></i> Saving...
+                    </span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/goal.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/goal-animations.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/modal-fixes.css" asp-append-version="true" />
+}
+
+@section Scripts {
+    <script src="~/js/goal.js" asp-append-version="true"></script>
+    <script src="~/js/read-more.js" asp-append-version="true"></script>
+    <script src="~/js/modal-handler.js" asp-append-version="true"></script>
+}

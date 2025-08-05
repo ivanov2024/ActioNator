@@ -10,9 +10,13 @@
     <link rel="stylesheet" href="~/ActioNator.styles.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/navigation.css" asp-append-version="true" />
     <link rel="stylesheet" href="~/css/post.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/goal.css" asp-append-version="true" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
 </head>
 <body>
     @if (User.IsInRole("Admin"))
@@ -38,6 +42,9 @@
     
     <!-- Global Toast Notification System -->
     @await Html.PartialAsync("_ToastPartial")
+    
+    <!-- Global Modal System -->
+    @await Html.PartialAsync("_ModalPartial")
     
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
