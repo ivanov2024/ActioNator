@@ -30,6 +30,8 @@ namespace ActioNator.Data.Models
 
         public DateTime RegisteredAt { get; set; }
 
+        public DateTime? LastLoginAt { get; set; } = null!;
+
         public bool IsDeleted { get; set; }
 
         public virtual ICollection<Goal> Goals { get; set; } 
@@ -53,21 +55,27 @@ namespace ActioNator.Data.Models
         /// <summary>
         /// Gets or sets the collection of chats where the user is the first participant (initiator).
         /// </summary>
-        public ICollection<Chat> ChatsInitiated { get; set; } = new HashSet<Chat>();
+        public ICollection<Chat> ChatsInitiated { get; set; } 
+            = new HashSet<Chat>();
 
         /// <summary>
         /// Gets or sets the collection of chats where the user is the second participant (receiver).
         /// </summary>
-        public ICollection<Chat> ChatsReceived { get; set; } = new HashSet<Chat>();
+        public ICollection<Chat> ChatsReceived { get; set; } 
+            = new HashSet<Chat>();
 
         /// <summary>
         /// Gets or sets the collection of messages sent by the user.
         /// </summary>
-        public ICollection<Message> MessagesSent { get; set; } = new HashSet<Message>();
+        public ICollection<Message> MessagesSent { get; set; } 
+            = new HashSet<Message>();
 
         /// <summary>
         /// Gets or sets the collection of messages received by the user.
         /// </summary>
-        public ICollection<Message> MessagesReceived { get; set; } = new HashSet<Message>();
+        public ICollection<Message> MessagesReceived { get; set; } 
+            = new HashSet<Message>();
+        public virtual ICollection<UserLoginHistory> LoginHistory { get; set; } 
+            = new HashSet<UserLoginHistory>();
     }
 }

@@ -1,0 +1,24 @@
+@{
+    var errors = ViewData["Errors"] as Dictionary<string, string[]>;
+    var toastType = ViewData["ToastType"] as string ?? "error";
+    var toastMessage = ViewData["ToastMessage"] as string ?? "Please fix the validation errors";
+}
+
+<div id="validationResponseData" 
+     data-success="false" 
+     data-toast-type="@toastType" 
+     data-toast-message="@toastMessage">
+    
+    @if (errors != null && errors.Any())
+    {
+        <div id="validationErrors">
+            @foreach (var error in errors)
+            {
+                <div class="validation-error" 
+                     data-field="@error.Key" 
+                     data-message="@string.Join(", ", error.Value)">
+                </div>
+            }
+        </div>
+    }
+</div>

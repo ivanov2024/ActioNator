@@ -17,6 +17,14 @@ namespace ActioNator.Data.EntityConfigurations
                 .HasDefaultValue(DateTime.UtcNow);
 
             applicationUser
+                .Property(au => au.LastLoginAt)
+                .HasDefaultValue(DateTime.UtcNow);
+
+            applicationUser
+                .Property(au => au.ProfilePictureUrl)
+                .HasDefaultValue("https://static.vecteezy.com/system/resources/thumbnails/020/765/399/small_2x/default-profile-account-unknown-icon-black-silhouette-free-vector.jpg");
+
+            applicationUser
                 .Property(au => au.IsDeleted)
                 .HasDefaultValue(false);
 

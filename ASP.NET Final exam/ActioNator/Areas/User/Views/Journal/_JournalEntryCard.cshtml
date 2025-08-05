@@ -1,0 +1,72 @@
+@* Journal Entry Card Partial View *@
+
+<div class="bg-white rounded-lg shadow-md p-6 journal-card relative">
+    <!-- Entry Header -->
+    <div class="flex justify-between items-start mb-3">
+        <h3 class="text-lg font-semibold text-gray-900 leading-tight" x-text="entry.title"></h3>
+        
+        <!-- Entry Menu -->
+        <div class="relative">
+            <button
+                @@click.stop="toggleMenu(index)"
+                class="text-gray-400 hover:text-gray-600 focus:outline-none"
+            >
+                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                </svg>
+            </button>
+            
+            <!-- Dropdown Menu -->
+            <div
+                x-show="activeMenu === index"
+                @@click.away="closeMenu"
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="transform opacity-0 scale-95"
+                x-transition:enter-end="transform opacity-100 scale-100"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="transform opacity-100 scale-100"
+                x-transition:leave-end="transform opacity-0 scale-95"
+                class="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10"
+            >
+                <div class="py-1" role="menu" aria-orientation="vertical">
+                    <button
+                        @@click="editEntry(entry)"
+                        class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900"
+                        role="menuitem"
+                    >
+                        Edit
+                    </button>
+                    <button
+                        @@click="openDeleteModal(entry.id)"
+                        class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 hover:text-red-700"
+                        role="menuitem"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Entry Content -->
+    <div
+        x-ref="content"
+        class="text-gray-600 leading-relaxed prose prose-sm max-w-none line-clamp-4 mb-3"
+        x-html="entry.content ? entry.content.replace(/\n/g, '<br>') : ''"
+    ></div>
+    
+    <!-- Entry Footer -->
+    <div class="flex flex-wrap justify-between items-center text-sm text-gray-500 mt-4">
+        <div class="flex items-center">
+            <svg class="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+            </svg>
+            <span x-text="formatDate(entry.createdAt)"></span>
+        </div>
+        
+        <div class="flex items-center mt-2 sm:mt-0">
+            <span class="mood-tag-prefix">#</span>
+            <span x-text="entry.moodTag || ''"></span>
+        </div>
+    </div>
+</div>

@@ -3,6 +3,7 @@ using ActioNator.Data.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+
 using static ActioNator.Data.ActioNatorConnectionString;
 
 namespace ActioNator.Data
@@ -19,6 +20,8 @@ namespace ActioNator.Data
         public DbSet<AchievementTemplate> AchievementTemplates { get; set; } = null!;
 
         public DbSet<ApplicationUser> ApplicationUsers { get; set; } = null!;
+
+        public DbSet<UserLoginHistory> UserLoginHistories { get; set; } = null!;
 
         public DbSet<Chat> Chats { get; set; } = null!;
 

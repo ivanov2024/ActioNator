@@ -1,34 +1,221 @@
 using ActioNator.Data;
 using ActioNator.Data.Models;
+using ActioNator.Middleware;
+using ActioNator.Services.Configuration;
+using ActioNator.Services.ContentInspectors;
+using ActioNator.Services.Implementations.AuthenticationService;
+using ActioNator.Services.Implementations.FileServices;
+using ActioNator.Services.Implementations.GoalService;
+using ActioNator.Services.Implementations.InputSanitization;
+using ActioNator.Services.Implementations.JournalService;
+using ActioNator.Services.Implementations.UserDashboard;
+using ActioNator.Services.Implementations.VerifyCoach;
+using ActioNator.Services.Implementations.WorkoutService;
+using ActioNator.Services.Interfaces.AuthenticationServices;
+using ActioNator.Services.Interfaces.FileServices;
+using ActioNator.Services.Interfaces.GoalService;
+using ActioNator.Services.Interfaces.InputSanitizationService;
+using ActioNator.Services.Interfaces.JournalService;
+using ActioNator.Services.Interfaces.UserDashboard;
+using ActioNator.Services.Interfaces.VerifyCoachServices;
+using ActioNator.Services.Interfaces.WorkoutService;
+using ActioNator.Services.Seeding;
+using ActioNator.Services.Validators;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace ActioNator
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
-            var builder = WebApplication.CreateBuilder(args);
+            WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
             // Add services to the container.
-            var connectionString = builder.Configuration.GetConnectionString("DefaultActioNatorConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-            builder.Services.AddDbContext<ActioNatorDbContext>(options =>
-                options.UseSqlServer(connectionString));
-            builder.Services.AddDatabaseDeveloperPageExceptionFilter();
+            string connectionString 
+                = builder
+                .Configuration
+                .GetConnectionString("DefaultActioNatorConnection") 
+                ?? 
+                throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-            builder.Services.AddControllersWithViews();
+            builder.Services.AddDbContext<ActioNatorDbContext>
+            (options =>
+                options.UseSqlServer(connectionString)
+            );
+
+            builder.Services
+                .AddDatabaseDeveloperPageExceptionFilter();
+
+            builder.Services
+                .AddControllersWithViews();
+
+            builder.Services
+                .AddRazorPages();
+
+            // Register configuration options
+            builder.Services
+                .Configure<FileUploadOptions>
+                (builder.Configuration.GetSection("FileUpload"));
+            
+            // Register file system and content inspectors
+            builder.Services
+                .AddScoped<IFileSystem, FileSystemService>();
+            builder.Services
+                .AddScoped<ImageContentInspector>();
+            builder.Services
+                .AddScoped<PdfContentInspector>();
+            
+            // Register content inspectors as IFileContentInspector (last one wins for interface resolution)
+            builder.Services
+                .AddScoped<IFileContentInspector>(sp => sp.GetRequiredService<ImageContentInspector>());
+            builder.Services
+                .AddScoped<IFileContentInspector>(sp => sp.GetRequiredService<PdfContentInspector>());
+            
+            // Register validators with specific named registrations to avoid DI conflicts
+            builder.Services.AddScoped<ImageFileValidator>(sp => 
+                new ImageFileValidator(
+                    sp
+                    .GetRequiredService<IOptions<FileUploadOptions>>(),
+                    sp
+                    .GetRequiredService<ILogger<ImageFileValidator>>(),
+                    sp
+                    .GetRequiredService<IFileSystem>(),
+                    sp
+                    .GetRequiredService<ImageContentInspector>()
+                ));
+            
+            builder.Services.AddScoped<PdfFileValidator>(sp => 
+                new PdfFileValidator(
+                    sp
+                    .GetRequiredService<IOptions<FileUploadOptions>>(),
+                    sp
+                    .GetRequiredService<ILogger<PdfFileValidator>>(),
+                    sp
+                    .GetRequiredService<IFileSystem>(),
+                    sp
+                    .GetRequiredService<PdfContentInspector>()
+                ));
+                
+            // Register concrete validators as IFileValidator
+            builder.Services
+                .AddScoped<IFileValidator>(sp => sp.GetRequiredService<ImageFileValidator>());
+            builder.Services
+                .AddScoped<IFileValidator>(sp => sp.GetRequiredService<PdfFileValidator>());
+            
+            // Register factory and orchestrator using factory methods
+            builder.Services
+                .AddScoped<IFileValidatorFactory>(sp => 
+                new FileValidatorFactory(sp)
+            );
+                
+            builder.Services.AddScoped<IFileValidationOrchestrator>(sp => 
+                new FileValidationOrchestrator(
+                    sp
+                    .GetRequiredService<IFileValidatorFactory>(),
+                    sp
+                    .GetRequiredService<ILogger<FileValidationOrchestrator>>()
+                ));
+            
+            // Register services
+            builder.Services
+                .AddScoped<IFileStorageService, FileStorageService>();
+            builder.Services
+                .AddScoped<ICoachDocumentUploadService, CoachDocumentUploadService>();
+            
+            // Register authentication service
+            builder.Services
+                .AddScoped<IAuthenticationService, AuthenticationService>();
+
+            // Register user dashboard service
+            builder.Services
+                .AddScoped<IUserDashboardService, UserDashboardService>();
+
+            builder.Services
+                .AddScoped<IWorkoutService, WorkoutService>();
+
+            builder.Services
+                .AddScoped<IInputSanitizationService, InputSanitizationService>();
+
+            builder.Services
+                .AddScoped<IGoalService, GoalService>();
+
+            // Register Journal service
+            builder.Services
+                .AddScoped<IJournalService, JournalService>();
 
             builder.Services
                 .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
                 {
-                    options.Password.RequireDigit = true;
+                    options.SignIn.RequireConfirmedAccount = false;
+                    options.Password.RequireDigit = false;
+                    options.Password.RequireLowercase = false;
+                    options.Password.RequireUppercase = false;
+                    options.Password.RequireNonAlphanumeric = false;
                     options.User.RequireUniqueEmail = true;
                 })
+                .AddRoles<IdentityRole<Guid>>()
                 .AddEntityFrameworkStores<ActioNatorDbContext>()
                 .AddDefaultTokenProviders();
 
-            var app = builder.Build();
+            builder.Services.AddAntiforgery(options => 
+            {
+                // Set the cookie name and header name
+                options.HeaderName = "X-CSRF-TOKEN";
+                options.Cookie.Name = "CSRF-TOKEN";
+                options.FormFieldName = "__RequestVerificationToken";
+            });
+
+            // Configure authorization options
+            builder.Services.ConfigureApplicationCookie(options =>
+            {
+                // Set the login path
+                options.LoginPath = "/Identity/Account/Access";
+                
+                // Set the access denied path
+                options.AccessDeniedPath = "/Identity/Account/AccessDenied";
+                
+                // Set cookie expiration
+                options.ExpireTimeSpan = TimeSpan.FromHours(2);
+                options.SlidingExpiration = true;
+            });
+
+            builder.Services
+            .AddControllers()
+            .AddJsonOptions(options =>
+            {
+                options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
+            });
+
+            WebApplication app = builder.Build();
+
+            AsyncServiceScope asyncServiceScope 
+                = app.Services.CreateAsyncScope();
+
+            using (IServiceScope scope = asyncServiceScope)
+            {
+                RoleManager<IdentityRole<Guid>> roleManager 
+                    = scope
+                    .ServiceProvider
+                    .GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+
+                RoleSeeder roleSeeder 
+                    = new (roleManager);
+
+                await roleSeeder.SeedRolesAsync();
+            }
+
+            app.Use(async (context, next) =>
+            {
+                if (context.Request.Path == "/")
+                {
+                    context.Response.Redirect("/Identity/Account/Access");
+                    return;
+                }
+                await next();
+            });
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
@@ -44,17 +231,22 @@ namespace ActioNator
 
             app.UseHttpsRedirection();
             app.UseStaticFiles();
+            
+            // Register custom exception middleware
+            app.UseFileUploadExceptionHandler();
 
             app.UseRouting();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
             app.MapControllerRoute(
-                name: "default",
-                pattern: "{controller=Home}/{action=Index}/{id?}");
+                name: "areas",
+                pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+
             app.MapRazorPages();
 
-            app.Run();
+            await app.RunAsync();
         }
     }
 }

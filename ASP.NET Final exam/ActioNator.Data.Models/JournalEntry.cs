@@ -29,9 +29,9 @@ namespace ActioNator.Data.Models
 
         [MinLength(MoodTagMinLength)]
         [MaxLength(MoodTagMaxLength)]
-        public string? MoodTag { get; set; } = null!;
+        public string? MoodTag { get; set; }
 
-        public string? ImageUrl { get; set; } = null!;
+        public string? ImageUrl { get; set; }
 
         public bool IsPublic { get; set; }
 

@@ -30,6 +30,8 @@ namespace ActioNator.Data.Models
         [Required]
         public TimeSpan Duration { get; set; }
 
+        public DateTime? CompletedAt { get; set; } = null!;
+
         public bool IsDeleted { get; set; }
 
         public virtual ICollection<Exercise> Exercises { get; set; } 

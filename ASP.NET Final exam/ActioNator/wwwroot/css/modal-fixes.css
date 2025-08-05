@@ -1,0 +1,47 @@
+/* Modal Z-Index Fixes */
+
+/* Ensure modals are always on top of everything */
+.modal {
+    z-index: 9999 !important;
+}
+
+.modal-overlay {
+    z-index: 9998 !important;
+}
+
+.modal-content {
+    z-index: 10000 !important;
+}
+
+/* Fix dropdown z-index to be below modals */
+.dropdown-container {
+    position: relative;
+    z-index: 100;
+}
+
+.dropdown-menu {
+    z-index: 101 !important;
+}
+
+/* When modal is open, force dropdowns below it */
+body.modal-open .dropdown-container,
+body.modal-open .dropdown-menu {
+    z-index: 10 !important;
+}
+
+/* Hide dropdown triggers when modal is open */
+body.modal-open .goal-menu-btn.dropdown-trigger {
+    visibility: hidden !important;
+    pointer-events: none !important;
+}
+
+/* Ensure tooltips don't appear above modals */
+[data-tooltip],
+.tooltip {
+    z-index: 200;
+}
+
+body.modal-open [data-tooltip],
+body.modal-open .tooltip {
+    z-index: 10 !important;
+}

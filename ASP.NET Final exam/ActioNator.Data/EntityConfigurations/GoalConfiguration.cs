@@ -22,10 +22,6 @@ namespace ActioNator.Data.EntityConfigurations
                 .HasDefaultValue(DateTime.UtcNow);
 
             goal
-                .Property(g => g.DueDate)
-                .IsRequired(false);
-
-            goal
                 .Property(g => g.IsCompleted)
                 .HasDefaultValue(false);
 

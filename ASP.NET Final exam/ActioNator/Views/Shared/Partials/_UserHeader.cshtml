@@ -1,0 +1,93 @@
+@* User Header Navigation *@
+<header class="fixed top-0 left-0 right-0 bg-white shadow-md z-50">
+    <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+        @* Logo *@
+        <a asp-controller="Home" asp-action="Index" class="text-2xl font-bold text-indigo-600">
+            <img src="~/images/logo/lightTheme-logo.png" alt="ActioNatorLogo" class="h-20" />
+        </a>
+
+        @* Desktop navigation *@
+        <nav class="hidden lg:flex space-x-8" aria-label="Main navigation">
+            <a asp-controller="Home" asp-action="Index" class="text-gray-700 hover:text-indigo-600 transition-colors">Dashboard</a>
+            <a asp-controller="Workout" asp-action="Index" class="text-gray-700 hover:text-indigo-600 transition-colors">Workouts</a>
+            <a asp-controller="Goal" asp-action="Index" class="text-gray-700 hover:text-indigo-600 transition-colors">Goals</a>
+            <a asp-controller="Journal" asp-action="Index" class="text-gray-700 hover:text-indigo-600 transition-colors">Journal</a>
+            <a asp-controller="Community" asp-action="Index" class="text-gray-700 hover:text-indigo-600 transition-colors">Community</a>
+            <a asp-controller="Chat" asp-action="Index" class="text-gray-700 hover:text-indigo-600 transition-colors">Chats</a>
+            <a asp-controller="Profile" asp-action="Index" class="text-gray-700 hover:text-indigo-600 transition-colors">Profile</a>
+            <form asp-area="Identity" asp-page="/Account/Logout" method="post">
+                <input type="hidden" name="returnUrl" value="~/Identity/Account/Access"/>
+                <button type="submit" class="w-full px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                    Logout
+                </button>
+            </form> 
+        </nav>
+
+        @* Mobile Menu Button *@
+        <button id="menu-toggle" class="lg:hidden text-gray-700 focus:outline-none" aria-label="Toggle menu" aria-expanded="false">
+            <i class="fas fa-bars text-2xl"></i>
+        </button>
+    </div>
+</header>
+
+@* Mobile drawer *@
+<div id="mobile-nav" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden">
+    <div class="bg-white h-full w-64 transform -translate-x-full transition-transform duration-300 ease-in-out">
+        <div class="flex justify-between items-center p-4 border-b">
+            <span class="text-xl font-bold text-indigo-600">Menu</span>
+            <button id="close-menu" class="text-gray-500 hover:text-gray-700 focus:outline-none" aria-label="Close menu">
+                <i class="fas fa-times text-2xl"></i>
+            </button>
+        </div>
+        <nav class="flex flex-col h-[calc(100%-4rem)]" aria-label="Mobile navigation">
+            <div class="flex-1 py-4">
+                <a asp-controller="Dashboard" asp-action="Index" class="block px-6 py-3 text-gray-700 hover:bg-gray-100">Dashboard</a>
+                <a asp-controller="Workout" asp-action="Index" class="block px-6 py-3 text-gray-700 hover:bg-gray-100">Workouts</a>
+                <a asp-controller="Goals" asp-action="Index" class="block px-6 py-3 text-gray-700 hover:bg-gray-100">Goals</a>
+                <a asp-controller="Journal" asp-action="Index" class="block px-6 py-3 text-gray-700 hover:bg-gray-100">Journal</a>
+                <a asp-controller="Community" asp-action="Index" class="block px-6 py-3 text-gray-700 hover:bg-gray-100">Community</a>
+                <a asp-controller="Chat" asp-action="Index" class="block px-6 py-3 text-gray-700 hover:bg-gray-100">Chats</a>
+                <a asp-controller="Profile" asp-action="Index" class="block px-6 py-3 text-gray-700 hover:bg-gray-100">Profile</a>
+            </div>
+            <div class="p-4 border-t">
+                <form asp-area="Identity" asp-page="/Account/Logout" method="post">
+                    <input type="hidden" name="returnUrl" value="~/Identity/Account/Access" />
+                    <button type = "submit" class="w-full px-4 py-2 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2">
+                        Logout
+                    </button>
+                </form>       
+            </div>
+        </nav>
+    </div>
+</div>
+
+@* Container for the coach verification banner *@
+<div id="coach-verification-banner-container" class="container mx-auto px-4 mt-20"></div>
+
+@* Script to load the verification banner via AJAX *@
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        if (document.body.classList.contains('authenticated') && 
+            !document.body.classList.contains('admin') && 
+            !document.body.classList.contains('coach')) {
+                
+            fetch('@Url.Content("~/Views/Shared/_VerifyCoachBanner.cshtml")')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    document.getElementById('coach-verification-banner-container').innerHTML = html;
+                    
+                    if (window.Alpine) {
+                        window.Alpine.initTree(document.getElementById('coach-verification-banner-container'));
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading coach verification banner:', error);
+                });
+        }
+    });
+</script>
