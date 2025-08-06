@@ -60,7 +60,7 @@ namespace ActioNator.Services.Implementations.JournalService
         /// <summary>
         /// Create a new journal entry
         /// </summary>
-        public async Task<JournalEntryViewModel> CreateEntryAsync(JournalEntryViewModel entry)
+        public async Task<JournalEntryViewModel> CreateEntryAsync(JournalEntryViewModel entry, Guid? userId)
         {
             if (string.IsNullOrEmpty(entry.Title) || entry.Title.Length < 3 || entry.Title.Length > 20)
             {
@@ -79,19 +79,25 @@ namespace ActioNator.Services.Implementations.JournalService
 
             JournalEntry journalEntry = new()
             {
+                Id = Guid.NewGuid(),
+                UserId = userId!.Value,
                 Title = entry.Title,
                 Content = entry.Content!,
                 MoodTag = entry.MoodTag,
                 CreatedAt = DateTime.UtcNow
             };
 
-            // Add to collection
-            await _dbContext
-                .AddAsync(entry);
+            // Add the JournalEntry entity to collection (not the ViewModel)
+            await _dbContext.JournalEntries
+                .AddAsync(journalEntry);
 
             await _dbContext
                 .SaveChangesAsync();
 
+            // Map the entity back to view model for return
+            entry.Id = journalEntry.Id;
+            entry.CreatedAt = journalEntry.CreatedAt;
+            
             return entry;
         }
 
@@ -155,8 +161,7 @@ namespace ActioNator.Services.Implementations.JournalService
                 return false;
             }
 
-            _dbContext
-                .Remove(entry);
+            entry.IsDeleted = true;
 
             await _dbContext
                 .SaveChangesAsync();

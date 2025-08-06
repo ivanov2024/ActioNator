@@ -30,15 +30,35 @@
         $watch('showModal', value => {
             console.log('Modal visibility changed:', value);
             if (value) document.body.classList.add('overflow-hidden');
-            else document.body.classList.remove('overflow-hidden');
+            else {
+                document.body.classList.remove('overflow-hidden');
+                // Reset to add mode when modal is closed
+                setTimeout(() => {
+                    isEditMode = false;
+                    currentEntry = {
+                        id: '',
+                        title: '',
+                        content: '',
+                        mood: ''
+                    };
+                }, 300); // Wait for transition to complete
+            }
         });
         document.addEventListener('open-workout-modal', () => {
             console.log('Journal modal: Received open-workout-modal event');
             showModal = true;
         });
+        document.addEventListener('open-journal-modal', () => {
+            console.log('Journal modal: Received open-journal-modal event');
+            showModal = true;
+        });
         document.addEventListener('close-journal-modal', () => {
             console.log('Journal modal: Received close-journal-modal event');
             showModal = false;
+        });
+        document.addEventListener('journal-edit-mode', (e) => {
+            console.log('Journal modal: Received journal-edit-mode event', e.detail);
+            isEditMode = e.detail.isEditMode;
         });
     "
     @@keydown.escape.window="showModal = false"

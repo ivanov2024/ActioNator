@@ -1,7 +1,7 @@
-﻿@using ActioNator.ViewModels.Posts
+@using ActioNator.ViewModels.Posts
 @model PostCardViewModel
 
-<div class="bg-facebook-card rounded-lg shadow mb-4" x-data="postCard">
+<div class="bg-facebook-card rounded-lg shadow mb-4" x-data="postCard" data-post-id="@Model.Id">
     <!-- Post Header -->
     <div class="p-4">
         <div class="flex items-start">
@@ -61,7 +61,7 @@
                      x-transition:leave-start="opacity-100 scale-100"
                      x-transition:leave-end="opacity-0 scale-95"
                      class="absolute right-0 z-10 w-48 py-1 mt-1 bg-white rounded-lg shadow-xl ring-1 ring-black ring-opacity-5">
-                    <button @@click ="showMenu = false; $store.modal.modalTitle = 'Delete Post'; $store.modal.modalMessage = 'Are you sure you want to delete this post?'; $store.modal.modalConfirmText = 'Delete'; $store.modal.modalCancelText = 'Cancel'; $store.modal.modalConfirmAction = () => { isDeleted = true; }; $store.modal.modalType = 'default'; $store.modal.modalOpen = true;"
+                    <button @@click ="showMenu = false; window.showDeletePostModal('@Model.Id');"
                             class="block w-full px-4 py-2.5 text-sm text-left text-red-600 hover:bg-gray-100 transition-colors">
                         <div class="flex items-center">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -80,7 +80,7 @@
                         </div>
                     </button>
                     <div class="border-t border-gray-100 my-1"></div>
-                    <button @@click ="showMenu = false; $store.modal.modalTitle = 'Report Post'; $store.modal.modalMessage = 'Do you want to report this post for inappropriate content?'; $store.modal.modalConfirmText = 'Report'; $store.modal.modalCancelText = 'Cancel'; $store.modal.modalConfirmAction = () => { alert('Post reported!'); }; $store.modal.modalType = 'default'; $store.modal.modalOpen = true;"
+                    <button @@click ="showMenu = false; window.showReportPostModal('@Model.Id');"
                             class="block w-full px-4 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-100 transition-colors">
                         <div class="flex items-center">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -89,7 +89,7 @@
                             Report Post
                         </div>
                     </button>
-                    <button @@click ="showMenu = false; $store.modal.modalTitle = 'Report User'; $store.modal.modalMessage = 'Do you want to report @Model.AuthorName for inappropriate behavior?'; $store.modal.modalConfirmText = 'Report'; $store.modal.modalCancelText = 'Cancel'; $store.modal.modalConfirmAction = () => { alert('User reported!'); }; $store.modal.modalType = 'default'; $store.modal.modalOpen = true;"
+                    <button @@click ="showMenu = false; window.showReportUserModal('@Model.AuthorId');"
                             class="block w-full px-4 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-100 transition-colors">
                         <div class="flex items-center">
                             <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

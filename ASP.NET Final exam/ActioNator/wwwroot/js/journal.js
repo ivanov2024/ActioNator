@@ -98,9 +98,60 @@ document.addEventListener('alpine:init', () => {
         
         // Open modal to edit existing journal entry
         editEntry(entry) {
-            console.log('Journal: Opening edit journal entry modal');
-            // First set up the entry data
+            console.log('Journal: Opening edit journal entry modal for entry:', entry.id);
+            
+            // Fetch the latest entry data from the server to ensure we have the most up-to-date content
+            fetch(`/User/Journal/Edit?id=${entry.id}`, {
+                method: 'GET',
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.json().catch(() => response.text());
+                } else {
+                    console.error('Failed to fetch entry for editing');
+                    showToast('error', 'Failed to load entry for editing');
+                    throw new Error('Failed to fetch entry');
+                }
+            })
+            .then(data => {
+                // If we got JSON data, use it directly
+                if (typeof data === 'object' && data !== null) {
+                    this.setupEditMode(data);
+                } else {
+                    // Otherwise, try to find the entry in our existing entries
+                    const existingEntry = this.entries.find(e => e.id === entry.id);
+                    if (existingEntry) {
+                        this.setupEditMode(existingEntry);
+                    } else {
+                        showToast('error', 'Could not load entry data');
+                        return;
+                    }
+                }
+                
+                // Open the modal after data is set up
+                openJournalModal();
+                
+                // Dispatch an event to notify the modal that we're in edit mode
+                document.dispatchEvent(new CustomEvent('journal-edit-mode', { 
+                    detail: { isEditMode: true }
+                }));
+            })
+            .catch(error => {
+                console.error('Error fetching entry for editing:', error);
+                showToast('error', 'An error occurred while loading the entry');
+            });
+        },
+        
+        // Helper function to set up edit mode with entry data
+        setupEditMode(entry) {
+            console.log('Setting up edit mode with entry:', entry);
+            // Set edit mode flag
             this.isEditMode = true;
+            
+            // Populate current entry with data
             this.currentEntry = {
                 id: entry.id,
                 title: entry.title,
@@ -108,10 +159,9 @@ document.addEventListener('alpine:init', () => {
                 mood: entry.moodTag || '',
                 createdAt: entry.createdAt
             };
-            this.validationAttempted = false;
             
-            // Dispatch journal-specific event to open the modal
-            openJournalModal();
+            // Reset validation
+            this.validationAttempted = false;
         },
         
         // Validate the form before submission
@@ -145,13 +195,20 @@ document.addEventListener('alpine:init', () => {
                 const response = await fetch('/User/Journal/Index' + (this.searchQuery ? `?searchTerm=${encodeURIComponent(this.searchQuery)}` : ''));
                 
                 if (response.ok) {
-                    // For a full page reload, we'd get HTML back, not JSON
-                    // This is just a fallback in case we implement AJAX search later
-                    if (response.headers.get('content-type')?.includes('application/json')) {
+                    // Check if we have server-side data already available
+                    if (window.initialJournalEntries && Array.isArray(window.initialJournalEntries) && !this.searchQuery) {
+                        console.log('Using server-provided entries:', window.initialJournalEntries.length);
+                        this.entries = window.initialJournalEntries;
+                        this.filteredEntries = [...this.entries];
+                    }
+                    // For AJAX requests, we'd get JSON back
+                    else if (response.headers.get('content-type')?.includes('application/json')) {
                         const data = await response.json();
                         this.entries = data;
                         this.filteredEntries = [...this.entries]; // Update filtered entries
                     }
+                    // Log the number of entries for debugging
+                    console.log(`Journal: Loaded ${this.entries.length} entries`);
                 } else {
                     console.error('Failed to fetch entries');
                 }
@@ -173,62 +230,146 @@ document.addEventListener('alpine:init', () => {
                 minute: 'numeric'
             }).format(date);
         },
-        
         // Save entry
         saveEntry() {
-            if (!this.validateForm()) {
-                return;
-            }
-
-            this.isLoading = true;
+            console.log('Journal: Saving entry in mode:', this.isEditMode ? 'EDIT' : 'CREATE');
             
-            // Add anti-forgery token to the request
+            // Get the CSRF token
             const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
             
-            // Map the currentEntry to the format expected by the server
+            // Prepare the data
             const entryData = {
-                id: this.currentEntry.id || '00000000-0000-0000-0000-000000000000', // Empty GUID if new entry
+                id: this.isEditMode ? this.currentEntry.id : null,
                 title: this.currentEntry.title,
                 content: this.currentEntry.content,
-                moodTag: this.currentEntry.mood, // Map mood to moodTag
-                createdAt: this.currentEntry.createdAt,
+                moodTag: this.currentEntry.mood,
                 __RequestVerificationToken: token
             };
-
-            fetch('/User/Journal/Save', {
+            
+            // Determine the endpoint based on mode
+            const endpoint = this.isEditMode ? '/User/Journal/Update' : '/User/Journal/Save';
+            
+            console.log(`Submitting to ${endpoint} with data:`, entryData);
+            
+            // Send the data to the server
+            fetch(endpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: JSON.stringify(entryData)
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    console.log('Journal: Save successful, closing journal modal');
-                    // Close the journal modal using our helper function
-                    closeJournalModal();
-                    
-                    // Use the shared toast component
-                    showToast('success', data.message || 'Journal entry saved successfully!');
-                    // Refresh entries from server
-                    this.fetchEntries();
+            .then(response => {
+                if (response.ok) {
+                    return response.text();
                 } else {
-                    const errorMessage = data.errors ? Object.values(data.errors).flat().join(', ') : 'Failed to save entry';
-                    showToast('error', errorMessage);
+                    throw new Error('Failed to save journal entry');
+                }
+            })
+            .then(responseText => {
+                try {
+                    // Try to parse as JSON
+                    const data = JSON.parse(responseText);
+                    
+                    if (data.success) {
+                        // Show success message
+                        const actionText = this.isEditMode ? 'updated' : 'saved';
+                        showToast('success', data.message || `Journal entry ${actionText} successfully!`);
+                        
+                        // Close the modal
+                        document.dispatchEvent(new CustomEvent('close-journal-modal'));
+                        
+                        // If we have HTML for the new entry, update the entries list
+                        if (data.entryHtml) {
+                            if (this.isEditMode) {
+                                // Find and update the existing entry
+                                const index = this.entries.findIndex(e => e.id === this.currentEntry.id);
+                                if (index !== -1) {
+                                    // Create a temporary container to parse the HTML
+                                    const tempContainer = document.createElement('div');
+                                    tempContainer.innerHTML = data.entryHtml;
+                                    
+                                    // Extract entry data from the HTML
+                                    const entryElement = tempContainer.firstElementChild;
+                                    const entryId = entryElement.getAttribute('data-entry-id');
+                                    const entryTitle = entryElement.querySelector('.entry-title').textContent;
+                                    const entryContent = entryElement.querySelector('.entry-content').textContent;
+                                    const entryDate = entryElement.getAttribute('data-created-at');
+                                    const entryMood = entryElement.getAttribute('data-mood-tag') || '';
+                                    
+                                    // Update the entry in the array
+                                    this.entries[index] = {
+                                        id: entryId,
+                                        title: entryTitle,
+                                        content: entryContent,
+                                        createdAt: entryDate,
+                                        moodTag: entryMood
+                                    };
+                                    
+                                    // Update filtered entries
+                                    this.updateFilteredEntries();
+                                }
+                            } else {
+                                // Create a temporary container to parse the HTML
+                                const tempContainer = document.createElement('div');
+                                tempContainer.innerHTML = data.entryHtml;
+                                
+                                // Extract entry data from the HTML
+                                const entryElement = tempContainer.firstElementChild;
+                                const entryId = entryElement.getAttribute('data-entry-id');
+                                const entryTitle = entryElement.querySelector('.entry-title').textContent;
+                                const entryContent = entryElement.querySelector('.entry-content').textContent;
+                                const entryDate = entryElement.getAttribute('data-created-at');
+                                const entryMood = entryElement.getAttribute('data-mood-tag') || '';
+                                
+                                // Add the new entry to the array
+                                this.entries.unshift({
+                                    id: entryId,
+                                    title: entryTitle,
+                                    content: entryContent,
+                                    createdAt: entryDate,
+                                    moodTag: entryMood
+                                });
+                                
+                                // Update filtered entries
+                                this.updateFilteredEntries();
+                            }
+                        } else {
+                            // If no HTML was returned, refresh entries from server
+                            this.fetchEntries();
+                        }
+                        
+                        // Reset the form
+                        this.resetForm();
+                    } else {
+                        // Show error message
+                        showToast('error', data.error || 'Failed to save journal entry');
+                    }
+                } catch (e) {
+                    // Not JSON, might be HTML with validation errors
+                    console.error('Error parsing response:', e);
+                    showToast('error', 'Failed to save journal entry');
                 }
             })
             .catch(error => {
                 console.error('Error saving entry:', error);
                 showToast('error', 'An error occurred while saving the entry');
-            })
-            .finally(() => {
-                this.isLoading = false;
             });
         },
         
         // Open delete confirmation modal using shared modal
         openDeleteModal(id) {
+            console.log('Opening delete modal for entry ID:', id);
+            
+            // Validate the ID before proceeding
+            if (!id || id === '00000000-0000-0000-0000-000000000000') {
+                console.error('Invalid journal entry ID:', id);
+                showToast('error', 'Invalid journal entry ID');
+                return;
+            }
+            
+            // Store the ID to delete
             this.entryToDelete = id;
             
             // Use the shared modal component
@@ -251,29 +392,63 @@ document.addEventListener('alpine:init', () => {
         // Delete the current entry
         confirmDelete() {
             this.isLoading = true;
+            
+            // Double-check ID validation before proceeding
+            if (!this.entryToDelete || this.entryToDelete === '00000000-0000-0000-0000-000000000000') {
+                console.error('Invalid journal entry ID:', this.entryToDelete);
+                showToast('error', 'Invalid journal entry ID');
+                this.isLoading = false;
+                this.entryToDelete = null;
+                return;
+            }
+            
+            console.log('Deleting entry with ID:', this.entryToDelete);
 
             // Add anti-forgery token to the request
             const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
             
+            // Format the request body to match the DeleteEntryRequest class on the backend
             fetch('/User/Journal/Delete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
                 },
                 body: JSON.stringify({
-                    id: this.entryToDelete,
+                    Id: this.entryToDelete, // Use capital 'I' to match C# property name
                     __RequestVerificationToken: token
                 })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    // Use the shared toast component
-                    showToast('success', data.message);
-                    // Refresh entries from server
-                    this.fetchEntries();
+            .then(response => {
+                // Check if the response is JSON before parsing
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json().then(data => ({ isJson: true, data, status: response.status }));
                 } else {
-                    showToast('error', data.error || 'Failed to delete entry');
+                    return response.text().then(text => ({ isJson: false, text, status: response.status }));
+                }
+            })
+            .then(result => {
+                // Handle both JSON and non-JSON responses
+                if (result.isJson) {
+                    const data = result.data;
+                    if (data.success) {
+                        // Use the shared toast component
+                        showToast('success', data.message || 'Journal entry deleted successfully!');
+                        // Refresh entries from server
+                        this.fetchEntries();
+                    } else {
+                        showToast('error', data.error || 'Failed to delete entry');
+                    }
+                } else {
+                    // Handle non-JSON response (likely HTML or error)
+                    console.log('Received non-JSON response during delete operation');
+                    if (result.status >= 200 && result.status < 300) {
+                        showToast('success', 'Journal entry deleted successfully!');
+                        this.fetchEntries();
+                    } else {
+                        showToast('error', 'Failed to delete entry');
+                    }
                 }
             })
             .catch(error => {

@@ -25,7 +25,7 @@ namespace ActioNator.Services.Interfaces.JournalService
         /// </summary>
         /// <param name="entry">The journal entry to create</param>
         /// <returns>The created journal entry with assigned ID</returns>
-        Task<JournalEntryViewModel> CreateEntryAsync(JournalEntryViewModel entry);
+        Task<JournalEntryViewModel> CreateEntryAsync(JournalEntryViewModel entry, Guid? userId);
         
         /// <summary>
         /// Update an existing journal entry

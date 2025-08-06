@@ -1,4 +1,4 @@
-﻿namespace ActioNator.ViewModels.Posts
+namespace ActioNator.ViewModels.Posts
 {
     public class PostCommentsViewModel
     {
@@ -12,5 +12,6 @@
         public string TimeAgo { get; set; } = null!;
         public bool IsDeleted { get; set; }
         public bool IsAuthor { get; set; }
+        public bool IsLikedByCurrentUser { get; set; }
     }
 }

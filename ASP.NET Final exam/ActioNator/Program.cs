@@ -4,6 +4,7 @@ using ActioNator.Middleware;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.ContentInspectors;
 using ActioNator.Services.Implementations.AuthenticationService;
+using ActioNator.Services.Implementations.Community;
 using ActioNator.Services.Implementations.FileServices;
 using ActioNator.Services.Implementations.GoalService;
 using ActioNator.Services.Implementations.InputSanitization;
@@ -12,6 +13,7 @@ using ActioNator.Services.Implementations.UserDashboard;
 using ActioNator.Services.Implementations.VerifyCoach;
 using ActioNator.Services.Implementations.WorkoutService;
 using ActioNator.Services.Interfaces.AuthenticationServices;
+using ActioNator.Services.Interfaces.Community;
 using ActioNator.Services.Interfaces.FileServices;
 using ActioNator.Services.Interfaces.GoalService;
 using ActioNator.Services.Interfaces.InputSanitizationService;
@@ -145,6 +147,10 @@ namespace ActioNator
             // Register Journal service
             builder.Services
                 .AddScoped<IJournalService, JournalService>();
+
+            builder
+                .Services
+                .AddScoped<ICommunityService, CommunityService>();
 
             builder.Services
                 .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>

@@ -1,0 +1,172 @@
+@model IEnumerable<ActioNator.ViewModels.Posts.PostCardViewModel>
+@{
+    ViewData["Title"] = "Community";
+    Layout = "_Layout";
+}
+
+<div class="container mx-auto px-4 py-8">
+    <div class="flex flex-col md:flex-row gap-6">
+        <!-- Left sidebar - can be used for filters, categories, etc. -->
+        <div class="w-full md:w-1/4 lg:w-1/5">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
+                <h3 class="text-lg font-semibold mb-3">Community</h3>
+                <ul class="space-y-2">
+                    <li>
+                        <a href="#" class="flex items-center text-blue-600 dark:text-blue-400">
+                            <span class="mr-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z" />
+                                </svg>
+                            </span>
+                            <span>Home</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center">
+                            <span class="mr-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+                                </svg>
+                            </span>
+                            <span>Friends</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center">
+                            <span class="mr-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.214.33-.403.713-.57 1.116-.334.804-.614 1.768-.84 2.734a31.365 31.365 0 00-.613 3.58 2.64 2.64 0 01-.945-1.067c-.328-.68-.398-1.534-.398-2.654A1 1 0 005.05 6.05 6.981 6.981 0 003 11a7 7 0 1011.95-4.95c-.592-.591-.98-.985-1.348-1.467-.363-.476-.724-1.063-1.207-2.03zM12.12 15.12A3 3 0 017 13s.879.5 2.5.5c0-1 .5-4 1.25-4.5.5 1 .786 1.293 1.371 1.879A2.99 2.99 0 0113 13a2.99 2.99 0 01-.879 2.121z" clip-rule="evenodd" />
+                                </svg>
+                            </span>
+                            <span>Trending</span>
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" class="flex items-center">
+                            <span class="mr-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                                </svg>
+                            </span>
+                            <span>Recent</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Main content area -->
+        <div class="w-full md:w-2/4 lg:w-3/5">
+            <!-- Create post card -->
+            <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <div class="flex items-center">
+                    <div class="h-10 w-10 rounded-full bg-purple-300 flex-shrink-0"></div>
+                    <button onclick="Alpine.store('modal').openCreatePostModal()" class="ml-3 bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-full flex-grow text-left">
+                        What's on your mind?
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filter Controls -->
+            <div class="bg-facebook-card rounded-lg shadow mb-4 p-4" x-data="{ showFilters: false, filters: { status: 'all', dateRange: 'all-time' } }">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold">Posts</h3>
+                    <button @@click="showFilters = !showFilters" class="text-blue-600 hover:text-blue-800 flex items-center">
+                        <span>Filter</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 ml-1" :class="{'rotate-180': showFilters}" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                
+                <div x-show="showFilters" x-transition class="mt-4 space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                        <div class="flex space-x-2">
+                            <button @@click="filters.status = 'all'" :class="{'bg-blue-600 text-white': filters.status === 'all', 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300': filters.status !== 'all'}" class="px-3 py-1 rounded-full text-sm">All</button>
+                            <button @@click="filters.status = 'active'" :class="{'bg-blue-600 text-white': filters.status === 'active', 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300': filters.status !== 'active'}" class="px-3 py-1 rounded-full text-sm">Active</button>
+                            <button @@click="filters.status = 'archived'" :class="{'bg-blue-600 text-white': filters.status === 'archived', 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300': filters.status !== 'archived'}" class="px-3 py-1 rounded-full text-sm">Archived</button>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date Range</label>
+                        <div class="flex space-x-2">
+                            <button @@click="filters.dateRange = 'all-time'" :class="{'bg-blue-600 text-white': filters.dateRange === 'all-time', 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300': filters.dateRange !== 'all-time'}" class="px-3 py-1 rounded-full text-sm">All Time</button>
+                            <button @@click="filters.dateRange = 'today'" :class="{'bg-blue-600 text-white': filters.dateRange === 'today', 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300': filters.dateRange !== 'today'}" class="px-3 py-1 rounded-full text-sm">Today</button>
+                            <button @@click="filters.dateRange = 'this-week'" :class="{'bg-blue-600 text-white': filters.dateRange === 'this-week', 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300': filters.dateRange !== 'this-week'}" class="px-3 py-1 rounded-full text-sm">This Week</button>
+                            <button @@click="filters.dateRange = 'this-month'" :class="{'bg-blue-600 text-white': filters.dateRange === 'this-month', 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300': filters.dateRange !== 'this-month'}" class="px-3 py-1 rounded-full text-sm">This Month</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Posts feed -->
+            <div id="posts-container" class="space-y-6">
+                @if (Model != null && Model.Any())
+                {
+                    foreach (var post in Model)
+                    {
+                        <partial name="_PostCardPartial" model="post" />
+                    }
+                }
+                else
+                {
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">
+                        <p class="text-gray-500 dark:text-gray-400">No posts yet. Be the first to share something!</p>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <!-- Right sidebar -->
+        <div class="w-full md:w-1/4 lg:w-1/5">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-4">
+                <h3 class="text-lg font-semibold mb-3">Suggested Users</h3>
+                <ul class="space-y-3">
+                    <li class="flex items-center space-x-3">
+                        <img class="h-8 w-8 rounded-full" src="/images/profiles/default.jpg" alt="User">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">Jane Smith</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Fitness Coach</p>
+                        </div>
+                        <button type="button" class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Follow
+                        </button>
+                    </li>
+                    <li class="flex items-center space-x-3">
+                        <img class="h-8 w-8 rounded-full" src="/images/profiles/default.jpg" alt="User">
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">John Doe</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 truncate">Nutrition Expert</p>
+                        </div>
+                        <button type="button" class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            Follow
+                        </button>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <h3 class="text-lg font-semibold mb-3">Trending Topics</h3>
+                <div class="space-y-2">
+                    <a href="#" class="block px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">#fitness</a>
+                    <a href="#" class="block px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">#nutrition</a>
+                    <a href="#" class="block px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">#workout</a>
+                    <a href="#" class="block px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-full text-sm text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">#motivation</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include modal partial for deletion and reporting -->
+<partial name="_ModalPartial" />
+
+@section Scripts {
+    <!-- post.js is already included in the layout -->
+}
+
+@section Styles {
+    <link rel="stylesheet" href="/css/post.css">
+}

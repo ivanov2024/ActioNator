@@ -509,6 +509,515 @@ document.addEventListener("alpine:init", () => {
     }));
 
     // Post Card component with Dynamic Image Grid
+    // Post liking functionality
+    // Make likePost function globally accessible
+    window.likePost = function(postId) {
+        likePost(postId);
+    };
+    
+    // Comment liking functionality
+    function likeComment(commentId) {
+        // Call the API to like/unlike the comment
+        fetch(`/User/Community/LikeComment/${commentId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Update the UI to reflect the like/unlike action
+                const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+                if (commentElement) {
+                    const likeButton = commentElement.querySelector('[data-action="like-comment"]');
+                    const likeCountElement = commentElement.querySelector('[data-like-count]');
+                    
+                    if (likeButton) {
+                        // Toggle the liked state
+                        const isLiked = likeButton.classList.contains('text-blue-600');
+                        
+                        if (isLiked) {
+                            likeButton.classList.remove('text-blue-600');
+                            likeButton.classList.add('text-gray-500');
+                        } else {
+                            likeButton.classList.remove('text-gray-500');
+                            likeButton.classList.add('text-blue-600');
+                        }
+                        
+                        // Update the like count if available
+                        if (likeCountElement && data.likesCount !== undefined) {
+                            likeCountElement.textContent = `(${data.likesCount})`;
+                        }
+                    }
+                }
+            } else {
+                throw new Error(data.message || 'Failed to like comment');
+            }
+        })
+        .catch(error => {
+            console.error('Error liking comment:', error);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to like comment. Please try again.'
+                }
+            }));
+        });
+    }
+    
+    // Make likeComment function globally accessible
+    window.likeComment = function(commentId) {
+        likeComment(commentId);
+    };
+    
+    // Comment creation functionality
+    function addComment(postId, content, parentCommentId = null) {
+        // Call the API to add a comment to the post
+        fetch(`/User/Community/AddComment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+            },
+            body: JSON.stringify({
+                postId: postId,
+                content: content,
+                parentCommentId: parentCommentId
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // If the comment was added successfully, you can either:
+                // 1. Refresh the comments section
+                // 2. Add the new comment to the UI directly
+                
+                // Option 1: Refresh the page or comments section
+                // window.location.reload();
+                
+                // Option 2: Add the new comment to the UI
+                // This requires the server to return the new comment data
+                if (data.comment) {
+                    // Dispatch an event that the postCommentsHandler can listen for
+                    window.dispatchEvent(new CustomEvent('comment-added', {
+                        detail: {
+                            comment: data.comment
+                        }
+                    }));
+                }
+                
+                // Show success message
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: {
+                        type: 'success',
+                        message: 'Comment added successfully.'
+                    }
+                }));
+            } else {
+                throw new Error(data.message || 'Failed to add comment');
+            }
+        })
+        .catch(error => {
+            console.error('Error adding comment:', error);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to add comment. Please try again.'
+                }
+            }));
+        });
+    }
+    
+    // Make addComment function globally accessible
+    window.addComment = function(postId, content, parentCommentId = null) {
+        addComment(postId, content, parentCommentId);
+    };
+    
+    // TODO: Add image upload functionality
+    // This should include:
+    // 1. Client-side image selection and preview
+    // 2. Image validation (size, type, dimensions)
+    // 3. Image upload to server via API
+    // 4. Handling upload progress and errors
+    // 5. Updating UI after successful upload
+    
+    function likePost(postId) {
+        // Call the API to like/unlike the post
+        fetch(`/User/Community/LikePost/${postId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Update the UI to reflect the like/unlike action
+                const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+                if (postElement) {
+                    const likeButton = postElement.querySelector('[data-action="like"]');
+                    const likeCountElement = postElement.querySelector('[data-like-count]');
+                    
+                    if (likeButton) {
+                        // Toggle the liked state
+                        const isLiked = likeButton.classList.contains('text-blue-600');
+                        
+                        if (isLiked) {
+                            likeButton.classList.remove('text-blue-600');
+                            likeButton.classList.add('text-gray-500');
+                        } else {
+                            likeButton.classList.remove('text-gray-500');
+                            likeButton.classList.add('text-blue-600');
+                        }
+                        
+                        // Update the like count if available
+                        if (likeCountElement && data.likesCount !== undefined) {
+                            likeCountElement.textContent = data.likesCount;
+                        }
+                    }
+                }
+            } else {
+                throw new Error(data.message || 'Failed to like post');
+            }
+        })
+        .catch(error => {
+            console.error('Error liking post:', error);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to like post. Please try again.'
+                }
+            }));
+        });
+    }
+    
+    // Post deletion and reporting functions
+    function deletePost(postId) {
+        // Call the API to delete the post
+        fetch(`/User/Community/DeletePost/${postId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Show success message or update UI
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: {
+                        type: 'success',
+                        message: 'Post deleted successfully.'
+                    }
+                }));
+                
+                // Refresh the page or update the UI
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                throw new Error(data.message || 'Failed to delete post');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting post:', error);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to delete post. Please try again.'
+                }
+            }));
+        });
+    }
+
+    function reportPost(postId) {
+        // Call the API to report the post
+        fetch(`/User/Community/ReportPost/${postId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: {
+                        type: 'success',
+                        message: 'Post reported successfully.'
+                    }
+                }));
+            } else {
+                throw new Error(data.message || 'Failed to report post');
+            }
+        })
+        .catch(error => {
+            console.error('Error reporting post:', error);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to report post. Please try again.'
+                }
+            }));
+        });
+    }
+
+    function deleteComment(commentId) {
+        // Call the API to delete the comment
+        fetch(`/User/Community/DeleteComment/${commentId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Show success message or update UI
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: {
+                        type: 'success',
+                        message: 'Comment deleted successfully.'
+                    }
+                }));
+                
+                // Update the UI to mark the comment as deleted
+                // This could be done by finding the comment in the DOM and updating it
+                // or by refreshing the comments section
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                throw new Error(data.message || 'Failed to delete comment');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting comment:', error);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to delete comment. Please try again.'
+                }
+            }));
+        });
+    }
+
+    function reportComment(commentId) {
+        // Call the API to report the comment
+        fetch(`/User/Community/ReportComment/${commentId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: {
+                        type: 'success',
+                        message: 'Comment reported successfully.'
+                    }
+                }));
+            } else {
+                throw new Error(data.message || 'Failed to report comment');
+            }
+        })
+        .catch(error => {
+            console.error('Error reporting comment:', error);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to report comment. Please try again.'
+                }
+            }));
+        });
+    }
+
+    function reportUser(userId) {
+        // Call the API to report the user
+        fetch(`/User/Community/ReportUser/${userId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.success) {
+                // Show success message
+                window.dispatchEvent(new CustomEvent('show-toast', {
+                    detail: {
+                        type: 'success',
+                        message: 'User reported successfully.'
+                    }
+                }));
+            } else {
+                throw new Error(data.message || 'Failed to report user');
+            }
+        })
+        .catch(error => {
+            console.error('Error reporting user:', error);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to report user. Please try again.'
+                }
+            }));
+        });
+    }
+
+    // Modal trigger functions
+    window.showDeletePostModal = function(postId) {
+        window.openModal({
+            type: 'delete',
+            title: 'Delete Post',
+            message: 'Are you sure you want to delete this post? This action cannot be undone.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            onConfirm: function() {
+                deletePost(postId);
+            }
+        });
+    };
+
+    window.showReportPostModal = function(postId) {
+        window.openModal({
+            type: 'report',
+            title: 'Report Post',
+            message: 'Are you sure you want to report this post? This will notify moderators for review.',
+            confirmText: 'Report',
+            cancelText: 'Cancel',
+            onConfirm: function() {
+                reportPost(postId);
+            }
+        });
+    };
+
+    window.showDeleteCommentModal = function(commentId) {
+        window.openModal({
+            type: 'delete',
+            title: 'Delete Comment',
+            message: 'Are you sure you want to delete this comment? This action cannot be undone.',
+            confirmText: 'Delete',
+            cancelText: 'Cancel',
+            onConfirm: function() {
+                deleteComment(commentId);
+            }
+        });
+    };
+
+    window.showReportCommentModal = function(commentId) {
+        window.openModal({
+            type: 'report',
+            title: 'Report Comment',
+            message: 'Are you sure you want to report this comment? This will notify moderators for review.',
+            confirmText: 'Report',
+            cancelText: 'Cancel',
+            onConfirm: function() {
+                reportComment(commentId);
+            }
+        });
+    };
+
+    window.showReportUserModal = function(userId) {
+        window.openModal({
+            type: 'report',
+            title: 'Report User',
+            message: 'Are you sure you want to report this user? This will notify moderators for review.',
+            confirmText: 'Report',
+            cancelText: 'Cancel',
+            onConfirm: function() {
+                reportUser(userId);
+            }
+        });
+    };
+
+    // Listen for modal confirmation events
+    window.addEventListener('modal-confirmed', function(event) {
+        const detail = event.detail;
+        console.log('Modal confirmed:', detail);
+        
+        // Handle different modal confirmations based on the title
+        if (detail.title === 'Delete Post' && detail.type === 'delete') {
+            // The postId should be stored in a data attribute or closure
+            const postId = document.querySelector('[data-post-id]')?.dataset.postId;
+            if (postId) {
+                deletePost(postId);
+            }
+        } else if (detail.title === 'Report Post' && detail.type === 'report') {
+            const postId = document.querySelector('[data-post-id]')?.dataset.postId;
+            if (postId) {
+                reportPost(postId);
+            }
+        } else if (detail.title === 'Delete Comment' && detail.type === 'delete') {
+            const commentId = document.querySelector('[data-comment-id]')?.dataset.commentId;
+            if (commentId) {
+                deleteComment(commentId);
+            }
+        } else if (detail.title === 'Report Comment' && detail.type === 'report') {
+            const commentId = document.querySelector('[data-comment-id]')?.dataset.commentId;
+            if (commentId) {
+                reportComment(commentId);
+            }
+        } else if (detail.title === 'Report User' && detail.type === 'report') {
+            const userId = document.querySelector('[data-user-id]')?.dataset.userId;
+            if (userId) {
+                reportUser(userId);
+            }
+        }
+    });
+
     Alpine.data("postCard", () => ({
         liked: false,
         showComments: false,

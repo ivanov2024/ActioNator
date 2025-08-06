@@ -1,6 +1,7 @@
 using ActioNator.Controllers;
 using ActioNator.Data.Models;
 using ActioNator.Infrastructure.Attributes;
+using ActioNator.Infrastructure.Extensions;
 using ActioNator.Services.Interfaces.InputSanitizationService;
 using ActioNator.Services.Interfaces.JournalService;
 using ActioNator.ViewModels.Journal;
@@ -75,8 +76,8 @@ namespace ActioNator.Areas.User.Controllers
 
             if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
             {
-                // If AJAX request, return partial view
-                return PartialView("_JournalEntryModal", entry);
+                // If AJAX request, return JSON data for the entry
+                return Json(entry);
             }
 
             // Otherwise redirect to index
@@ -84,11 +85,11 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         /// <summary>
-        /// Handle saving (create or update) a journal entry
+        /// Handle saving (create only) a journal entry
         /// </summary>
         [HttpPost]
-        [ValidateAntiForgeryTokenFromJson]
-        public async Task<IActionResult> Save([FromBody] JournalEntryViewModel model)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Save(JournalEntryViewModel model)
         {
             if (!ModelState.IsValid)
             {
@@ -114,9 +115,11 @@ namespace ActioNator.Areas.User.Controllers
             {
                 if (model.Id == Guid.Empty)
                 {
+                    Guid? userId = GetUserId();
+
                     // Create new entry
                     await _journalService
-                        .CreateEntryAsync(model);
+                        .CreateEntryAsync(model, userId);
 
                     TempData["SuccessMessage"] = "Journal entry created successfully.";
                 }
@@ -131,8 +134,16 @@ namespace ActioNator.Areas.User.Controllers
 
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 {
-                    return 
-                        Json(new { success = true, message = TempData["SuccessMessage"] });
+                    // Get the newly created/updated entry to return with the response
+                    var entry = await _journalService.GetEntryByIdAsync(model.Id);
+                    
+                    // Return both JSON success data and the entry HTML
+                    return Json(new { 
+                        success = true, 
+                        message = TempData["SuccessMessage"],
+                        entryHtml = await this.RenderViewToStringAsync("_JournalEntryCard", entry),
+                        entry = entry
+                    });
                 }
 
                 return RedirectToAction(nameof(Index));
@@ -153,14 +164,89 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         /// <summary>
+        /// Update an existing journal entry
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryTokenFromJson]
+        public async Task<IActionResult> Update([FromBody] JournalEntryViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return 
+                    BadRequest
+                    (new { success = false, errors 
+                    = ModelState.Values
+                    .SelectMany(v => v.Errors)
+                        .Select(e => e.ErrorMessage) });
+            }
+
+            if (model.Id == Guid.Empty)
+            {
+                return BadRequest(new { error = "Invalid entry ID" });
+            }
+
+            // Sanitize user inputs
+            model.Title = _sanitizationService
+                .SanitizeString(model.Title);
+
+            model.Content = _sanitizationService
+                .SanitizeHtml(model.Content);
+
+            model.MoodTag = _sanitizationService
+                .SanitizeString(model.MoodTag);
+
+            try
+            {
+                // Update existing entry
+                await _journalService
+                    .UpdateEntryAsync(model);
+
+                TempData["SuccessMessage"] = "Journal entry updated successfully.";
+
+                // Get the updated entry to return with the response
+                var entry = await _journalService.GetEntryByIdAsync(model.Id);
+                
+                // Return both JSON success data and the entry HTML
+                return Json(new { 
+                    success = true, 
+                    message = TempData["SuccessMessage"],
+                    entryHtml = await this.RenderViewToStringAsync("_JournalEntryCard", entry),
+                    entry = entry
+                });
+            }
+            catch (Exception ex)
+            {
+                ModelState
+                    .AddModelError("", ex.Message);
+
+                return BadRequest(new { error = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Delete a journal entry
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryTokenFromJson]
-        public async Task<IActionResult> Delete([FromBody] Guid id)
+        public async Task<IActionResult> Delete([FromBody] DeleteEntryRequest request)
         {      
+            // Log the received ID for debugging
+            Console.WriteLine($"Received delete request for ID: {request?.Id}");
+            
+            // Validate the ID
+            if (request == null || request.Id == Guid.Empty)
+            {
+                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
+                {
+                    return BadRequest(new { error = "Invalid journal entry ID." });
+                }
+                
+                TempData["ErrorMessage"] = "Invalid journal entry ID.";
+                return RedirectToAction(nameof(Index));
+            }
+            
             if (!await _journalService
-                .DeleteEntryAsync(id))
+                .DeleteEntryAsync(request.Id))
             {
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 {

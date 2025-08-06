@@ -118,63 +118,60 @@ namespace ActioNator.Services.Implementations.AuthenticationService
         {
             try
             {
-                // Create new user
+                // Create new user and assign Id BEFORE creation
                 ApplicationUser user = CreateUser();
+                user.Id = Guid.NewGuid();
 
                 await _userStore
-                    .SetUserNameAsync
-                    (user, firstName + " " + lastName, CancellationToken.None);
-                await _emailStore
-                    .SetEmailAsync(user, email, CancellationToken.None);
+                    .SetUserNameAsync(user, firstName + lastName, CancellationToken.None);
+
+                await _emailStore.SetEmailAsync(user, email, CancellationToken.None);
 
                 user.FirstName = firstName;
                 user.LastName = lastName;
 
-                // Create user with password
                 IdentityResult result 
                     = await _userManager
                     .CreateAsync(user, password);
 
-                await _userManager
-                    .AddToRoleAsync(user, RoleConstants.User);
+                if (!result.Succeeded)
+                {
+                    _logger.LogWarning("User registration failed: {Errors}",
+                        string.Join(", ", result.Errors.Select(e => e.Description)));
 
-                await _dbContext
-                    .UserLoginHistories
-                    .AddAsync
-                    (new UserLoginHistory
-                    {
-                        UserId = user.Id,
-                        LoginDate = DateTime.UtcNow
-                    });
+                    return (false, string.Empty, result.Errors.Select(e => e.Description));
+                }
+
+                IdentityResult roleResult = await _userManager.AddToRoleAsync(user, RoleConstants.User);
+                if (!roleResult.Succeeded)
+                {
+                    _logger.LogWarning("Adding role failed: {Errors}",
+                        string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+
+                    return (false, string.Empty, roleResult.Errors.Select(e => e.Description));
+                }
+
+                await _dbContext.UserLoginHistories.AddAsync(new UserLoginHistory
+                {
+                    UserId = user.Id,
+                    LoginDate = DateTime.UtcNow
+                });
 
                 await _dbContext.SaveChangesAsync();
 
-                if (result.Succeeded)
-                {
-                    _logger
-                        .LogInformation("User {UserName} created successfully", user.UserName);
+                _logger.LogInformation("User {UserName} created successfully", user.UserName);
 
-                    // Sign in the user
-                    await _signInManager
-                        .SignInAsync(user, isPersistent: false);
+                // Sign in the user
+                await _signInManager.SignInAsync(user, isPersistent: false);
 
-                    // Get role-based redirect path
-                    string redirectPath 
-                        = await GetRoleBasedRedirectPathAsync(user);
+                // Get role-based redirect path
+                string redirectPath = await GetRoleBasedRedirectPathAsync(user);
 
-                    return (true, redirectPath, Array.Empty<string>());
-                }
-
-                _logger
-                    .LogWarning("User registration failed: {Errors}",
-                    string.Join(", ", result.Errors.Select(e => e.Description)));
-
-                return (false, string.Empty, result.Errors.Select(e => e.Description));
+                return (true, redirectPath, Array.Empty<string>());
             }
             catch (Exception ex)
             {
-                _logger
-                    .LogError(ex, "Error during user registration");
+                _logger.LogError(ex, "Error during user registration");
                 return (false, string.Empty, new[] { "An error occurred during registration. Please try again later." });
             }
         }

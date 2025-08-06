@@ -4,6 +4,7 @@
     x-data="journalModal()"
     @@open-journal-modal.window="openModal()"
     @@close-journal-modal.window="closeModal()"
+    x-cloak
 >
     <!-- Backdrop with improved blur effect -->
     <div
@@ -15,21 +16,29 @@
         x-transition:leave="transition ease-in duration-200"
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
+        x-ref="backdrop"
         x-cloak
         @@click="closeModal()"
     ></div>
     
     <!-- Modal Container with improved centering and max-width -->
     <div
-        class="fixed inset-0 flex items-center justify-center p-4 z-50 mt-20 sm:mt-12"
+        class="fixed inset-0 flex items-start justify-center p-4 z-50 mt-16 sm:mt-20 md:mt-24 lg:mt-28"
         x-show="showModal"
-        x-transition
+        x-transition:enter="transition ease-out duration-300"
+        x-transition:enter-start="opacity-0"
+        x-transition:enter-end="opacity-100"
+        x-transition:leave="transition ease-in duration-200"
+        x-transition:leave-start="opacity-100"
+        x-transition:leave-end="opacity-0"
         x-cloak
         @@keydown.escape.window="closeModal()"
+        @@click="closeModal()"
+        x-ref="modalContainer"
     >
         <!-- Modal Content with improved styling and animations -->
         <div
-            class="bg-white rounded-lg shadow-xl overflow-hidden w-full max-w-md mx-auto transform transition-all w-full max-w-md md:max-w-lg relative"
+            class="bg-white rounded-lg shadow-xl w-full mx-auto transform transition-all max-w-[95%] sm:max-w-lg md:max-w-xl lg:max-w-md xl:max-w-lg relative overflow-y-auto max-h-[90vh]"
             x-show="showModal"
             x-transition:enter="transition ease-out duration-300"
             x-transition:enter-start="opacity-0 transform scale-95 translate-y-4"
@@ -38,9 +47,10 @@
             x-transition:leave-start="opacity-100 transform scale-100 translate-y-0"
             x-transition:leave-end="opacity-0 transform scale-95 translate-y-4"
             @@click.stop
+            x-ref="modalContent"
         >
             <!-- Modal Header with purple background and icon -->
-            <div class="bg-indigo-600 px-8 py-5 flex items-center justify-between">
+            <div class="bg-indigo-600 px-4 sm:px-6 md:px-8 py-4 sm:py-5 flex items-center justify-between border-b border-indigo-700">
                 <div class="flex items-center space-x-2">
                     <svg class="h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -61,12 +71,12 @@
             </div>
             
             <!-- Modal Subheader with description -->
-            <div class="px-10 pt-6 pb-3">
+            <div class="px-4 sm:px-8 md:px-12 pt-4 sm:pt-6 pb-2 sm:pb-3">
                 <p class="text-sm text-gray-600" x-text="isEditMode ? 'Update your journal entry details below.' : 'Create a new journal entry to record your thoughts.'"></p>
             </div>
                 
             <!-- Form Content -->
-            <form id="journalEntryForm" @@submit.prevent="validateForm() && saveEntry()" class="px-10 pt-4 pb-8">
+            <form id="journalEntryForm" @@submit.prevent="validateForm() && saveEntry()" class="px-4 sm:px-8 md:px-12 pt-3 sm:pt-4 pb-6 sm:pb-8">
                 <input type="hidden" name="id" x-model="currentEntry.id">
                 <input type="hidden" name="createdAt" x-model="currentEntry.createdAt">
                 
@@ -89,6 +99,7 @@
                             class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-base"
                             :class="{'border-red-300 focus:ring-red-500 focus:border-red-500': !isTitleValid && validationAttempted}"
                             placeholder="What's on your mind?"
+                            style="white-space: normal; overflow-wrap: break-word;"
                         >
                     </div>
                     <div 
@@ -116,6 +127,7 @@
                             class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-base"
                             :class="{'border-red-300 focus:ring-red-500 focus:border-red-500': !isMoodValid && validationAttempted}"
                             placeholder="How are you feeling? (e.g., Happy, Stressed, Calm)"
+                            style="white-space: normal; overflow-wrap: break-word;"
                         >
                     </div>
                     <div 
@@ -142,6 +154,7 @@
                             id="entry-content" 
                             x-model="currentEntry.content"
                             placeholder="Write your journal entry here..."
+                            style="white-space: normal; overflow-wrap: break-word;"
                             rows="5"
                             class="block w-full pl-10 pr-4 py-3 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition duration-150 ease-in-out text-base"
                             :class="{'border-red-500 focus:border-red-500 focus:ring-red-200': !isContentValid && validationAttempted}"
@@ -159,12 +172,12 @@
                 </div>
             </form>
             
-            <!-- Modal Footer with improved button styling -->
-            <div class="bg-gray-50 px-10 py-6 flex justify-end space-x-4">
+            <!-- Modal Footer with improved button styling-->
+            <div class="bg-gray-50 px-4 sm:px-8 md:px-12 py-4 sm:py-6 flex flex-col sm:flex-row sm:justify-end sm:space-x-4 space-y-3 sm:space-y-0 border-t border-gray-200">
                 <button
                     type="button"
                     @@click="closeModal()"
-                    class="px-6 py-2.5 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out flex items-center justify-center"
+                    class="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 bg-white text-gray-700 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out flex items-center justify-center"
                 >
                     <svg class="h-4 w-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -174,7 +187,7 @@
                 <button
                     type="button"
                     @@click="validateForm() && saveEntry()"
-                    class="px-6 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out flex items-center justify-center"
+                    class="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 ease-in-out flex items-center justify-center"
                 >
                     <svg class="h-4 w-4 mr-1.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
@@ -196,6 +209,7 @@
         Alpine.data('journalModal', () => ({
             showModal: false,
             isEditMode: false,
+            isClosing: false,
             currentEntry: {
                 id: '',
                 title: '',
@@ -225,14 +239,45 @@
             
             openModal() {
                 console.log('Journal modal opening');
+                
+                // Reset any previous state to avoid animation conflicts
+                if (this.$refs.modalContent) {
+                    this.$refs.modalContent.style.display = '';
+                }
+                if (this.$refs.backdrop) {
+                    this.$refs.backdrop.style.display = '';
+                }
+                
                 this.showModal = true;
                 document.body.classList.add('overflow-hidden');
+                
+                // Ensure any dropdowns are properly contained within the modal
+                this.$nextTick(() => {
+                    const dropdowns = this.$refs.modalContent?.querySelectorAll('.dropdown-content');
+                    if (dropdowns) {
+                        dropdowns.forEach(dropdown => {
+                            dropdown.classList.add('max-h-60', 'overflow-y-auto');
+                        });
+                    }
+                });
             },
             
-            closeModal() {
-                console.log('Journal modal closing');
-                this.showModal = false;
-                document.body.classList.remove('overflow-hidden');
+            closeModal(event) {
+                // Only close if clicking directly on the backdrop or explicitly calling closeModal()
+                if (!event || event.target === event.currentTarget) {
+                    console.log('Journal modal closing');
+                    
+                    // Use a proper animation sequence to prevent flickering
+                    // First mark as closing but don't hide yet
+                    this.isClosing = true;
+                    
+                    // Wait for animation to complete before hiding
+                    setTimeout(() => {
+                        this.showModal = false;
+                        this.isClosing = false;
+                        document.body.classList.remove('overflow-hidden');
+                    }, 250); // Match this with the duration in the transition classes
+                }
             },
             
             resetForm() {
