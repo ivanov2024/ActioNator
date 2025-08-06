@@ -78,9 +78,6 @@ namespace ActioNator.Data.Models
         public virtual ICollection<UserLoginHistory> LoginHistory { get; set; } 
             = new HashSet<UserLoginHistory>();
 
-        /// <summary>
-        /// JSON-serialized additional profile data
-        /// </summary>
-        public string? ProfileDataJson { get; set; }
+
     }
 }

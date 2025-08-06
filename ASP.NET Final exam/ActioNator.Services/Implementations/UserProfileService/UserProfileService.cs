@@ -55,58 +55,9 @@ namespace ActioNator.Services.Implementations.UserProfileService
             };
 
             // Load data for each tab
-            profile.Overview = await GetOverviewTabAsync(userId);
-            profile.About = await GetAboutTabAsync(userId);
             profile.Friends = await GetFriendsTabAsync(userId);
 
             return profile;
-        }
-        
-        /// <summary>
-        /// Gets data for the Overview tab of a user's profile
-        /// </summary>
-        public async Task<OverviewTabViewModel> GetOverviewTabAsync(Guid userId)
-        {
-            var user = await _dbContext.ApplicationUsers.FindAsync(userId);
-            if (user == null)
-            {
-                return null;
-            }
-
-            var education = new List<EducationItem>();
-            var workExperience = new List<WorkExperienceItem>();
-
-            var overview = new OverviewTabViewModel
-            {
-                UserId = userId,
-                Bio = string.Empty,
-                Education = education,
-                WorkExperience = workExperience,
-                Skills = new List<string>(),
-                Interests = new List<string>(),
-                SocialLinks = new Dictionary<string, string>()
-            };
-
-            return overview;
-        }
-        
-        /// <summary>
-        /// Gets data for the About tab of a user's profile
-        /// </summary>
-        public async Task<AboutTabViewModel> GetAboutTabAsync(Guid userId)
-        {
-            var aboutTabJsonPath = Path.Combine("UserData", "AboutTabs", $"about_{userId}.json");
-            if (System.IO.File.Exists(aboutTabJsonPath))
-            {
-                var aboutTabJson = await System.IO.File.ReadAllTextAsync(aboutTabJsonPath);
-                var aboutTabViewModel = System.Text.Json.JsonSerializer.Deserialize<AboutTabViewModel>(aboutTabJson);
-                if (aboutTabViewModel != null)
-                {
-                    return aboutTabViewModel;
-                }
-            }
-            // If no JSON exists, return a new AboutTabViewModel with the userId
-            return new AboutTabViewModel { UserId = userId };
         }
         
         /// <summary>
@@ -162,6 +113,42 @@ namespace ActioNator.Services.Implementations.UserProfileService
             Directory.CreateDirectory(Path.GetDirectoryName(aboutTabJsonPath));
             var aboutTabJson = System.Text.Json.JsonSerializer.Serialize(aboutTabViewModel, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
             await System.IO.File.WriteAllTextAsync(aboutTabJsonPath, aboutTabJson);
+        }
+        /// <summary>
+        /// Gets the additional profile data for a user
+        /// </summary>
+        /// <param name="userId">The ID of the user</param>
+        /// <returns>The user's profile data</returns>
+        public async Task<UserProfileData> GetProfileDataAsync(Guid userId)
+        {
+            var profileDataJsonPath = Path.Combine("UserData", "ProfileData", $"profile_{userId}.json");
+            if (System.IO.File.Exists(profileDataJsonPath))
+            {
+                var profileDataJson = await System.IO.File.ReadAllTextAsync(profileDataJsonPath);
+                var profileData = System.Text.Json.JsonSerializer.Deserialize<UserProfileData>(profileDataJson);
+                if (profileData != null)
+                {
+                    return profileData;
+                }
+            }
+            // If no JSON exists, return a new UserProfileData with the userId
+            return new UserProfileData();
+        }
+
+        /// <summary>
+        /// Updates the additional profile data for a user
+        /// </summary>
+        /// <param name="userId">The ID of the user</param>
+        /// <param name="updateAction">Action to update the profile data</param>
+        /// <returns>Task representing the asynchronous operation</returns>
+        public async Task UpdateProfileDataAsync(Guid userId, Action<UserProfileData> updateAction)
+        {
+            var profileData = await GetProfileDataAsync(userId) ?? new UserProfileData();
+            updateAction(profileData);
+            var profileDataJsonPath = Path.Combine("UserData", "ProfileData", $"profile_{userId}.json");
+            Directory.CreateDirectory(Path.GetDirectoryName(profileDataJsonPath));
+            var profileDataJson = System.Text.Json.JsonSerializer.Serialize(profileData, new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+            await System.IO.File.WriteAllTextAsync(profileDataJsonPath, profileDataJson);
         }
     }
 }

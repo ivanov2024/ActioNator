@@ -1,0 +1,66 @@
+@model FinalExamUI.ViewModels.CoachVerification.CoachVerificationUserViewModel
+
+<div class="user-verification-container">
+    <div class="mb-3">
+        <h4>Documents for User: @Model.UserId</h4>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4 mb-4">
+        @foreach (var document in Model.Documents)
+        {
+            <div class="col">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        @if (document.FileType == "image")
+                        {
+                            <div class="document-preview mb-2">
+                                <img src="/@document.RelativePath" class="img-fluid rounded" alt="@document.FileName" />
+                            </div>
+                        }
+                        else if (document.FileType == "pdf")
+                        {
+                            <div class="document-preview mb-2 text-center">
+                                <i class="bi bi-file-earmark-pdf text-danger" style="font-size: 3rem;"></i>
+                                <p class="mt-2 mb-0">PDF Document</p>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="document-preview mb-2 text-center">
+                                <i class="bi bi-file-earmark text-secondary" style="font-size: 3rem;"></i>
+                                <p class="mt-2 mb-0">Document</p>
+                            </div>
+                        }
+                        
+                        <h5 class="card-title text-truncate" data-bs-toggle="tooltip" title="@document.FileName">
+                            @document.FileName
+                        </h5>
+                    </div>
+                    <div class="card-footer bg-transparent">
+                        <div class="d-flex justify-content-between">
+                            <a href="/@document.RelativePath" class="btn btn-sm btn-outline-primary" target="_blank">
+                                <i class="bi bi-eye me-1"></i> View
+                            </a>
+                            <a href="/@document.RelativePath" class="btn btn-sm btn-outline-secondary" download>
+                                <i class="bi bi-download me-1"></i> Download
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <div class="d-flex justify-content-end mt-3">
+        <form asp-action="RejectVerification" asp-route-userId="@Model.UserId" method="post" class="me-2">
+            <button type="submit" class="btn btn-danger">
+                <i class="bi bi-x-circle me-1"></i> Reject
+            </button>
+        </form>
+        <form asp-action="ApproveVerification" asp-route-userId="@Model.UserId" method="post">
+            <button type="submit" class="btn btn-success">
+                <i class="bi bi-check-circle me-1"></i> Approve
+            </button>
+        </form>
+    </div>
+</div>

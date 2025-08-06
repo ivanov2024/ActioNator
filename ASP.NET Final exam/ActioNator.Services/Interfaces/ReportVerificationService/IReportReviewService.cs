@@ -1,0 +1,53 @@
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using ActioNator.ViewModels.Reports;
+
+namespace ActioNator.Services.Interfaces.ReportVerificationService
+{
+    /// <summary>
+    /// Service for reviewing and managing reported content
+    /// </summary>
+    public interface IReportReviewService
+    {
+        /// <summary>
+        /// Gets all reported posts
+        /// </summary>
+        /// <returns>List of reported posts</returns>
+        Task<List<ReportedPostViewModel>> GetReportedPostsAsync();
+        
+        /// <summary>
+        /// Gets all reported comments
+        /// </summary>
+        /// <returns>List of reported comments</returns>
+        Task<List<ReportedCommentViewModel>> GetReportedCommentsAsync();
+        
+        /// <summary>
+        /// Deletes a post and its associated reports
+        /// </summary>
+        /// <param name="postId">ID of the post to delete</param>
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> DeletePostAsync(Guid postId);
+        
+        /// <summary>
+        /// Deletes a comment and its associated reports
+        /// </summary>
+        /// <param name="commentId">ID of the comment to delete</param>
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> DeleteCommentAsync(Guid commentId);
+        
+        /// <summary>
+        /// Dismisses reports for a post without deleting the post
+        /// </summary>
+        /// <param name="postId">ID of the post</param>
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> DismissPostReportAsync(Guid postId);
+        
+        /// <summary>
+        /// Dismisses reports for a comment without deleting the comment
+        /// </summary>
+        /// <param name="commentId">ID of the comment</param>
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> DismissCommentReportAsync(Guid commentId);
+    }
+}

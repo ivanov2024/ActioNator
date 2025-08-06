@@ -15,20 +15,6 @@ namespace ActioNator.Services.Interfaces.UserProfileService
         Task<ProfileViewModel> GetUserProfileAsync(Guid userId);
         
         /// <summary>
-        /// Gets data for the Overview tab of a user's profile
-        /// </summary>
-        /// <param name="userId">The ID of the user</param>
-        /// <returns>An OverviewTabViewModel containing overview data</returns>
-        Task<OverviewTabViewModel> GetOverviewTabAsync(Guid userId);
-        
-        /// <summary>
-        /// Gets data for the About tab of a user's profile
-        /// </summary>
-        /// <param name="userId">The ID of the user</param>
-        /// <returns>An AboutTabViewModel containing about data</returns>
-        Task<AboutTabViewModel> GetAboutTabAsync(Guid userId);
-        
-        /// <summary>
         /// Gets data for the Friends tab of a user's profile
         /// </summary>
         /// <param name="userId">The ID of the user</param>
@@ -36,10 +22,6 @@ namespace ActioNator.Services.Interfaces.UserProfileService
         Task<FriendsTabViewModel> GetFriendsTabAsync(Guid userId);
         
         /// <summary>
-        /// Updates the About tab data for a user
-        /// </summary>
-        /// <param name="userId">The ID of the user</param>
-        /// <param name="aboutTabViewModel">The updated About tab data</param>
         /// <returns>Task representing the asynchronous operation</returns>
         Task UpdateAboutTabAsync(Guid userId, AboutTabViewModel aboutTabViewModel);
 

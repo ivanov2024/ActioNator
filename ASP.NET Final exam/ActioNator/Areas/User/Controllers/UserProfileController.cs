@@ -13,63 +13,21 @@ namespace ActioNator.Areas.User.Controllers
     [Area("User")]
     public class UserProfileController : BaseController
     {
-        private readonly IDropboxFileStorageService _dropboxFileStorageService;
+        private readonly IFileStorageService _fileStorageService;
         private readonly IFileValidatorFactory _fileValidatorFactory;
 
         public UserProfileController(
             IUserProfileService userProfileService,
             UserManager<ApplicationUser> userManager,
-            IDropboxFileStorageService dropboxFileStorageService,
+            IFileStorageService fileStorageService,
             IFileValidatorFactory fileValidatorFactory)
             : base(userManager)
         {
             _userProfileService = userProfileService;
-            _dropboxFileStorageService = dropboxFileStorageService;
+            _fileStorageService = fileStorageService;
             _fileValidatorFactory = fileValidatorFactory;
         }
 
-        [HttpPost]
-        public async Task<IActionResult> UploadAboutBackgroundImage(Guid userId, IFormFile image)
-        {
-            if (image == null || image.Length == 0)
-                return BadRequest("No file uploaded.");
-
-            var validator = _fileValidatorFactory.GetValidatorForFile(image);
-            var validationResult = await validator.ValidateAsync(image);
-            if (!validationResult.IsValid)
-                return BadRequest(validationResult.ErrorMessage);
-
-            var url = (await _dropboxFileStorageService.SaveFilesAsync(new FormFileCollection { image }, "about-backgrounds", userId.ToString())).FirstOrDefault();
-            if (string.IsNullOrEmpty(url))
-                return StatusCode(500, "Failed to upload image to Dropbox.");
-
-            var aboutTab = await _userProfileService.GetAboutTabAsync(userId);
-            aboutTab.BackgroundImageUrl = url;
-            await _userProfileService.UpdateAboutTabAsync(userId, aboutTab);
-            return Ok(new { imageUrl = url });
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> ReplaceAboutBackgroundImage(Guid userId, IFormFile image)
-        {
-            var aboutTab = await _userProfileService.GetAboutTabAsync(userId);
-            if (!string.IsNullOrEmpty(aboutTab.BackgroundImageUrl))
-                await _dropboxFileStorageService.DeleteFileAsync(aboutTab.BackgroundImageUrl);
-            return await UploadAboutBackgroundImage(userId, image);
-        }
-
-        [HttpDelete]
-        public async Task<IActionResult> DeleteAboutBackgroundImage(Guid userId)
-        {
-            var aboutTab = await _userProfileService.GetAboutTabAsync(userId);
-            if (!string.IsNullOrEmpty(aboutTab.BackgroundImageUrl))
-            {
-                await _dropboxFileStorageService.DeleteFileAsync(aboutTab.BackgroundImageUrl);
-                aboutTab.BackgroundImageUrl = null;
-                await _userProfileService.UpdateAboutTabAsync(userId, aboutTab);
-            }
-            return Ok();
-        }
     // Class members continue here
         private readonly IUserProfileService _userProfileService;
 
@@ -95,50 +53,6 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         /// <summary>
-        /// Returns the Overview tab partial view
-        /// </summary>
-        /// <param name="userId">The ID of the user</param>
-        /// <returns>The Overview partial view</returns>
-        public async Task<IActionResult> GetOverviewPartial(string userId)
-        {
-            if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out Guid guid))
-            {
-                return NotFound();
-            }
-
-            var viewModel = await _userProfileService.GetOverviewTabAsync(guid);
-            
-            if (viewModel == null)
-            {
-                return NotFound();
-            }
-
-            return PartialView("_OverviewPartial", viewModel);
-        }
-
-        /// <summary>
-        /// Returns the About tab partial view
-        /// </summary>
-        /// <param name="userId">The ID of the user</param>
-        /// <returns>The About partial view</returns>
-        public async Task<IActionResult> GetAboutPartial(string userId)
-        {
-            if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out Guid guid))
-            {
-                return NotFound();
-            }
-
-            var viewModel = await _userProfileService.GetAboutTabAsync(guid);
-            
-            if (viewModel == null)
-            {
-                return NotFound();
-            }
-
-            return PartialView("_AboutPartial", viewModel);
-        }
-
-        /// <summary>
         /// Returns the Friends tab partial view
         /// </summary>
         /// <param name="userId">The ID of the user</param>
@@ -160,39 +74,6 @@ namespace ActioNator.Areas.User.Controllers
             return PartialView("_FriendsPartial", viewModel);
         }
 
-
-        /// <summary>
-        /// Updates the About tab data for a user
-        /// </summary>
-        /// <param name="userId">The ID of the user</param>
-        /// <param name="model">The updated About tab data</param>
-        /// <returns>JSON result indicating success or failure</returns>
-        [HttpPost]
-        public async Task<IActionResult> UpdateAboutPartial(string userId, [FromBody] AboutTabViewModel model)
-        {
-            if (string.IsNullOrEmpty(userId) || model == null || !Guid.TryParse(userId, out Guid guid))
-            {
-                return BadRequest("Invalid user ID or About data");
-            }
-            
-            try
-            {
-                // Ensure the model's UserId matches the route userId
-                model.UserId = guid;
-                
-                // Update the About tab data
-                await _userProfileService
-                    .UpdateAboutTabAsync(guid, model);
-                
-                return Json(new { success = true, message = "About information updated successfully" });
-            }
-            catch (Exception ex)
-            {
-                // In a real application, you would log the error
-                return Json(new { success = false, message = $"Error updating About information: {ex.Message}" });
-            }
-        }
-        
         /// <summary>
         /// Handles updating the user's profile information
         /// </summary>
@@ -217,9 +98,10 @@ namespace ActioNator.Areas.User.Controllers
                     if (!validationResult.IsValid)
                         return BadRequest(validationResult.ErrorMessage);
 
-                    profilePictureUrl = (await _dropboxFileStorageService.SaveFilesAsync(
+                    // Save profile picture to App_Data
+                    profilePictureUrl = (await _fileStorageService.SaveFilesAsync(
                         new FormFileCollection { profilePic }, 
-                        "profile-pictures", 
+                        "App_Data/profile-pictures", 
                         userId.Value.ToString())).FirstOrDefault();
                 }
 
@@ -233,9 +115,10 @@ namespace ActioNator.Areas.User.Controllers
                     if (!validationResult.IsValid)
                         return BadRequest(validationResult.ErrorMessage);
 
-                    coverPhotoUrl = (await _dropboxFileStorageService.SaveFilesAsync(
+                    // Save cover photo to App_Data
+                    coverPhotoUrl = (await _fileStorageService.SaveFilesAsync(
                         new FormFileCollection { coverPhoto }, 
-                        "cover-photos", 
+                        "App_Data/cover-photos", 
                         userId.Value.ToString())).FirstOrDefault();
                 }
 
@@ -249,7 +132,7 @@ namespace ActioNator.Areas.User.Controllers
                 user.LastName = form["lastName"].FirstOrDefault() ?? user.LastName;
                 
                 if (!string.IsNullOrEmpty(profilePictureUrl))
-                    user.ProfilePictureUrl = profilePictureUrl;
+                    user.ProfilePictureUrl = $"/User/UserProfile/GetFile?filePath={Uri.EscapeDataString(profilePictureUrl)}";
 
                 // Update profile data stored in JSON
                 await _userProfileService.UpdateProfileDataAsync(userId.Value, profileData =>
@@ -258,7 +141,7 @@ namespace ActioNator.Areas.User.Controllers
                     profileData.Location = form["location"].FirstOrDefault();
                     
                     if (!string.IsNullOrEmpty(coverPhotoUrl))
-                        profileData.CoverPhotoUrl = coverPhotoUrl;
+                        profileData.CoverPhotoUrl = $"/User/UserProfile/GetFile?filePath={Uri.EscapeDataString(coverPhotoUrl)}";
                 });
                 
                 // Save changes to user
@@ -272,6 +155,46 @@ namespace ActioNator.Areas.User.Controllers
             {
                 // Log the error
                 return StatusCode(500, $"An error occurred while updating the profile: {ex.Message}");
+            }
+        }
+        
+        /// <summary>
+        /// Serves files from local storage
+        /// </summary>
+        /// <param name="filePath">Path to the file</param>
+        /// <returns>File content</returns>
+        [HttpGet]
+        public async Task<IActionResult> GetFile(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath))
+                return BadRequest("File path is required");
+                
+            var userId = GetUserId();
+            if (userId == null)
+                return Unauthorized();
+                
+            try
+            {
+                // Check if user is authorized to access this file
+                bool isAuthorized = await _fileStorageService.IsUserAuthorizedForFileAsync(filePath, userId.Value.ToString());
+                if (!isAuthorized)
+                {
+                    return Forbid();
+                }
+                
+                // Get the file
+                var (fileStream, contentType) = await _fileStorageService.GetFileAsync(filePath, userId.Value.ToString());
+                
+                // Return the file
+                return File(fileStream, contentType);
+            }
+            catch (FileNotFoundException)
+            {
+                return NotFound("File not found");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"An error occurred while retrieving the file: {ex.Message}");
             }
         }
 

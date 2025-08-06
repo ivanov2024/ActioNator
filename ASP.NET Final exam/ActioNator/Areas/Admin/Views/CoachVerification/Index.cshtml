@@ -1,0 +1,61 @@
+@model List<FinalExamUI.ViewModels.CoachVerification.CoachVerificationUserViewModel>
+@{
+    ViewData["Title"] = "Coach Verification Requests";
+}
+
+<div class="container-fluid py-4">
+    <h1 class="mb-4">Coach Verification Requests</h1>
+
+    @if (Model == null || !Model.Any())
+    {
+        <div class="alert alert-info">
+            No verification requests found.
+        </div>
+    }
+    else
+    {
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">Pending Verifications</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="accordion" id="verificationAccordion">
+                            @foreach (var user in Model)
+                            {
+                                <div class="accordion-item mb-3 border">
+                                    <h2 class="accordion-header" id="heading-@user.UserId">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                                data-bs-target="#collapse-@user.UserId" aria-expanded="false" aria-controls="collapse-@user.UserId">
+                                            <span class="fw-bold">User ID: @user.UserId</span>
+                                            <span class="ms-auto badge bg-primary">@user.Documents.Count Documents</span>
+                                        </button>
+                                    </h2>
+                                    <div id="collapse-@user.UserId" class="accordion-collapse collapse" 
+                                         aria-labelledby="heading-@user.UserId" data-bs-parent="#verificationAccordion">
+                                        <div class="accordion-body">
+                                            @await Html.PartialAsync("_UserVerificationPartial", user)
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@section Scripts {
+    <script>
+        // Enable tooltips
+        document.addEventListener('DOMContentLoaded', function () {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+}

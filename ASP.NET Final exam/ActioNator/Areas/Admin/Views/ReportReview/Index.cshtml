@@ -1,0 +1,254 @@
+@model ActioNator.ViewModels.Reports.ReportReviewPageViewModel
+@{
+    ViewData["Title"] = "Report Review";
+    Layout = "_AdminLayout";
+}
+
+<div class="container-fluid py-4">
+    <h1 class="mb-4">Report Review</h1>
+
+    <ul class="nav nav-tabs mb-4" id="reportTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="posts-tab" data-bs-toggle="tab" data-bs-target="#posts" 
+                    type="button" role="tab" aria-controls="posts" aria-selected="true">
+                Reported Posts <span class="badge bg-danger ms-2">@Model.ReportedPosts.Count</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="comments-tab" data-bs-toggle="tab" data-bs-target="#comments" 
+                    type="button" role="tab" aria-controls="comments" aria-selected="false">
+                Reported Comments <span class="badge bg-danger ms-2">@Model.ReportedComments.Count</span>
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="reportTabsContent">
+        <div class="tab-pane fade show active" id="posts" role="tabpanel" aria-labelledby="posts-tab">
+            @if (!Model.ReportedPosts.Any())
+            {
+                <div class="alert alert-info">
+                    No reported posts found.
+                </div>
+            }
+            else
+            {
+                <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+                    @foreach (var post in Model.ReportedPosts)
+                    {
+                        <div class="col">
+                            @await Html.PartialAsync("_ReportedPostPartial", post)
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <div class="tab-pane fade" id="comments" role="tabpanel" aria-labelledby="comments-tab">
+            @if (!Model.ReportedComments.Any())
+            {
+                <div class="alert alert-info">
+                    No reported comments found.
+                </div>
+            }
+            else
+            {
+                <div class="row row-cols-1 row-cols-md-2 row-cols-xl-3 g-4">
+                    @foreach (var comment in Model.ReportedComments)
+                    {
+                        <div class="col">
+                            @await Html.PartialAsync("_ReportedCommentPartial", comment)
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+<!-- View Content Modal -->
+<div class="modal fade" id="viewContentModal" tabindex="-1" aria-labelledby="viewContentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="viewContentModalLabel">Content Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="contentDetails">
+                    <!-- Content will be loaded here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notifications -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="successToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header bg-success text-white">
+            <strong class="me-auto">Success</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            Operation completed successfully.
+        </div>
+    </div>
+    
+    <div id="errorToast" class="toast" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header bg-danger text-white">
+            <strong class="me-auto">Error</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            An error occurred. Please try again.
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Function to show toast notifications
+        function showToast(isSuccess, message) {
+            const toast = isSuccess ? $('#successToast') : $('#errorToast');
+            if (message) {
+                toast.find('.toast-body').text(message);
+            }
+            const bsToast = new bootstrap.Toast(toast);
+            bsToast.show();
+        }
+        
+        // View content functions
+        function viewPost(id) {
+            $.get('@Url.Action("ViewPost", "ReportReview")', { id: id }, function(data) {
+                $('#contentDetails').html('<div class="mb-3"><strong>Post Content:</strong></div><div class="p-3 bg-light rounded">' + data.content + '</div>');
+                $('#viewContentModalLabel').text('Post Details');
+                const modal = new bootstrap.Modal(document.getElementById('viewContentModal'));
+                modal.show();
+            });
+        }
+        
+        function viewComment(id) {
+            $.get('@Url.Action("ViewComment", "ReportReview")', { id: id }, function(data) {
+                $('#contentDetails').html('<div class="mb-3"><strong>Comment Content:</strong></div><div class="p-3 bg-light rounded">' + data.content + '</div>');
+                $('#viewContentModalLabel').text('Comment Details');
+                const modal = new bootstrap.Modal(document.getElementById('viewContentModal'));
+                modal.show();
+            });
+        }
+        
+        // Delete functions
+        function deletePost(id) {
+            if (confirm('Are you sure you want to delete this post? This action cannot be undone.')) {
+                $.ajax({
+                    url: '@Url.Action("DeletePost", "ReportReview")',
+                    type: 'POST',
+                    data: { id: id, __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() },
+                    success: function(result) {
+                        if (result.success) {
+                            showToast(true, 'Post deleted successfully.');
+                            // Remove the card from the UI
+                            $('#post-' + id).fadeOut(function() {
+                                $(this).remove();
+                                // Check if there are no more posts
+                                if ($('#posts .card').length === 0) {
+                                    $('#posts').html('<div class="alert alert-info">No reported posts found.</div>');
+                                }
+                            });
+                        } else {
+                            showToast(false, 'Failed to delete post.');
+                        }
+                    },
+                    error: function() {
+                        showToast(false, 'An error occurred while deleting the post.');
+                    }
+                });
+            }
+        }
+        
+        function deleteComment(id) {
+            if (confirm('Are you sure you want to delete this comment? This action cannot be undone.')) {
+                $.ajax({
+                    url: '@Url.Action("DeleteComment", "ReportReview")',
+                    type: 'POST',
+                    data: { id: id, __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() },
+                    success: function(result) {
+                        if (result.success) {
+                            showToast(true, 'Comment deleted successfully.');
+                            // Remove the card from the UI
+                            $('#comment-' + id).fadeOut(function() {
+                                $(this).remove();
+                                // Check if there are no more comments
+                                if ($('#comments .card').length === 0) {
+                                    $('#comments').html('<div class="alert alert-info">No reported comments found.</div>');
+                                }
+                            });
+                        } else {
+                            showToast(false, 'Failed to delete comment.');
+                        }
+                    },
+                    error: function() {
+                        showToast(false, 'An error occurred while deleting the comment.');
+                    }
+                });
+            }
+        }
+        
+        // Dismiss report functions
+        function dismissPostReport(id) {
+            $.ajax({
+                url: '@Url.Action("DismissPostReport", "ReportReview")',
+                type: 'POST',
+                data: { id: id, __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() },
+                success: function(result) {
+                    if (result.success) {
+                        showToast(true, 'Post report dismissed successfully.');
+                        // Remove the card from the UI
+                        $('#post-' + id).fadeOut(function() {
+                            $(this).remove();
+                            // Check if there are no more posts
+                            if ($('#posts .card').length === 0) {
+                                $('#posts').html('<div class="alert alert-info">No reported posts found.</div>');
+                            }
+                        });
+                    } else {
+                        showToast(false, 'Failed to dismiss post report.');
+                    }
+                },
+                error: function() {
+                    showToast(false, 'An error occurred while dismissing the post report.');
+                }
+            });
+        }
+        
+        function dismissCommentReport(id) {
+            $.ajax({
+                url: '@Url.Action("DismissCommentReport", "ReportReview")',
+                type: 'POST',
+                data: { id: id, __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val() },
+                success: function(result) {
+                    if (result.success) {
+                        showToast(true, 'Comment report dismissed successfully.');
+                        // Remove the card from the UI
+                        $('#comment-' + id).fadeOut(function() {
+                            $(this).remove();
+                            // Check if there are no more comments
+                            if ($('#comments .card').length === 0) {
+                                $('#comments').html('<div class="alert alert-info">No reported comments found.</div>');
+                            }
+                        });
+                    } else {
+                        showToast(false, 'Failed to dismiss comment report.');
+                    }
+                },
+                error: function() {
+                    showToast(false, 'An error occurred while dismissing the comment report.');
+                }
+            });
+        }
+    </script>
+    
+    @* Add anti-forgery token *@
+    @Html.AntiForgeryToken()
+}

@@ -2,9 +2,9 @@
 
 <!-- Edit Profile Modal -->
 <div id="editProfileModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
-    <div class="relative top-20 mx-auto p-5 border w-11/12 md:max-w-2xl shadow-lg rounded-md bg-white">
+    <div class="relative top-20 mx-auto p-5 border w-11/12 md:max-w-md shadow-lg rounded-md bg-white">
         <div class="flex justify-between items-center pb-3">
-            <p class="text-2xl font-bold">Edit Profile</p>
+            <p class="text-2xl font-bold">Update Profile</p>
             <button onclick="closeEditModal()" class="text-gray-400 hover:text-gray-500">
                 <span class="text-2xl">&times;</span>
             </button>
@@ -14,74 +14,56 @@
             <form id="editProfileForm" method="post" enctype="multipart/form-data">
                 <!-- Profile Picture Upload -->
                 <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="profilePicture">
-                        Profile Picture
-                    </label>
-                    <div class="flex items-center">
-                        <img id="profileImagePreview" src="@Model.ProfilePictureUrl" alt="Profile" class="w-20 h-20 rounded-full object-cover mr-4">
-                        <input type="file" id="profilePicture" name="profilePicture" accept="image/*" class="hidden" onchange="previewImage(this, 'profileImagePreview')">
-                        <button type="button" onclick="document.getElementById('profilePicture').click()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded">
-                            Change
-                        </button>
+                    <label class="block text-gray-700 text-sm font-bold mb-2 text-center">Profile Picture</label>
+                    <div class="flex flex-col items-center">
+                        <div id="profileImageDrop" class="w-32 h-32 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer relative mb-2" 
+                             onclick="document.getElementById('profilePicture').click()" 
+                             ondrop="handleDrop(event)" 
+                             ondragover="event.preventDefault()">
+                            <img id="profileImagePreview" src="@Model.ProfilePictureUrl" alt="Profile" 
+                                 class="w-32 h-32 rounded-full object-cover absolute top-0 left-0" style="z-index:1;">
+                            <div class="absolute w-full h-full flex items-center justify-center text-gray-400" style="z-index:0;">
+                                <span id="profileImageDropText">Click or drag image</span>
+                            </div>
+                            <input type="file" id="profilePicture" name="profilePicture" accept="image/*" class="hidden" 
+                                   onchange="previewImage(this, 'profileImagePreview')">
+                        </div>
+                        <div id="profileImageError" class="text-red-500 text-xs mt-1 hidden"></div>
                     </div>
                 </div>
 
-                <!-- Cover Photo Upload -->
+                <!-- Username/Full Name -->
                 <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="coverPhoto">
-                        Cover Photo
-                    </label>
-                    <div class="relative h-40 bg-gray-200 rounded-lg overflow-hidden">
-                        <img id="coverImagePreview" src="@Model.CoverPhotoUrl" alt="Cover" class="w-full h-full object-cover">
-                        <input type="file" id="coverPhoto" name="coverPhoto" accept="image/*" class="hidden" onchange="previewImage(this, 'coverImagePreview')">
-                        <button type="button" onclick="document.getElementById('coverPhoto').click()" class="absolute top-2 right-2 bg-black bg-opacity-50 text-white p-2 rounded-full hover:bg-opacity-70">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Full Name -->
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="fullName">
-                        Full Name
-                    </label>
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="fullName">Username</label>
                     <input type="text" id="fullName" name="fullName" value="@Model.FullName" 
                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
                 </div>
 
-                <!-- Headline -->
-                <div class="mb-4">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="headline">
-                        Headline
-                    </label>
-                    <input type="text" id="headline" name="headline" value="@Model.Headline" 
-                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
-                           placeholder="E.g., Software Developer at ActioNator">
-                </div>
-
-                <!-- Location -->
-                <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="location">
-                        Location
-                    </label>
-                    <input type="text" id="location" name="location" value="@Model.Location" 
-                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline" 
-                           placeholder="E.g., New York, NY">
-                </div>
-
                 <!-- Form Actions -->
                 <div class="flex items-center justify-end pt-4 border-t border-gray-200">
-                    <button type="button" onclick="closeEditModal()" class="bg-white hover:bg-gray-100 text-gray-700 font-medium py-2 px-4 border border-gray-300 rounded shadow-sm mr-2">
+                    <button type="button" onclick="closeEditModal()" 
+                            class="bg-white hover:bg-gray-100 text-gray-700 font-medium py-2 px-4 border border-gray-300 rounded shadow-sm mr-2">
                         Cancel
                     </button>
-                    <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded shadow-sm">
-                        Save Changes
+                    <button type="submit" id="saveButton" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded shadow-sm flex items-center">
+                        <span>Save Changes</span>
+                        <div id="loadingSpinner" class="hidden ml-2">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </div>
                     </button>
                 </div>
             </form>
+        </div>
+        
+        <!-- Toast Notifications -->
+        <div id="successToast" class="hidden fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg">
+            Profile updated successfully!
+        </div>
+        <div id="errorToast" class="hidden fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded shadow-lg">
+            Error updating profile.
         </div>
     </div>
 </div>
@@ -97,48 +79,119 @@
     // Close the modal
     function closeEditModal() {
         document.getElementById('editProfileModal').classList.add('hidden');
-        document.body.classList.remove('overflow-hidden');
+        document.body.classList.remove('hidden');
+        hideToasts();
+    }
+    
+    // Show/hide loading spinner
+    function toggleLoading(isLoading) {
+        const spinner = document.getElementById('loadingSpinner');
+        const saveButton = document.getElementById('saveButton');
+        
+        if (isLoading) {
+            spinner.classList.remove('hidden');
+            saveButton.disabled = true;
+            saveButton.classList.add('opacity-75');
+        } else {
+            spinner.classList.add('hidden');
+            saveButton.disabled = false;
+            saveButton.classList.remove('opacity-75');
+        }
+    }
+    
+    // Show toast notification
+    function showToast(type, duration = 3000) {
+        hideToasts();
+        const toast = document.getElementById(type + 'Toast');
+        toast.classList.remove('hidden');
+        
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, duration);
+    }
+    
+    // Hide all toasts
+    function hideToasts() {
+        document.getElementById('successToast').classList.add('hidden');
+        document.getElementById('errorToast').classList.add('hidden');
     }
 
-    // Preview image before upload
+    // Preview image before upload and validate
     function previewImage(input, previewId) {
         const preview = document.getElementById(previewId);
         const file = input.files[0];
+        const errorDiv = document.getElementById('profileImageError');
+        errorDiv.classList.add('hidden');
+        errorDiv.innerText = '';
+        
+        if (!file) return;
+        
+        // Client-side validation (type & size)
+        if (!file.type.startsWith('image/')) {
+            errorDiv.innerText = 'Please select a valid image file.';
+            errorDiv.classList.remove('hidden');
+            input.value = '';
+            return;
+        }
+        
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            errorDiv.innerText = 'Image must be less than 5MB.';
+            errorDiv.classList.remove('hidden');
+            input.value = '';
+            return;
+        }
+        
         const reader = new FileReader();
-
         reader.onloadend = function() {
             preview.src = reader.result;
         }
-
-        if (file) {
-            reader.readAsDataURL(file);
-        }
+        reader.readAsDataURL(file);
     }
 
     // Handle form submission
     document.getElementById('editProfileForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+        const errorDiv = document.getElementById('profileImageError');
+        errorDiv.classList.add('hidden');
+        errorDiv.innerText = '';
+        
+        // Show loading spinner
+        toggleLoading(true);
         
         const formData = new FormData(this);
         
         try {
+            // Add antiforgery token to the form data instead of headers
+            const token = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (token) {
+                formData.append('__RequestVerificationToken', token.value);
+            }
+            
             const response = await fetch('/User/UserProfile/UpdateProfile', {
                 method: 'POST',
-                body: formData,
-                headers: {
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                }
+                body: formData
+                // No headers - let the browser set the Content-Type automatically for FormData
             });
-
+            
+            toggleLoading(false);
+            
             if (response.ok) {
-                // Reload the page to see changes
-                window.location.reload();
+                showToast('success');
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
             } else {
-                alert('Error updating profile. Please try again.');
+                const errText = await response.text();
+                errorDiv.innerText = errText || 'Error updating profile. Please try again.';
+                errorDiv.classList.remove('hidden');
+                showToast('error');
             }
         } catch (error) {
             console.error('Error:', error);
-            alert('An error occurred while updating your profile.');
+            errorDiv.innerText = 'An error occurred while updating your profile.';
+            errorDiv.classList.remove('hidden');
+            toggleLoading(false);
+            showToast('error');
         }
     });
 
@@ -147,6 +200,17 @@
         const modal = document.getElementById('editProfileModal');
         if (event.target === modal) {
             closeEditModal();
+        }
+    }
+
+    // Drag-and-drop support for profile image
+    function handleDrop(event) {
+        event.preventDefault();
+        const files = event.dataTransfer.files;
+        if (files.length > 0) {
+            const input = document.getElementById('profilePicture');
+            input.files = files;
+            previewImage(input, 'profileImagePreview');
         }
     }
 </script>

@@ -44,16 +44,24 @@ namespace ActioNator
         {
             WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
 
-            // Register DropboxFileStorageService for IDropboxFileStorageService
-            builder.Services.AddScoped<IDropboxFileStorageService>(provider =>
+            // Ensure App_Data directory exists
+            var appDataPath = Path.Combine(builder.Environment.ContentRootPath, "App_Data");
+            if (!Directory.Exists(appDataPath))
             {
-                var dropboxAccessToken = builder.Configuration["Dropbox:AccessToken"];
-                if (string.IsNullOrEmpty(dropboxAccessToken))
-                {
-                    throw new InvalidOperationException("Dropbox access token is not configured. Please set the 'Dropbox:AccessToken' in appsettings.json");
-                }
-                return new DropboxFileStorageService(dropboxAccessToken);
-            });
+                Directory.CreateDirectory(appDataPath);
+            }
+            
+            // Ensure profile pictures and cover photos directories exist
+            var profilePicsPath = Path.Combine(appDataPath, "profile-pictures");
+            var coverPhotosPath = Path.Combine(appDataPath, "cover-photos");
+            if (!Directory.Exists(profilePicsPath))
+            {
+                Directory.CreateDirectory(profilePicsPath);
+            }
+            if (!Directory.Exists(coverPhotosPath))
+            {
+                Directory.CreateDirectory(coverPhotosPath);
+            }
 
             // Add services to the container.
             string connectionString 
