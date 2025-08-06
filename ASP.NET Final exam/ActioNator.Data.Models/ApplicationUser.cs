@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity;
 
 using ActioNator.Data.Models.Enums;
 using System.ComponentModel.DataAnnotations;
@@ -77,5 +77,10 @@ namespace ActioNator.Data.Models
             = new HashSet<Message>();
         public virtual ICollection<UserLoginHistory> LoginHistory { get; set; } 
             = new HashSet<UserLoginHistory>();
+
+        /// <summary>
+        /// JSON-serialized additional profile data
+        /// </summary>
+        public string? ProfileDataJson { get; set; }
     }
 }

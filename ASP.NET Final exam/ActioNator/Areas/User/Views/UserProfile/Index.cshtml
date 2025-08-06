@@ -1,0 +1,142 @@
+@model FinalExamUI.ViewModels.UserProfile.ProfileViewModel
+@{
+    ViewData["Title"] = $"{Model.FullName} - Profile";
+}
+
+<div class="profile-container">
+    <!-- Cover Photo and Profile Header -->
+    <div class="relative">
+        <div class="h-80 bg-cover bg-center" style="background-image: url('@Model.CoverPhotoUrl')">
+            <!-- Cover Photo -->
+        </div>
+        
+        <div class="absolute bottom-0 left-8 transform translate-y-1/2">
+            <!-- Profile Picture -->
+            <img src="@Model.ProfilePictureUrl" alt="@Model.FullName" 
+                 class="w-40 h-40 rounded-full border-4 border-white shadow-lg">
+        </div>
+    </div>
+    
+    <!-- Profile Info -->
+    <div class="pt-24 pb-4 px-8 bg-white">
+        <div class="flex flex-col md:flex-row md:items-end md:justify-between">
+            <div class="text-center md:text-left md:ml-48">
+                <h1 class="text-3xl font-bold">@Model.FullName</h1>
+                <p class="text-gray-600 mt-1">@Model.Headline</p>
+                <p class="text-gray-500 text-sm mt-1">@Model.FriendsCount friends</p>
+            </div>
+            
+            <div class="flex gap-2 mt-4 md:mt-0 justify-center md:justify-end">
+                @if (Model.IsCurrentUser)
+                {
+                    <button onclick="openEditModal()" class="bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600 transition-colors">
+                        <i class="fas fa-edit mr-2"></i>Edit Profile
+                    </button>
+                }
+            </div>
+        </div>
+    </div>
+    
+    <!-- Navigation Tabs -->
+    <div class="sticky top-0 z-10 bg-white border-b border-gray-200">
+        <div class="px-8">
+            <nav class="flex space-x-8 overflow-x-auto">
+                <a href="#overview" 
+                   class="tab-link py-4 px-1 border-b-2 @(Model.ActiveTab == "Overview" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700")"
+                   data-tab="Overview">
+                    Overview
+                </a>
+                <a href="#about" 
+                   class="tab-link py-4 px-1 border-b-2 @(Model.ActiveTab == "About" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700")"
+                   data-tab="About">
+                    About
+                </a>
+                <a href="#posts" 
+                   class="tab-link py-4 px-1 border-b-2 @(Model.ActiveTab == "Posts" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700")"
+                   data-tab="Posts">
+                    Posts
+                </a>
+            </nav>
+        </div>
+    </div>
+    
+    <!-- Tab Content -->
+    <div class="max-w-7xl mx-auto p-4">
+        <!-- Overview Tab -->
+        <div id="overview-tab" class="tab-content @(Model.ActiveTab == "Overview" ? "block" : "hidden")">
+            <partial name="_OverviewPartial" model="Model.Overview" />
+        </div>
+        
+        <!-- About Tab -->
+        <div id="about-tab" class="tab-content @(Model.ActiveTab == "About" ? "block" : "hidden")">
+            <partial name="_AboutPartial" model="Model.About" />
+        </div>
+        
+        <!-- Posts Tab -->
+        <div id="posts-tab" class="tab-content @(Model.ActiveTab == "Posts" ? "block" : "hidden")">
+            @* TODO: Load posts via partial view *@
+            <div class="bg-white rounded-lg shadow p-8 text-center">
+                <h3 class="text-xl font-semibold text-gray-700">Posts Coming Soon</h3>
+                <p class="text-gray-500 mt-2">This feature is currently under development.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Include the edit profile modal -->
+<partial name="_EditProfileModal" model="Model" />
+
+<!-- Include Font Awesome for icons -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+@section Scripts {
+    <script>
+        // Tab switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabLinks = document.querySelectorAll('.tab-link');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const tabName = this.getAttribute('data-tab');
+                    
+                    // Update active tab styling
+                    tabLinks.forEach(t => {
+                        t.classList.remove('border-blue-500', 'text-blue-600');
+                        t.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+                    });
+                    
+                    this.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700');
+                    this.classList.add('border-blue-500', 'text-blue-600');
+                    
+                    // Show the selected tab content
+                    tabContents.forEach(content => {
+                        content.classList.add('hidden');
+                    });
+                    
+                    document.getElementById(`${tabName.toLowerCase()}-tab`).classList.remove('hidden');
+                    
+                    // Load tab content via AJAX if needed
+                    loadTabContent(tabName, '@Model.UserId');
+                });
+            });
+            
+            function loadTabContent(tabName, userId) {
+                // This function would make AJAX calls to load tab content dynamically
+                // For this example, we're using server-side rendering with partials
+                console.log(`Loading ${tabName} tab content for user ${userId}`);
+                
+                // Example AJAX call (commented out since we're using server-side rendering)
+                /*
+                fetch(`/User/UserProfile/Get${tabName}Partial?userId=${userId}`)
+                    .then(response => response.text())
+                    .then(html => {
+                        document.getElementById(`${tabName.toLowerCase()}-tab`).innerHTML = html;
+                    });
+                */
+            }
+        });
+    </script>
+}

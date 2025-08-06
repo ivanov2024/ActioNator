@@ -14,6 +14,7 @@ using ActioNator.Services.Implementations.GoalService;
 using ActioNator.Services.Implementations.InputSanitization;
 using ActioNator.Services.Implementations.JournalService;
 using ActioNator.Services.Implementations.UserDashboard;
+using ActioNator.Services.Implementations.UserProfileService;
 using ActioNator.Services.Implementations.VerifyCoach;
 using ActioNator.Services.Implementations.WorkoutService;
 using ActioNator.Services.Interfaces.AuthenticationServices;
@@ -25,6 +26,7 @@ using ActioNator.Services.Interfaces.GoalService;
 using ActioNator.Services.Interfaces.InputSanitizationService;
 using ActioNator.Services.Interfaces.JournalService;
 using ActioNator.Services.Interfaces.UserDashboard;
+using ActioNator.Services.Interfaces.UserProfileService;
 using ActioNator.Services.Interfaces.VerifyCoachServices;
 using ActioNator.Services.Interfaces.WorkoutService;
 using ActioNator.Services.Seeding;
@@ -41,6 +43,17 @@ namespace ActioNator
         public static async Task Main(string[] args)
         {
             WebApplicationBuilder builder = WebApplication.CreateBuilder(args);
+
+            // Register DropboxFileStorageService for IDropboxFileStorageService
+            builder.Services.AddScoped<IDropboxFileStorageService>(provider =>
+            {
+                var dropboxAccessToken = builder.Configuration["Dropbox:AccessToken"];
+                if (string.IsNullOrEmpty(dropboxAccessToken))
+                {
+                    throw new InvalidOperationException("Dropbox access token is not configured. Please set the 'Dropbox:AccessToken' in appsettings.json");
+                }
+                return new DropboxFileStorageService(dropboxAccessToken);
+            });
 
             // Add services to the container.
             string connectionString 
@@ -180,6 +193,10 @@ namespace ActioNator
                 .Services
                 .AddScoped<ICommunityService, CommunityService>();
 
+            builder
+                .Services
+                .AddScoped<IUserProfileService, UserProfileService>();
+
             // Check if we're running in migration mode
             bool isMigrationMode = args.Contains("--design-time") || 
                                   AppDomain.CurrentDomain.GetAssemblies().Any(a => a.FullName?.Contains("Microsoft.EntityFrameworkCore.Design") == true) ||
@@ -316,11 +333,6 @@ namespace ActioNator
                 name: "areas",
                 pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
                 
-            // Map default controller route
-            app.MapControllerRoute(
-                name: "default",
-                pattern: "{controller=Home}/{action=Index}/{id?}");
-
             // Map Razor Pages
             app.MapRazorPages();
             

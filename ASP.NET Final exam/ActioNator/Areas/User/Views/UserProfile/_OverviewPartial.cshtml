@@ -1,0 +1,197 @@
+@model FinalExamUI.ViewModels.UserProfile.OverviewTabViewModel
+@{
+    // Anti-forgery token
+    @Html.AntiForgeryToken()
+}
+
+@if (Model == null)
+{
+    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <svg class="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                </svg>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-yellow-700">
+                    No overview data available for this user.
+                </p>
+            </div>
+        </div>
+    </div>
+    return;
+}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left Column -->
+    <div class="lg:col-span-2">
+        <!-- Bio Section -->
+        <div class="bg-white rounded-lg shadow mb-6">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Bio</h2>
+                <p class="text-gray-700">@Model.Bio</p>
+            </div>
+        </div>
+
+        <!-- Work Experience Section -->
+        <div class="bg-white rounded-lg shadow mb-6">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Work Experience</h2>
+                
+                @if (Model.WorkExperience != null && Model.WorkExperience.Any())
+                {
+                    <div class="space-y-6">
+                        @foreach (var work in Model.WorkExperience)
+                        {
+                            <div class="border-b border-gray-200 pb-4 last:border-b-0 last:pb-0">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0 mt-1">
+                                        <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                            <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <h3 class="text-lg font-medium text-gray-900">@work.Position</h3>
+                                        <p class="text-gray-700">@work.Company</p>
+                                        <p class="text-sm text-gray-500">
+                                            @work.Location • 
+                                            @work.StartDate?.ToString("MMM yyyy") - 
+                                            @(work.IsCurrentlyWorking ? "Present" : work.EndDate?.ToString("MMM yyyy"))
+                                        </p>
+                                        <p class="mt-2 text-gray-600">@work.Description</p>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-gray-500 italic">No work experience listed.</p>
+                }
+            </div>
+        </div>
+
+        <!-- Education Section -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Education</h2>
+                
+                @if (Model.Education != null && Model.Education.Any())
+                {
+                    <div class="space-y-6">
+                        @foreach (var edu in Model.Education)
+                        {
+                            <div class="border-b border-gray-200 pb-4 last:border-b-0 last:pb-0">
+                                <div class="flex items-start">
+                                    <div class="flex-shrink-0 mt-1">
+                                        <div class="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                                            <svg class="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                                                <path d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path>
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"></path>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <h3 class="text-lg font-medium text-gray-900">@edu.School</h3>
+                                        <p class="text-gray-700">@edu.Degree, @edu.FieldOfStudy</p>
+                                        <p class="text-sm text-gray-500">
+                                            @edu.StartDate?.ToString("yyyy") - 
+                                            @(edu.IsCurrentlyStudying ? "Present" : edu.EndDate?.ToString("yyyy"))
+                                        </p>
+                                        <p class="mt-2 text-gray-600">@edu.Description</p>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-gray-500 italic">No education listed.</p>
+                }
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column -->
+    <div class="space-y-6">
+        <!-- Skills Section -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Skills</h2>
+                
+                @if (Model.Skills != null && Model.Skills.Any())
+                {
+                    <div class="flex flex-wrap gap-2">
+                        @foreach (var skill in Model.Skills)
+                        {
+                            <span class="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
+                                @skill
+                            </span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-gray-500 italic">No skills listed.</p>
+                }
+            </div>
+        </div>
+
+        <!-- Interests Section -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Interests</h2>
+                
+                @if (Model.Interests != null && Model.Interests.Any())
+                {
+                    <div class="flex flex-wrap gap-2">
+                        @foreach (var interest in Model.Interests)
+                        {
+                            <span class="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full">
+                                @interest
+                            </span>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-gray-500 italic">No interests listed.</p>
+                }
+            </div>
+        </div>
+
+        <!-- Social Links Section -->
+        <div class="bg-white rounded-lg shadow">
+            <div class="p-6">
+                <h2 class="text-xl font-semibold text-gray-800 mb-4">Social Links</h2>
+                
+                @if (Model.SocialLinks != null && Model.SocialLinks.Any())
+                {
+                    <div class="space-y-3">
+                        @foreach (var link in Model.SocialLinks)
+                        {
+                            <a href="@link.Value" target="_blank" rel="noopener noreferrer" 
+                               class="flex items-center text-blue-600 hover:text-blue-800">
+                                <span class="mr-2">@link.Key</span>
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z"></path>
+                                    <path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z"></path>
+                                </svg>
+                            </a>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <p class="text-gray-500 italic">No social links listed.</p>
+                }
+            </div>
+        </div>
+    </div>
+</div>
