@@ -76,7 +76,7 @@
             </div>
                 
             <!-- Form Content -->
-            <form id="journalEntryForm" @@submit.prevent="validateForm() && saveEntry()" class="px-4 sm:px-8 md:px-12 pt-3 sm:pt-4 pb-6 sm:pb-8">
+            <form id="journalEntryForm" class="px-4 sm:px-8 md:px-12 pt-3 sm:pt-4 pb-6 sm:pb-8" x-on:submit.prevent="validateForm() && saveEntry()">
                 <input type="hidden" name="id" x-model="currentEntry.id">
                 <input type="hidden" name="createdAt" x-model="currentEntry.createdAt">
                 

@@ -1,4 +1,4 @@
-﻿using ActioNator.Data.EntityConfigurations;
+using ActioNator.Data.EntityConfigurations;
 using ActioNator.Data.Models;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -38,6 +38,16 @@ namespace ActioNator.Data
         public DbSet<Message> Messages { get; set; } = null!;
 
         public DbSet<Post> Posts { get; set; } = null!;
+
+        public DbSet<PostImage> PostImages { get; set; } = null!;
+
+        public DbSet<PostLike> PostLikes { get; set; } = null!;
+
+        public DbSet<PostReport> PostReports { get; set; } = null!;
+
+        public DbSet<CommentReport> CommentReports { get; set; } = null!;
+
+        public DbSet<CommentLike> CommentLikes { get; set; } = null!;
 
         public DbSet<Workout> Workouts { get; set; } = null!;
 

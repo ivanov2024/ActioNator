@@ -1,4 +1,4 @@
-﻿namespace ActioNator.GCommon
+namespace ActioNator.GCommon
 {
     public static class ValidationConstants
     {
@@ -52,9 +52,6 @@
 
         public static class Post
         {
-            public const int TitleMinLength = 3;
-            public const int TitleMaxLength = 20;
-
             public const int ContentMinLength = 0;
             public const int ContentMaxLength = 150;
         }

@@ -43,22 +43,12 @@ document.addEventListener('alpine:init', function() {
                 // Call the server-side function to add the comment
                 window.addComment(postId, content, parentCommentId);
                 
-                // Create a temporary comment to show immediately in the UI
-                var newComment = {
-                    author: 'Current User',
-                    avatar: 'bg-purple-300',
-                    text: content,
-                    time: 'Just now',
-                    likes: 0,
-                    liked: false,
-                    isCertified: false,
-                    isAdmin: false,
-                    isDeleted: false
-                };
-                
-                this.comments.push(newComment);
+                // Clear the comment input field after submission
                 this.commentText = '';
                 this.replyingTo = null;
+                
+                // The actual comment will be added by the SignalR hub
+                // We don't need to create a temporary comment here as it causes duplicate components
             },
             
             setReplyTo: function(author) {

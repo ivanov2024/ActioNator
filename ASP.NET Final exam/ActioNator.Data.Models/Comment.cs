@@ -1,4 +1,5 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 
 using static ActioNator.GCommon.ValidationConstants.Comment;
 
@@ -29,6 +30,11 @@ namespace ActioNator.Data.Models
         public string Content { get; set; } = null!;
 
         public int LikesCount { get; set; }
+
+        /// <summary>
+        /// Collection of likes on this comment
+        /// </summary>
+        public virtual ICollection<CommentLike> Likes { get; set; } = new HashSet<CommentLike>();
 
         public DateTime CreatedAt { get; set; }
 

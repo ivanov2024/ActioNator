@@ -6,12 +6,20 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UserSecretsId>aspnet-ActioNator-4a7d48d5-2dbe-42c3-84af-43e23c143db4</UserSecretsId>
     <GenerateStaticWebAssetsPrecompressedFiles>false</GenerateStaticWebAssetsPrecompressedFiles>
+    <StaticWebAssetBasePath>/</StaticWebAssetBasePath>
+    <StaticWebAssetsDisableProjectBuildStaticWebAssetCompression>true</StaticWebAssetsDisableProjectBuildStaticWebAssetCompression>
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="CloudinaryDotNet" Version="1.27.6" />
+    <PackageReference Include="JWT" Version="11.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="8.0.18" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="8.0.18" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="8.0.18" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Razor.RuntimeCompilation" Version="8.0.19" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="8.0.18" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.18" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.18" />

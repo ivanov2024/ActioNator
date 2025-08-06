@@ -1,5 +1,5 @@
-@using ActioNator.ViewModels.Posts
-@model IEnumerable<PostImagesViewModel>
+@using ActioNator.ViewModels.Community
+@model IEnumerable<PostImageViewModel>
 
 @if (Model != null && Model.Any())
 {
@@ -7,7 +7,7 @@
         <div class="dynamic-image-grid" :class="getGridClass()">
             <template x-for="(image, index) in displayedImages" :key="index">
                 <div class="relative overflow-hidden bg-gray-200 cursor-pointer group" @@click ="openImageModal(index)" :class="getImageContainerClass(index)">
-                    <img :src="image.url" :alt="image.alt || 'Post image'" class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" @@error ="handleImageError($event, index)">
+                    <img :src="image.url" :alt="image.alt || 'Post image'" class="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105" @@error ="handleImageError($event, index)" onerror="this.onerror=null; this.src='/images/placeholder-image.png';">
 
                     <!-- Overlay for additional images (+N) -->
                     <template x-if="index === 2 && postImages.length > 3">

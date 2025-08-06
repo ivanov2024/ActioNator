@@ -1,0 +1,138 @@
+@model ActioNator.ViewModels.Admin.ReportsViewModel
+
+@{
+    ViewData["Title"] = "Content Reports";
+}
+
+<div class="container mt-4">
+    <h1 class="mb-4">Content Reports</h1>
+
+    <ul class="nav nav-tabs mb-4" id="reportsTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="post-reports-tab" data-bs-toggle="tab" data-bs-target="#post-reports" type="button" role="tab" aria-controls="post-reports" aria-selected="true">
+                Post Reports <span class="badge bg-danger">@Model.PostReports.Count(r => r.Status == "Pending")</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="comment-reports-tab" data-bs-toggle="tab" data-bs-target="#comment-reports" type="button" role="tab" aria-controls="comment-reports" aria-selected="false">
+                Comment Reports <span class="badge bg-danger">@Model.CommentReports.Count(r => r.Status == "Pending")</span>
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="reportsTabContent">
+        <!-- Post Reports Tab -->
+        <div class="tab-pane fade show active" id="post-reports" role="tabpanel" aria-labelledby="post-reports-tab">
+            @if (!Model.PostReports.Any())
+            {
+                <div class="alert alert-info">No post reports found.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Post ID</th>
+                                <th>Reported By</th>
+                                <th>Reason</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var report in Model.PostReports)
+                            {
+                                <tr class="@(report.Status == "Pending" ? "table-warning" : "")">
+                                    <td>@report.PostId</td>
+                                    <td>@report.ReportedByUserName</td>
+                                    <td>@report.Reason</td>
+                                    <td>@report.CreatedAt.ToString("g")</td>
+                                    <td>
+                                        <span class="badge @(report.Status == "Pending" ? "bg-warning" : 
+                                                            report.Status == "Resolved" ? "bg-success" : 
+                                                            report.Status == "Rejected" ? "bg-danger" : "bg-secondary")">
+                                            @report.Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a asp-action="PostReportDetails" asp-route-id="@report.Id" class="btn btn-sm btn-primary">
+                                            Details
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+
+        <!-- Comment Reports Tab -->
+        <div class="tab-pane fade" id="comment-reports" role="tabpanel" aria-labelledby="comment-reports-tab">
+            @if (!Model.CommentReports.Any())
+            {
+                <div class="alert alert-info">No comment reports found.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th>Comment</th>
+                                <th>Post ID</th>
+                                <th>Reported By</th>
+                                <th>Reason</th>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var report in Model.CommentReports)
+                            {
+                                <tr class="@(report.Status == "Pending" ? "table-warning" : "")">
+                                    <td>@(report.CommentContent.Length > 50 ? report.CommentContent.Substring(0, 47) + "..." : report.CommentContent)</td>
+                                    <td>@report.PostId</td>
+                                    <td>@report.ReportedByUserName</td>
+                                    <td>@report.Reason</td>
+                                    <td>@report.CreatedAt.ToString("g")</td>
+                                    <td>
+                                        <span class="badge @(report.Status == "Pending" ? "bg-warning" : 
+                                                            report.Status == "Resolved" ? "bg-success" : 
+                                                            report.Status == "Rejected" ? "bg-danger" : "bg-secondary")">
+                                            @report.Status
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <a asp-action="CommentReportDetails" asp-route-id="@report.Id" class="btn btn-sm btn-primary">
+                                            Details
+                                        </a>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(function () {
+            // Initialize Bootstrap tabs
+            var triggerTabList = [].slice.call(document.querySelectorAll('#reportsTab button'))
+            triggerTabList.forEach(function (triggerEl) {
+                var tabTrigger = new bootstrap.Tab(triggerEl)
+                triggerEl.addEventListener('click', function (event) {
+                    event.preventDefault()
+                    tabTrigger.show()
+                })
+            })
+        });
+    </script>
+}

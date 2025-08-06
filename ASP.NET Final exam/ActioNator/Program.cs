@@ -1,9 +1,13 @@
+using ActioNator.Configuration;
 using ActioNator.Data;
 using ActioNator.Data.Models;
+using ActioNator.Hubs;
 using ActioNator.Middleware;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.ContentInspectors;
 using ActioNator.Services.Implementations.AuthenticationService;
+using ActioNator.Services.Implementations.Cloud;
+using ActioNator.Services.Implementations.Communication;
 using ActioNator.Services.Implementations.Community;
 using ActioNator.Services.Implementations.FileServices;
 using ActioNator.Services.Implementations.GoalService;
@@ -13,6 +17,8 @@ using ActioNator.Services.Implementations.UserDashboard;
 using ActioNator.Services.Implementations.VerifyCoach;
 using ActioNator.Services.Implementations.WorkoutService;
 using ActioNator.Services.Interfaces.AuthenticationServices;
+using ActioNator.Services.Interfaces.Cloud;
+using ActioNator.Services.Interfaces.Communication;
 using ActioNator.Services.Interfaces.Community;
 using ActioNator.Services.Interfaces.FileServices;
 using ActioNator.Services.Interfaces.GoalService;
@@ -23,6 +29,7 @@ using ActioNator.Services.Interfaces.VerifyCoachServices;
 using ActioNator.Services.Interfaces.WorkoutService;
 using ActioNator.Services.Seeding;
 using ActioNator.Services.Validators;
+using CloudinaryDotNet;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -45,7 +52,8 @@ namespace ActioNator
 
             builder.Services.AddDbContext<ActioNatorDbContext>
             (options =>
-                options.UseSqlServer(connectionString)
+                options.UseSqlServer(connectionString, b 
+                => b.MigrationsAssembly("ActioNator.Data"))
             );
 
             builder.Services
@@ -55,12 +63,32 @@ namespace ActioNator
                 .AddControllersWithViews();
 
             builder.Services
-                .AddRazorPages();
+                .AddRazorPages()
+                .AddRazorPagesOptions(options =>
+                {
+                    // Configure Identity area pages
+                    options.Conventions.AuthorizeAreaFolder("Identity", "/Account");
+                    options.Conventions.AllowAnonymousToAreaPage("Identity", "/Account/Access");
+                    options.Conventions.AllowAnonymousToAreaPage("Identity", "/Account/AccessDenied");
+                })
+                .AddRazorRuntimeCompilation();
+                
+            // Add SignalR services
+            builder.Services.AddSignalR();
 
             // Register configuration options
             builder.Services
                 .Configure<FileUploadOptions>
                 (builder.Configuration.GetSection("FileUpload"));
+                
+            // Register Cloudinary configuration
+            builder.Services
+                .Configure<CloudinarySettings>
+                (builder.Configuration.GetSection("Cloudinary"));
+                
+            // Register Cloudinary service
+            builder.Services
+                .AddScoped<ICloudinaryService, CloudinaryService>();
             
             // Register file system and content inspectors
             builder.Services
@@ -152,6 +180,26 @@ namespace ActioNator
                 .Services
                 .AddScoped<ICommunityService, CommunityService>();
 
+            // Check if we're running in migration mode
+            bool isMigrationMode = args.Contains("--design-time") || 
+                                  AppDomain.CurrentDomain.GetAssemblies().Any(a => a.FullName?.Contains("Microsoft.EntityFrameworkCore.Design") == true) ||
+                                  Environment.GetEnvironmentVariable("ACTIO_NATOR_MIGRATION_MODE") == "true";
+            
+            // Register SignalRService with conditional dependency injection
+            if (isMigrationMode)
+            {
+                // For design-time operations (migrations), register the null implementation
+                builder.Services.AddScoped<ISignalRService, NullSignalRService>();
+                
+                // Log that we're using the null implementation
+                Console.WriteLine("Using NullSignalRService for design-time operations");
+            }
+            else
+            {
+                // For runtime operations, register the real implementation
+                builder.Services.AddScoped<ISignalRService, SignalRService>();
+            }
+
             builder.Services
                 .AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
                 {
@@ -195,6 +243,22 @@ namespace ActioNator
                 options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
             });
 
+            builder.Services.Configure<CloudinarySettings>(
+                builder.Configuration.GetSection("CloudinarySettings"));
+
+            builder.Services
+                .AddSingleton(provider =>
+            {
+                CloudinarySettings config 
+                = provider
+                .GetRequiredService<IOptions<CloudinarySettings>>().Value;
+
+                Account account 
+                = new (config.CloudName, config.ApiKey, config.ApiSecret);
+
+                return new Cloudinary(account);
+            });
+
             WebApplication app = builder.Build();
 
             AsyncServiceScope asyncServiceScope 
@@ -202,13 +266,13 @@ namespace ActioNator
 
             using (IServiceScope scope = asyncServiceScope)
             {
-                RoleManager<IdentityRole<Guid>> roleManager 
+                RoleManager<IdentityRole<Guid>> roleManager
                     = scope
                     .ServiceProvider
                     .GetRequiredService<RoleManager<IdentityRole<Guid>>>();
 
-                RoleSeeder roleSeeder 
-                    = new (roleManager);
+                RoleSeeder roleSeeder
+                    = new(roleManager);
 
                 await roleSeeder.SeedRolesAsync();
             }
@@ -222,6 +286,7 @@ namespace ActioNator
                 }
                 await next();
             });
+
 
             // Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
@@ -246,13 +311,23 @@ namespace ActioNator
             app.UseAuthentication();
             app.UseAuthorization();
 
+            // Map area route with higher priority
             app.MapControllerRoute(
                 name: "areas",
                 pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");
+                
+            // Map default controller route
+            app.MapControllerRoute(
+                name: "default",
+                pattern: "{controller=Home}/{action=Index}/{id?}");
 
+            // Map Razor Pages
             app.MapRazorPages();
+            
+            // Map SignalR hubs
+            app.MapHub<CommunityHub>("/communityHub");
 
-            await app.RunAsync();
+            await app.RunAsync();      
         }
     }
 }

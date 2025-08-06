@@ -1,4 +1,4 @@
-﻿using ActioNator.Data.Models;
+using ActioNator.Data.Models;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -14,11 +14,11 @@ namespace ActioNator.Data.EntityConfigurations
 
             applicationUser
                 .Property(au => au.RegisteredAt)
-                .HasDefaultValue(DateTime.UtcNow);
+                .HasDefaultValueSql("GETUTCDATE()");
 
             applicationUser
                 .Property(au => au.LastLoginAt)
-                .HasDefaultValue(DateTime.UtcNow);
+                .HasDefaultValueSql("GETUTCDATE()");
 
             applicationUser
                 .Property(au => au.ProfilePictureUrl)

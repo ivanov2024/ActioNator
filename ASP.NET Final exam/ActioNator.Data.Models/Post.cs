@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 using static ActioNator.GCommon.ValidationConstants.Post;
 
@@ -15,10 +15,6 @@ namespace ActioNator.Data.Models
         [Required]
         public virtual ApplicationUser ApplicationUser { get; set; } = null!;
 
-        [Required]
-        [MinLength(TitleMinLength)]
-        [MaxLength(TitleMaxLength)]
-        public string Title { get; set; } = null!;
 
         [MinLength(ContentMinLength)]
         [MaxLength(ContentMaxLength)]
@@ -41,5 +37,8 @@ namespace ActioNator.Data.Models
 
         public virtual ICollection<PostImage> PostImages { get; set; }
             = new HashSet<PostImage>();
+
+        public virtual ICollection<PostLike> Likes { get; set; }
+            = new HashSet<PostLike>();
     }
 }

@@ -143,10 +143,174 @@ function autoResizeTextarea(el) {
     el.style.height = el.scrollHeight + "px";
 }
 
+// Function to like a post via AJAX
+function likePost(postId) {
+    // Get the anti-forgery token
+    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+    
+    // Make the AJAX call to the controller
+    fetch('/User/Community/ToggleLike', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': token
+        },
+        body: JSON.stringify({ postId: postId })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Post like toggled successfully:', data);
+        // The UI is already updated optimistically by Alpine.js
+        // SignalR will broadcast the update to other clients
+    })
+    .catch(error => {
+        console.error('Error toggling post like:', error);
+        // Revert the optimistic UI update if there was an error
+        const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+        if (postElement && postElement.__x) {
+            postElement.__x.$data.liked = !postElement.__x.$data.liked;
+            if (postElement.__x.$data.liked) {
+                postElement.__x.$data.likesCount++;
+            } else {
+                postElement.__x.$data.likesCount = Math.max(0, postElement.__x.$data.likesCount - 1);
+            }
+        }
+    });
+}
+
+// Function to like a comment via AJAX
+function likeComment(commentId) {
+    // Get the anti-forgery token
+    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+    
+    // Make the AJAX call to the controller
+    fetch('/User/Community/ToggleLikeComment', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'RequestVerificationToken': token
+        },
+        body: JSON.stringify({ commentId: commentId })
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log('Comment like toggled successfully:', data);
+        // The UI is already updated optimistically by Alpine.js
+        // SignalR will broadcast the update to other clients
+    })
+    .catch(error => {
+        console.error('Error toggling comment like:', error);
+        // Revert the optimistic UI update if there was an error
+        const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+        if (commentElement && commentElement.__x) {
+            commentElement.__x.$data.liked = !commentElement.__x.$data.liked;
+            if (commentElement.__x.$data.liked) {
+                commentElement.__x.$data.likesCount++;
+            } else {
+                commentElement.__x.$data.likesCount = Math.max(0, commentElement.__x.$data.likesCount - 1);
+            }
+        }
+    });
+}
+
 // Alpine.js initialization
 document.addEventListener("alpine:init", () => {
     // Debug Alpine.js initialization
     console.log("Alpine.js initialized");
+    
+    // Register the postCard component
+    Alpine.data('postCard', function(initialLiked = false) {
+        return {
+            liked: initialLiked,
+            likesCount: 0,
+            commentsVisible: false,
+            shareModalOpen: false,
+            isDeleted: false,
+            isAdmin: false,
+            isCertified: false,
+            comments: [],
+            
+            init() {
+                // Initialize from data attributes if available
+                const postElement = this.$el;
+                if (postElement) {
+                    this.liked = postElement.getAttribute('data-liked') === 'true';
+                    this.likesCount = parseInt(postElement.getAttribute('data-likes-count') || '0');
+                    this.isDeleted = postElement.getAttribute('data-is-deleted') === 'true';
+                    this.isAdmin = postElement.getAttribute('data-is-admin') === 'true';
+                    this.isCertified = postElement.getAttribute('data-is-certified') === 'true';
+                }
+            },
+            
+            toggleLike() {
+                // Toggle the liked state in the UI immediately for better UX
+                this.liked = !this.liked;
+                
+                // Update the likes count optimistically
+                if (this.liked) {
+                    this.likesCount++;
+                } else {
+                    this.likesCount = Math.max(0, this.likesCount - 1);
+                }
+                
+                // The actual API call is handled by the likePost function
+                // which will update the server and trigger SignalR updates
+            },
+            
+            toggleComments() {
+                this.commentsVisible = !this.commentsVisible;
+                
+                // Find the comments container and toggle its visibility
+                const commentsContainer = this.$el.querySelector('.comments-container');
+                if (commentsContainer) {
+                    if (this.commentsVisible) {
+                        commentsContainer.classList.remove('hidden');
+                    } else {
+                        commentsContainer.classList.add('hidden');
+                    }
+                }
+            },
+            
+            openShareModal() {
+                this.shareModalOpen = true;
+            },
+            
+            closeShareModal() {
+                this.shareModalOpen = false;
+            },
+            
+            copyLink() {
+                const postId = this.$el.getAttribute('data-post-id');
+                const url = `${window.location.origin}/User/Community/Post/${postId}`;
+                
+                navigator.clipboard.writeText(url)
+                    .then(() => {
+                        // Show a success message
+                        alert('Link copied to clipboard!');
+                        this.closeShareModal();
+                    })
+                    .catch(err => {
+                        console.error('Failed to copy link: ', err);
+                    });
+            },
+            
+            shareToFeed() {
+                // Implement share to feed functionality
+                alert('Share to feed functionality will be implemented soon!');
+                this.closeShareModal();
+            }
+        };
+    });
 
     // Global posts store for managing posts and loading state
     Alpine.store("posts", {
@@ -517,13 +681,29 @@ document.addEventListener("alpine:init", () => {
     
     // Comment liking functionality
     function likeComment(commentId) {
+        // Get the anti-forgery token
+        const token = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (!token) {
+            console.error('Anti-forgery token not found');
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Security token missing. Please refresh the page and try again.'
+                }
+            }));
+            return;
+        }
+        
         // Call the API to like/unlike the comment
-        fetch(`/User/Community/LikeComment/${commentId}`, {
+        fetch(`/User/Community/ToggleLikeComment`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-            }
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ 
+                commentId: commentId,
+                __RequestVerificationToken: token.value 
+            })
         })
         .then(response => {
             if (!response.ok) {
@@ -537,7 +717,7 @@ document.addEventListener("alpine:init", () => {
                 const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
                 if (commentElement) {
                     const likeButton = commentElement.querySelector('[data-action="like-comment"]');
-                    const likeCountElement = commentElement.querySelector('[data-like-count]');
+                    const likeCountElement = commentElement.querySelector('span[data-like-count]');
                     
                     if (likeButton) {
                         // Toggle the liked state
@@ -553,7 +733,12 @@ document.addEventListener("alpine:init", () => {
                         
                         // Update the like count if available
                         if (likeCountElement && data.likesCount !== undefined) {
-                            likeCountElement.textContent = `(${data.likesCount})`;
+                            // If there are no likes, remove the count element
+                            if (data.likesCount === 0) {
+                                likeCountElement.textContent = '';
+                            } else {
+                                likeCountElement.textContent = `(${data.likesCount})`;
+                            }
                         }
                     }
                 }
@@ -579,45 +764,45 @@ document.addEventListener("alpine:init", () => {
     
     // Comment creation functionality
     function addComment(postId, content, parentCommentId = null) {
+        console.log('Adding comment:', { postId, content, parentCommentId });
+        
+        // Get the anti-forgery token
+        const token = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (!token) {
+            console.error('Anti-forgery token not found');
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Security token missing. Please refresh the page and try again.'
+                }
+            }));
+            return;
+        }
+        
         // Call the API to add a comment to the post
         fetch(`/User/Community/AddComment`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 postId: postId,
                 content: content,
-                parentCommentId: parentCommentId
+                parentCommentId: parentCommentId,
+                __RequestVerificationToken: token.value
             })
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                console.error('Response not OK:', response.status, response.statusText);
+                return response.text().then(text => {
+                    throw new Error(`Network response was not ok: ${response.status} ${response.statusText}\n${text}`);
+                });
             }
             return response.json();
         })
         .then(data => {
             if (data.success) {
-                // If the comment was added successfully, you can either:
-                // 1. Refresh the comments section
-                // 2. Add the new comment to the UI directly
-                
-                // Option 1: Refresh the page or comments section
-                // window.location.reload();
-                
-                // Option 2: Add the new comment to the UI
-                // This requires the server to return the new comment data
-                if (data.comment) {
-                    // Dispatch an event that the postCommentsHandler can listen for
-                    window.dispatchEvent(new CustomEvent('comment-added', {
-                        detail: {
-                            comment: data.comment
-                        }
-                    }));
-                }
-                
                 // Show success message
                 window.dispatchEvent(new CustomEvent('show-toast', {
                     detail: {
@@ -654,17 +839,33 @@ document.addEventListener("alpine:init", () => {
     // 5. Updating UI after successful upload
     
     function likePost(postId) {
+        // Get the anti-forgery token
+        const token = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (!token) {
+            console.error('Anti-forgery token not found');
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Security token missing. Please refresh the page and try again.'
+                }
+            }));
+            return;
+        }
+        
         // Call the API to like/unlike the post
-        fetch(`/User/Community/LikePost/${postId}`, {
+        fetch(`/User/Community/ToggleLike`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-            }
+                'RequestVerificationToken': token.value
+            },
+            body: JSON.stringify({ 
+                postId: postId
+            })
         })
         .then(response => {
             if (!response.ok) {
-                throw new Error('Network response was not ok');
+                throw new Error(`Network response was not ok: ${response.status}`);
             }
             return response.json();
         })
@@ -674,23 +875,36 @@ document.addEventListener("alpine:init", () => {
                 const postElement = document.querySelector(`[data-post-id="${postId}"]`);
                 if (postElement) {
                     const likeButton = postElement.querySelector('[data-action="like"]');
-                    const likeCountElement = postElement.querySelector('[data-like-count]');
                     
                     if (likeButton) {
                         // Toggle the liked state
-                        const isLiked = likeButton.classList.contains('text-blue-600');
+                        const isLiked = likeButton.classList.contains('text-facebook-blue');
                         
                         if (isLiked) {
-                            likeButton.classList.remove('text-blue-600');
-                            likeButton.classList.add('text-gray-500');
+                            likeButton.classList.remove('text-facebook-blue');
+                            likeButton.querySelector('span').textContent = 'Like';
                         } else {
-                            likeButton.classList.remove('text-gray-500');
-                            likeButton.classList.add('text-blue-600');
+                            likeButton.classList.add('text-facebook-blue');
+                            likeButton.querySelector('span').textContent = 'Liked';
                         }
                         
-                        // Update the like count if available
+                        // Find the like count element and update it
+                        const likeCountElement = postElement.querySelector('span[x-text]');
                         if (likeCountElement && data.likesCount !== undefined) {
                             likeCountElement.textContent = data.likesCount;
+                        }
+                        
+                        // Update Alpine.js state if available
+                        if (window.Alpine && postElement.__x) {
+                            try {
+                                const alpineData = postElement.__x.getUnobservedData();
+                                if (alpineData) {
+                                    // Toggle the liked state in Alpine data
+                                    alpineData.liked = !isLiked;
+                                }
+                            } catch (error) {
+                                console.error("Error updating Alpine.js state:", error);
+                            }
                         }
                     }
                 }
@@ -794,13 +1008,56 @@ document.addEventListener("alpine:init", () => {
     }
 
     function deleteComment(commentId) {
+        // Find the comment element to get the post ID
+        const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+        if (!commentElement) {
+            console.error(`Comment element with ID ${commentId} not found`);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to delete comment. Comment not found.'
+                }
+            }));
+            return;
+        }
+        
+        // Find the closest post element to get the post ID
+        const postElement = commentElement.closest('[data-post-id]');
+        if (!postElement) {
+            console.error(`Post element for comment ${commentId} not found`);
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to delete comment. Post not found.'
+                }
+            }));
+            return;
+        }
+        
+        const postId = postElement.dataset.postId;
+        const token = document.querySelector('input[name="__RequestVerificationToken"]');
+        
+        if (!token) {
+            console.error('Anti-forgery token not found');
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to delete comment. Security token missing.'
+                }
+            }));
+            return;
+        }
+        
         // Call the API to delete the comment
         fetch(`/User/Community/DeleteComment/${commentId}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-            }
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                postId: postId,
+                __RequestVerificationToken: token.value
+            })
         })
         .then(response => {
             if (!response.ok) {
@@ -840,13 +1097,32 @@ document.addEventListener("alpine:init", () => {
     }
 
     function reportComment(commentId) {
+        const token = document.querySelector('input[name="__RequestVerificationToken"]');
+        
+        if (!token) {
+            console.error('Anti-forgery token not found');
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to report comment. Security token missing.'
+                }
+            }));
+            return;
+        }
+        
+        // Default reason for reporting
+        const reason = 'Inappropriate content';
+        
         // Call the API to report the comment
         fetch(`/User/Community/ReportComment/${commentId}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-            }
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                reason: reason,
+                __RequestVerificationToken: token.value
+            })
         })
         .then(response => {
             if (!response.ok) {
