@@ -1,10 +1,10 @@
-using FinalExamUI.Services.Interfaces;
-using FinalExamUI.ViewModels.CoachVerification;
+using ActioNator.Services.Interfaces.VerifyCoachServices;
+using ActioNator.ViewModels.CoachVerification;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
 
-namespace FinalExamUI.Areas.Admin.Controllers
+namespace ActioNator.Areas.Admin.Controllers
 {
     [Area("Admin")]
     [Authorize(Roles = "Admin")]

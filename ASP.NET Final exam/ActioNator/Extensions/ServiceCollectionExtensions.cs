@@ -1,5 +1,7 @@
 using ActioNator.Services.Implementations.ReportVerificationService;
+using ActioNator.Services.Implementations.VerifyCoach;
 using ActioNator.Services.Interfaces.ReportVerificationService;
+using ActioNator.Services.Interfaces.VerifyCoachServices;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace ActioNator.Extensions
@@ -18,3 +20,4 @@ namespace ActioNator.Extensions
             return services;
         }
     }
+}

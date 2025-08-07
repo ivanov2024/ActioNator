@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace FinalExamUI.ViewModels.CoachVerification
+namespace ActioNator.ViewModels.CoachVerification
 {
     public class CoachVerificationUserViewModel
     {

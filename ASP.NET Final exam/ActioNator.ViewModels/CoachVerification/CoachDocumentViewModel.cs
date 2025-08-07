@@ -1,4 +1,4 @@
-namespace FinalExamUI.ViewModels.CoachVerification
+namespace ActioNator.ViewModels.CoachVerification
 {
     public class CoachDocumentViewModel
     {
