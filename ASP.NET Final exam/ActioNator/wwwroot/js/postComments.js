@@ -1,59 +1,39 @@
-// Post comments handler for Alpine.js
-document.addEventListener('alpine:init', function() {
-    // Define the comments handler component
-    Alpine.data('postCommentsHandler', function() {
-        return {
-            comments: window.postCommentsData || [],
-            commentText: '',
-            replyingTo: null,
-            
-            init: function() {
-                // Ensure the parent component has these methods
-                if (!this.toggleComments) {
-                    this.toggleComments = function() {
-                        this.showComments = !this.showComments;
-                    };
-                }
-            },
-            
-            addComment: function() {
-                if (this.commentText.trim() === '') return;
-                
-                // Get the post ID from the parent element
-                const postElement = this.$el.closest('[data-post-id]');
-                const postId = postElement ? postElement.dataset.postId : null;
-                
-                if (!postId) {
-                    console.error('Could not find post ID');
-                    return;
-                }
-                
-                let content = this.commentText;
-                let parentCommentId = null;
-                
-                if (this.replyingTo) {
-                    // Use a mention symbol instead of @ to avoid Razor conflicts
-                    content = '@' + this.replyingTo + ' ' + this.commentText;
-                    
-                    // If we're replying to a specific comment, get its ID
-                    // This assumes the replyingTo contains the comment ID or we have a way to map username to comment ID
-                    // For now, we'll just use null as the parentCommentId
-                }
-                
-                // Call the server-side function to add the comment
-                window.addComment(postId, content, parentCommentId);
-                
-                // Clear the comment input field after submission
-                this.commentText = '';
-                this.replyingTo = null;
-                
-                // The actual comment will be added by the SignalR hub
-                // We don't need to create a temporary comment here as it causes duplicate components
-            },
-            
-            setReplyTo: function(author) {
-                this.replyingTo = author;
-            }
-        };
-    });
+// Post comments handler - REMOVED DUPLICATE DEFINITION
+// The Alpine.js component is now defined in alpine-init.js to avoid conflicts
+// This file now only contains helper functions for comment management
+
+// Helper function to ensure comments data is properly initialized
+function initializeCommentsData() {
+    if (!window.postCommentsData) {
+        window.postCommentsData = {};
+    }
+}
+
+// Initialize on DOM load
+document.addEventListener('DOMContentLoaded', function() {
+    initializeCommentsData();
+    console.log('Post comments helper functions initialized');
 });
+
+// Global function to add a comment (used by external scripts)
+window.addComment = function(postId, content, parentCommentId, options) {
+    if (window.communityHub && window.communityHub.connection.state === 'Connected') {
+        return window.communityHub.invoke('AddComment', postId, content, parentCommentId);
+    } else {
+        // Fallback to traditional AJAX
+        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+        return fetch(`/User/Community/AddComment`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token,
+                ...(options?.headers || {})
+            },
+            body: JSON.stringify({
+                postId: postId,
+                content: content,
+                parentCommentId: parentCommentId
+            })
+        });
+    }
+};

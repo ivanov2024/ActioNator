@@ -17,6 +17,8 @@
     <form asp-action="Edit" asp-controller="Workout" asp-route-id="@Model.Id" method="post" id="editWorkoutForm">
         @Html.AntiForgeryToken()
         <input type="hidden" asp-for="Id" />
+        <!-- Hidden field to store exercises data as JSON -->
+        <input type="hidden" id="exercisesData" name="exercisesJson" value="" />
         <div class="container mx-auto px-4 py-8 max-w-4xl">
             <div class="flex flex-col sm:flex-row items-center justify-between mb-8">
                 <div class="flex items-center mb-4 sm:mb-0">

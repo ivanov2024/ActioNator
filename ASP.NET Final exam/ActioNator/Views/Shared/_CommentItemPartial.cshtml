@@ -1,4 +1,5 @@
 @model ActioNator.ViewModels.Community.PostCommentViewModel
+@using System.Security.Claims
 
 <div class="comment-item flex space-x-3 py-3" 
      x-data="{ 
@@ -7,11 +8,11 @@
          liked: @Json.Serialize(Model.IsLiked),
          likesCount: @Model.LikesCount,
          toggleLike() {
-             this.liked = !this.liked;
-             if (this.liked) {
-                 this.likesCount++;
-             } else {
-                 this.likesCount = Math.max(0, this.likesCount - 1);
+             // Don't update UI directly, let SignalR handle it
+             // Just send the like request
+             const postId = this.$root.closest('[data-post-id]')?.dataset.postId;
+             if (postId) {
+                 window.likeComment('@Model.Id.ToString()', postId);
              }
          }
      }" 
@@ -24,6 +25,26 @@
             <div>
                 <p class="text-sm font-medium text-gray-900 dark:text-white">
                     @Model.AuthorName
+                    <!-- Administrator Badge -->
+                    @if (User.IsInRole("Administrator"))
+                    {
+                        <span class="admin-badge inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 ml-1">
+                            <svg class="h-3 w-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 005 10a6 6 0 0012 0c0-.352-.035-.696-.1-1.028A5.001 5.001 0 0010 11z" clip-rule="evenodd"></path>
+                            </svg>
+                            Admin
+                        </span>
+                    }
+                    <!-- Deleted Badge -->
+                    @if (Model.IsDeleted)
+                    {
+                        <span class="deleted-tag inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 ml-1">
+                            <svg class="h-3 w-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                            Deleted
+                        </span>
+                    }
                 </p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">
                     @Model.TimeAgo
@@ -46,36 +67,54 @@
                     x-transition:leave="transition ease-in duration-75" 
                     x-transition:leave-start="transform opacity-100 scale-100" 
                     x-transition:leave-end="transform opacity-0 scale-95" 
-                    class="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 z-10"
+                    class="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-10 border border-gray-100 z-10"
                     style="display: none;">
                     <div class="py-1" role="menu" aria-orientation="vertical">
-                        @if (Model.IsAuthor)
+                        <!-- Delete Comment - Only visible to comment owner or admin -->
+                        @if (Model.IsAuthor || User.IsInRole("Administrator"))
                         {
                             <button 
-                                @@click="showActions = false; window.showDeleteCommentModal('@Model.Id.ToString()')" 
+                                @@click="showActions = false; window.deleteComment('@Model.Id.ToString()', $root.closest('[data-post-id]')?.dataset.postId)" 
                                 class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" 
                                 role="menuitem"
                                 data-action="delete-comment">
                                 Delete
                             </button>
                         }
-                        <button 
-                            @@click="showActions = false; window.showReportCommentModal('@Model.Id.ToString()')" 
-                            class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" 
-                            role="menuitem"
-                            data-action="report-comment">
-                            Report
-                        </button>
+                        
+                        <!-- Restore Comment - Only visible to admins for deleted comments -->
+                        @if (Model.IsDeleted && User.IsInRole("Administrator"))
+                        {
+                            <button 
+                                @@click="showActions = false; window.restoreComment('@Model.Id.ToString()', $root.closest('[data-post-id]')?.dataset.postId)" 
+                                class="block w-full text-left px-4 py-2 text-sm text-green-600 dark:text-green-400 hover:bg-gray-100 dark:hover:bg-gray-700" 
+                                role="menuitem"
+                                data-action="restore-comment">
+                                Restore
+                            </button>
+                        }
+                        
+                        <!-- Report Comment - Not visible to comment owner or if comment is deleted -->
+                        @if (!Model.IsAuthor && !Model.IsDeleted)
+                        {
+                            <button 
+                                @@click="showActions = false; window.reportComment('@Model.Id.ToString()', $root.closest('[data-post-id]')?.dataset.postId)" 
+                                class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" 
+                                role="menuitem"
+                                data-action="report-comment">
+                                Report
+                            </button>
+                        }
                     </div>
                 </div>
             </div>
         </div>
-        <div :class="{ 'opacity-50': isDeleted }">
+        <div :class="isDeleted ? 'opacity-50' : ''">
             <p class="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">@(string.IsNullOrEmpty(Model.Content) ? "" : Model.Content)</p>
         </div>
         <div class="mt-1 flex items-center space-x-4">
             <button 
-                @@click="toggleLike(); window.likeComment('@Model.Id.ToString()')"
+                @@click="toggleLike()"
                 :class="{ 'text-blue-600': liked, 'text-gray-500': !liked }"
                 class="text-xs flex items-center dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
                 data-action="like-comment">
@@ -87,15 +126,7 @@
                     <span class="ml-1" data-like-count x-text="'(' + likesCount + ')'">(@Model.LikesCount)</span>
                 </template>
             </button>
-            <button 
-                class="text-xs flex items-center text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
-                data-comment-id="@Model.Id"
-                data-action="reply-comment">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                </svg>
-                <span>Reply</span>
-            </button>
+            
         </div>
     </div>
 </div>

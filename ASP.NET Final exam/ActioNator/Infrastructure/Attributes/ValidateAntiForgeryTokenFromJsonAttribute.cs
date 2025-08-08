@@ -31,62 +31,49 @@ namespace ActioNator.Infrastructure.Attributes
             {
                 try
                 {
-                    // First try standard validation
-                    try
-                    {
-                        await _antiforgery.ValidateRequestAsync(context.HttpContext);
-                        _logger.LogInformation("Anti-forgery token validated via standard method");
-                        return; // If standard validation passes, we're done
-                    }
-                    catch (AntiforgeryValidationException ex)
-                    {
-                        _logger.LogInformation("Standard anti-forgery validation failed: {Message}, trying JSON body extraction", ex.Message);
-                        // Continue to JSON body extraction
-                    }
-
-                    // If standard validation fails, try to extract from JSON body
+                    // Always check for X-CSRF-TOKEN header for JSON requests
                     if (context.HttpContext.Request.HasJsonContentType())
                     {
-                        context.HttpContext.Request.EnableBuffering();
-                        using (var reader = new StreamReader(context.HttpContext.Request.Body, System.Text.Encoding.UTF8, true, 1024, true))
+                        var csrfHeader = context.HttpContext.Request.Headers["X-CSRF-TOKEN"].FirstOrDefault();
+                        if (!string.IsNullOrEmpty(csrfHeader))
                         {
-                            context.HttpContext.Request.Body.Position = 0;
-                            var body = await reader.ReadToEndAsync();
-                            context.HttpContext.Request.Body.Position = 0;
-
-                            _logger.LogInformation("Request body: {Body}", body);
-
-                            if (!string.IsNullOrEmpty(body))
+                            context.HttpContext.Request.Headers["RequestVerificationToken"] = csrfHeader;
+                            try
                             {
-                                try
-                                {
-                                    var jsonDocument = JsonDocument.Parse(body);
-                                    if (jsonDocument.RootElement.TryGetProperty("__RequestVerificationToken", out var tokenElement))
-                                    {
-                                        var token = tokenElement.GetString();
-                                        if (!string.IsNullOrEmpty(token))
-                                        {
-                                            // Add the token to the headers for validation
-                                            context.HttpContext.Request.Headers["X-CSRF-TOKEN"] = token;
-                                            
-                                            // Try validation again
-                                            await _antiforgery.ValidateRequestAsync(context.HttpContext);
-                                            _logger.LogInformation("Anti-forgery token validated from JSON body");
-                                            return;
-                                        }
-                                    }
-                                }
-                                catch (JsonException ex)
-                                {
-                                    _logger.LogError(ex, "Error parsing JSON body for anti-forgery token");
-                                }
+                                await _antiforgery.ValidateRequestAsync(context.HttpContext);
+                                _logger.LogInformation("Anti-forgery token validated via X-CSRF-TOKEN header");
+                                return;
+                            }
+                            catch (AntiforgeryValidationException ex)
+                            {
+                                _logger.LogWarning("Anti-forgery validation failed via X-CSRF-TOKEN header: {Message}", ex.Message);
+                                context.Result = new JsonResult(new { success = false, message = "Invalid or expired anti-forgery token." }) { StatusCode = StatusCodes.Status403Forbidden };
+                                return;
                             }
                         }
+                        else
+                        {
+                            _logger.LogWarning("Missing X-CSRF-TOKEN header for JSON request");
+                            context.Result = new JsonResult(new { success = false, message = "Missing anti-forgery token. Please refresh and try again." }) { StatusCode = StatusCodes.Status403Forbidden };
+                            return;
+                        }
                     }
-
-                    // If we get here, validation failed
-                    _logger.LogWarning("Anti-forgery token validation failed");
-                    context.Result = new StatusCodeResult(StatusCodes.Status403Forbidden);
+                    else
+                    {
+                        // Fallback to standard validation for non-JSON requests
+                        try
+                        {
+                            await _antiforgery.ValidateRequestAsync(context.HttpContext);
+                            _logger.LogInformation("Anti-forgery token validated via standard method");
+                            return;
+                        }
+                        catch (AntiforgeryValidationException ex)
+                        {
+                            _logger.LogWarning("Standard anti-forgery validation failed: {Message}", ex.Message);
+                            context.Result = new JsonResult(new { success = false, message = "Invalid or expired anti-forgery token." }) { StatusCode = StatusCodes.Status403Forbidden };
+                            return;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {

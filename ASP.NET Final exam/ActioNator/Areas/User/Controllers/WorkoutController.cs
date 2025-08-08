@@ -151,10 +151,21 @@ namespace ActioNator.Areas.User.Controllers
                     // For AJAX requests, return validation errors
                     if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                     {
+                        // Collect validation errors for the response
+                        var errors = ModelState.ToDictionary(
+                            // Keep the original property name casing for client-side matching
+                            kvp => kvp.Key,
+                            kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
+                        );
+                        
+                        // Log the validation errors
+                        _logger.LogWarning("Validation errors for workout: {@ValidationErrors}", errors);
+                        
                         return Json(new { 
                             success = false, 
                             toastType = "error", 
-                            toastMessage = "Please fix the validation errors."
+                            toastMessage = "Please fix the validation errors.",
+                            validationErrors = errors
                         });
                     }
                     
@@ -790,32 +801,93 @@ namespace ActioNator.Areas.User.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateWorkout(WorkoutCardViewModel model)
+        public async Task<IActionResult> CreateWorkout(WorkoutCardViewModel model, string exercisesJson)
         {
             Guid? userId = GetUserId();
             string userIdString = userId?.ToString() ?? "Unknown";
 
             // Check if this is an AJAX request
             bool isAjaxRequest = Request.Headers["X-Requested-With"] == "XMLHttpRequest";
+            
+            // Log the received exercisesJson
+            _logger.LogInformation("Received exercisesJson: {ExercisesJson}", 
+                exercisesJson?.Length > 100 ? exercisesJson.Substring(0, 100) + "..." : exercisesJson ?? "null");
+                
+            // Try to deserialize exercises from JSON if provided
+            if (!string.IsNullOrEmpty(exercisesJson) && (model.Exercises == null || !model.Exercises.Any()))
+            {
+                try
+                {
+                    var exercises = System.Text.Json.JsonSerializer.Deserialize<List<ExerciseViewModel>>(exercisesJson);
+                    if (exercises != null && exercises.Any())
+                    {
+                        _logger.LogInformation("Successfully deserialized {Count} exercises from JSON", exercises.Count);
+                        model.Exercises = exercises;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error deserializing exercises from JSON: {ErrorMessage}", ex.Message);
+                }
+            }
+            
+            // Log the full input model data for debugging
+            _logger.LogInformation("Received workout data for user {UserId}: {@WorkoutData}", 
+                userIdString, new { 
+                    Title = model.Title, 
+                    Notes = model.Notes,
+                    ExercisesCount = model.Exercises?.Count() ?? 0,
+                    HasExercises = model.Exercises != null && model.Exercises.Any(),
+                    FirstExerciseName = model.Exercises?.FirstOrDefault()?.Name,
+                    ModelState = ModelState.IsValid,
+                    ModelStateKeys = string.Join(", ", ModelState.Keys)
+                });
+                
+            // Log all form values for debugging
+            foreach (var key in Request.Form.Keys)
+            {
+                var values = Request.Form[key];
+                _logger.LogInformation("Form value {Key}: {Value}", key, string.Join(", ", values));
+            }
 
             if (!ModelState.IsValid)
             {
+                // Log all model state errors
+                foreach (var modelStateKey in ModelState.Keys)
+                {
+                    var modelStateVal = ModelState[modelStateKey];
+                    foreach (var error in modelStateVal.Errors)
+                    {
+                        _logger.LogWarning("Validation error for {Key}: {ErrorMessage}", 
+                            modelStateKey, error.ErrorMessage);
+                    }
+                }
+                
                 _logger.LogWarning("Validation failed for workout creation for user {UserId}", userIdString);
                 
                 // Prepare validation errors for the response
                 ViewData["Success"] = false;
                 ViewData["ToastType"] = "error";
                 ViewData["ToastMessage"] = "Please fix the validation errors.";
-                ViewData["Errors"] = ModelState.ToDictionary(
+                var errors = ModelState.ToDictionary(
                     // Keep the original property name casing for client-side matching
                     kvp => kvp.Key,
                     kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
                 );
+                ViewData["Errors"] = errors;
+                
+                // Log the validation errors dictionary
+                _logger.LogWarning("Validation errors: {@ValidationErrors}", errors);
                 
                 // For AJAX requests, return partial view with validation errors
                 if (isAjaxRequest)
                 {
-                    return PartialView("_WorkoutResponsePartial", null);
+                    return Json(new { 
+                        success = false, 
+                        toastType = "error", 
+                        toastMessage = "Please fix the validation errors.",
+                        validationErrors = errors
+                    });
                 }
                 
                 // For non-AJAX requests, return to the form with model state errors
@@ -833,14 +905,22 @@ namespace ActioNator.Areas.User.Controllers
                 ViewData["ToastType"] = "success";
                 ViewData["ToastMessage"] = "Workout created successfully!";
                 
-                // For AJAX requests, return partial view with success data and updated workout list
+                // For AJAX requests, return JSON with success data and updated workout list
                 if (isAjaxRequest)
                 {
                     // Get the updated list of workouts to include in the response
                     var workouts = await _workoutService.GetAllWorkoutsAsync(userId);
                     
-                    // Return the partial view with the updated workout list
-                    return PartialView("_WorkoutResponsePartial", workouts);
+                    // Render the partial view to HTML string
+                    var workoutsHtml = await this.RenderPartialViewToStringAsync("_WorkoutsPartial", workouts);
+                    
+                    // Return JSON response with success data and HTML for client-side update
+                    return Json(new { 
+                        success = true, 
+                        toastType = "success", 
+                        toastMessage = "Workout created successfully!",
+                        workoutsHtml = workoutsHtml
+                    });
                 }
                 
                 // For non-AJAX requests, redirect to index with success message in TempData

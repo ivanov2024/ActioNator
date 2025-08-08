@@ -2,21 +2,16 @@ using ActioNator.Hubs;
 using ActioNator.Infrastructure.Attributes;
 using ActioNator.Services.Interfaces.Community;
 using ActioNator.ViewModels.Community;
-using JWT.Builder;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
-using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Security.Claims;
-using System.Threading.Tasks;
 
 namespace ActioNator.Areas.User.Controllers
 {
     [Area("User")]
     [Authorize]
+    [Route("User/[controller]/[action]")]
     public class CommunityController : Controller
     {
         private readonly ICommunityService _communityService;
@@ -31,38 +26,6 @@ namespace ActioNator.Areas.User.Controllers
             _communityService = communityService;
             _hubContext = hubContext;
             _logger = logger;
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ToggleLike([FromBody] PostLikeRequest request)
-        {
-            try
-            {
-                if (request?.PostId == null || request.PostId == Guid.Empty)
-                {
-                    return BadRequest(new { success = false, message = "Valid Post ID is required" });
-                }
-
-                var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-                if (string.IsNullOrEmpty(userIdString))
-                {
-                    return Unauthorized(new { success = false, message = "User not authenticated" });
-                }
-
-                var userId = Guid.Parse(userIdString);
-                var likesCount = await _communityService.ToggleLikePostAsync(request.PostId, userId);
-                
-                // Broadcast the post update to all connected clients
-                await _hubContext.Clients.All.SendAsync("ReceivePostUpdate", request.PostId, likesCount);
-
-                return Json(new { success = true, likesCount });    
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error toggling like for post {PostId}", request?.PostId);
-                return StatusCode(500, new { success = false, message = "An error occurred while processing your request" });
-            }
         }
 
         public async Task<IActionResult> Index(string status = null)
@@ -86,21 +49,36 @@ namespace ActioNator.Areas.User.Controllers
         [HttpGet]
         public async Task<IActionResult> GetPost(Guid id)
         {
-            if (id == Guid.Empty)
+            try
             {
-                return BadRequest("Valid Post ID is required");
+                if (id == Guid.Empty)
+                {
+                    return BadRequest("Valid Post ID is required");
+                }
+
+                var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userIdString))
+                {
+                    return Unauthorized(new { success = false, message = "User not authenticated" });
+                }
+
+                var userId = Guid.Parse(userIdString);
+                var post = await _communityService.GetPostByIdAsync(id, userId);
+
+                if (post == null)
+                {
+                    return NotFound("Post not found");
+                }
+
+                // The service now returns ActioNator.ViewModels.Community.PostCardViewModel directly
+                // No need for conversion
+                return PartialView("_PostCardPartial", post);
             }
-
-            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userId = Guid.Parse(userIdString);
-            var post = await _communityService.GetPostByIdAsync(id, userId);
-
-            if (post == null)
+            catch (Exception ex)
             {
-                return NotFound("Post not found");
+                _logger.LogError(ex, "Error getting post {PostId}", id);
+                return StatusCode(500, new { success = false, message = "An error occurred while processing your request" });
             }
-
-            return PartialView("_PostCardPartial", post);
         }
 
         [HttpPost]
@@ -160,25 +138,6 @@ namespace ActioNator.Areas.User.Controllers
                 return StatusCode(500, new { success = false, message = "An error occurred while creating your post. Please try again." });
             }
         }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ToggleLike(Guid postId)
-        {
-            if (postId == Guid.Empty)
-            {
-                return BadRequest("Valid Post ID is required");
-            }
-
-            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userId = Guid.Parse(userIdString);
-            var likesCount = await _communityService.ToggleLikePostAsync(postId, userId);
-            
-            // Broadcast the post update to all connected clients
-            await _hubContext.Clients.All.SendAsync("ReceivePostUpdate", postId, likesCount);
-
-            return Json(new { success = true, likesCount });
-        }
         
         [HttpPost]
         [ValidateAntiForgeryTokenFromJson]
@@ -197,6 +156,37 @@ namespace ActioNator.Areas.User.Controllers
             await _hubContext.Clients.All.SendAsync("ReceiveCommentUpdate", request.CommentId, likesCount);
 
             return Json(new { success = true, likesCount });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryTokenFromJson]
+        public async Task<IActionResult> ToggleLike([FromBody] PostLikeRequest request)
+        {
+            try
+            {
+                if (request?.PostId == null || request.PostId == Guid.Empty)
+                {
+                    return BadRequest(new { success = false, message = "Valid Post ID is required" });
+                }
+
+                var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userIdString))
+                {
+                    return Unauthorized(new { success = false, message = "User not authenticated" });
+                }
+
+                var userId = Guid.Parse(userIdString);
+                var likesCount = await _communityService.ToggleLikePostAsync(request.PostId, userId);
+
+                await _hubContext.Clients.All.SendAsync("ReceivePostUpdate", request.PostId, likesCount);
+
+                return Json(new { success = true, likesCount });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error toggling like for post {PostId}", request?.PostId);
+                return StatusCode(500, new { success = false, message = "An error occurred while processing your request" });
+            }
         }
 
         [HttpPost]
@@ -221,47 +211,67 @@ namespace ActioNator.Areas.User.Controllers
             return Json(new { success = true, comment });
         }
 
-        [HttpPost]
+        [HttpPost("/User/Community/DeletePost/{id}")]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeletePost(Guid postId)
+        public async Task<IActionResult> DeletePost(Guid id)
         {
-            if (postId == Guid.Empty)
+            try
             {
-                return BadRequest("Valid Post ID is required");
-            }
+                if (id == Guid.Empty)
+                {
+                    return BadRequest(new { success = false, message = "Valid Post ID is required" });
+                }
 
-            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userId = Guid.Parse(userIdString);
-            var success = await _communityService.DeletePostAsync(postId, userId);
-            
-            // Broadcast the post deletion to all connected clients
-            if (success)
+                var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userIdString))
+                {
+                    return Unauthorized(new { success = false, message = "User not authenticated" });
+                }
+
+                var userId = Guid.Parse(userIdString);
+                var success = await _communityService.DeletePostAsync(id, userId);
+                
+                // Broadcast the post deletion to all connected clients
+                if (success)
+                {
+                    await _hubContext.Clients.All.SendAsync("ReceivePostDeletion", id);
+                }
+
+                return Json(new { success });
+            }
+            catch (Exception ex)
             {
-                await _hubContext.Clients.All.SendAsync("ReceivePostDeletion", postId);
+                _logger.LogError(ex, "Error deleting post {PostId}", id);
+                return StatusCode(500, new { success = false, message = "An error occurred while processing your request" });
             }
-
-            return Json(new { success });
         }
 
-        [HttpPost]
+        [HttpPost("/User/Community/DeleteComment/{commentId}")]
         [ValidateAntiForgeryTokenFromJson]
         public async Task<IActionResult> DeleteComment(Guid commentId, [FromBody] CommentDeleteRequest request)
         {
-            if (commentId == Guid.Empty)
+            try
             {
-                return BadRequest("Valid Comment ID is required");
-            }
+                if (commentId == Guid.Empty)
+                {
+                    return BadRequest(new { success = false, message = "Valid Comment ID is required" });
+                }
 
-            // Extract postId from the request
-            var postId = request?.PostId ?? Guid.Empty;
-            if (postId == Guid.Empty)
-            {
-                return BadRequest("Valid Post ID is required");
-            }
+                // Extract postId from the request
+                var postId = request?.PostId ?? Guid.Empty;
+                if (postId == Guid.Empty)
+                {
+                    return BadRequest(new { success = false, message = "Valid Post ID is required" });
+                }
 
-            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userId = Guid.Parse(userIdString);
-            var success = await _communityService.DeleteCommentAsync(commentId, userId);
+                var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userIdString))
+                {
+                    return Unauthorized(new { success = false, message = "User not authenticated" });
+                }
+                
+                var userId = Guid.Parse(userIdString);
+                var success = await _communityService.DeleteCommentAsync(commentId, userId);
             
             // Broadcast the comment deletion to all connected clients
             if (success)
@@ -270,6 +280,12 @@ namespace ActioNator.Areas.User.Controllers
             }
 
             return Json(new { success });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting comment {CommentId}", commentId);
+                return StatusCode(500, new { success = false, message = "An error occurred while processing your request" });
+            }
         }
 
         [HttpPost]
@@ -316,7 +332,7 @@ namespace ActioNator.Areas.User.Controllers
         /// <summary>
         /// Gets a comment by ID for real-time updates
         /// </summary>
-        [HttpGet]
+        [HttpGet("/User/Community/GetComment/{id}")]
         public async Task<IActionResult> GetComment(Guid id)
         {
             if (id == Guid.Empty)
@@ -325,15 +341,20 @@ namespace ActioNator.Areas.User.Controllers
             }
 
             var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(userIdString))
+            {
+                return Unauthorized(new { success = false, message = "User not authenticated" });
+            }
             var userId = Guid.Parse(userIdString);
-            var comment = await _communityService.GetCommentByIdAsync(id, userId);
 
+            var comment = await _communityService.GetCommentByIdAsync(id, userId);
             if (comment == null)
             {
                 return NotFound("Comment not found");
             }
 
-            return PartialView("_CommentItemPartial", comment);
+            // If mapping is needed, do it here (assume comment is already a PostCommentViewModel)
+            return PartialView("~/Views/Shared/_CommentItemPartial.cshtml", comment);
         }
     }
 }

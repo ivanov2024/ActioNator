@@ -113,27 +113,18 @@
                 },
 
                 confirm() {
-                    // For delete operations, directly call the Alpine component method if possible
+                    // For delete operations, call the global deletion handler
                     if (this.type === 'delete') {
                         try {
-                            const alpineElement = document.querySelector('[x-data="editWorkoutPage()"]');
-                            if (alpineElement && alpineElement.__x && alpineElement.__x.$data && 
-                                typeof alpineElement.__x.$data.confirmDelete === 'function') {
-                                // Call the Alpine component's confirmDelete method directly
-                                alpineElement.__x.$data.confirmDelete();
-                                console.log('Called confirmDelete directly from modal');
+                            // Call the global post deletion function
+                            if (typeof window.handlePostDeletion === 'function') {
+                                window.handlePostDeletion();
+                                console.log('Called handlePostDeletion from modal');
                             } else {
-                                // Fallback to event dispatch only if direct call fails
-                                console.log('Direct call failed, using event dispatch');
-                                window.dispatchEvent(new CustomEvent('modal-confirmed', {
-                                    detail: {
-                                        type: this.type,
-                                        title: this.title
-                                    }
-                                }));
+                                console.error('handlePostDeletion function not found');
                             }
                         } catch (error) {
-                            console.error('Error in direct confirmDelete call:', error);
+                            console.error('Error in post deletion:', error);
                         }
                     } else {
                         // For non-delete operations, use the event system

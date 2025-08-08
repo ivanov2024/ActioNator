@@ -66,6 +66,19 @@
                     foreach (var post in Model)
                     {
                         <partial name="_PostCardPartial" model="post" />
+                        <script>
+                            window.postCommentsData = window.postCommentsData || {};
+                            window.postCommentsData['@post.Id'] = @Html.Raw(Json.Serialize(
+                                post.Comments.Select(c => new {
+                                    author = c.AuthorName,
+                                    content = c.Content,
+                                    time = c.TimeAgo,
+                                    likes = c.LikesCount,
+                                    liked = c.IsLiked,
+                                    isDeleted = c.IsDeleted
+                                })
+                            ));
+                        </script>
                     }
                 }
                 else

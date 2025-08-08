@@ -51,10 +51,10 @@
                     </div>
                 </div>
                 <!-- Add New Goal Button -->
-                <button @@click ="showToast('New goal feature coming soon!', 'success')"
-                        class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow transition">
+                <a asp-controller="Goal" asp-action="Index" asp-area="User"
+                        class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow transition text-center block">
                     Add New Goal
-                </button>
+                </a>
             </section>
 
             <!-- Right Panel -->
@@ -81,24 +81,30 @@
                     }
                 </div>
                 <div class="mt-2 text-right">
-                    <a href="#" class="text-blue-600 hover:underline font-medium text-sm">View All</a>
+                    <a asp-controller="Workout" asp-action="Index" asp-area="User" class="text-blue-600 hover:underline font-medium text-sm">View All Workouts</a>
                 </div>
             </section>
         </div>
 
         <!-- Social Feed Section -->
         <div class="mt-8">
-            @if (Model.RecentPosts != null && Model.RecentPosts.Any())
+            @if (ViewBag.ConvertedRecentPosts != null && ((IEnumerable<ActioNator.ViewModels.Community.PostCardViewModel>)ViewBag.ConvertedRecentPosts).Any())
             {
                 <h2 class="text-xl font-semibold mb-4">Recent Posts</h2>
                 <div class="max-w-3xl mx-auto flex flex-col gap-4">
-                    @foreach (var post in Model.RecentPosts)
+                    @foreach (var post in (IEnumerable<ActioNator.ViewModels.Community.PostCardViewModel>)ViewBag.ConvertedRecentPosts)
                     {
                         @await Html.PartialAsync("_PostCardPartial", post)
                     }
                 </div>
                 <div class="mt-4 text-right max-w-3xl mx-auto">
                     <a href="#" class="text-blue-600 hover:underline font-medium text-sm">View All Posts</a>
+                </div>
+            }
+            else if (Model.RecentPosts != null && Model.RecentPosts.Any())
+            {
+                <div class="text-center text-gray-500 py-4 max-w-3xl mx-auto">
+                    Posts are available but could not be displayed due to model conversion issues.
                 </div>
             }
             else
