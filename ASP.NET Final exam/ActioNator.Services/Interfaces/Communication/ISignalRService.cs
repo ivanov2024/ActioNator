@@ -1,6 +1,3 @@
-using System;
-using System.Threading.Tasks;
-
 namespace ActioNator.Services.Interfaces.Communication
 {
     /// <summary>

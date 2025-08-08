@@ -1,7 +1,7 @@
-using ActioNator.Configuration;
 using ActioNator.Data;
 using ActioNator.Data.Models;
 using ActioNator.Hubs;
+using ActioNator.Infrastructure.Settings;
 using ActioNator.Middleware;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.ContentInspectors;
@@ -69,7 +69,7 @@ namespace ActioNator
                 .Configuration
                 .GetConnectionString("DefaultActioNatorConnection") 
                 ?? 
-                throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+                throw new InvalidOperationException("Connection string 'DefaultActioNatorConnection' not found.");
 
             builder.Services.AddDbContext<ActioNatorDbContext>
             (options =>
@@ -105,7 +105,7 @@ namespace ActioNator
             // Register Cloudinary configuration
             builder.Services
                 .Configure<CloudinarySettings>
-                (builder.Configuration.GetSection("Cloudinary"));
+                (builder.Configuration.GetSection("CloudinarySettings"));
                 
             // Register Cloudinary service
             builder.Services
@@ -272,21 +272,30 @@ namespace ActioNator
                 options.JsonSerializerOptions.PropertyNameCaseInsensitive = true;
             });
 
+            // Bind CloudinarySettings section from appsettings.json
             builder.Services.Configure<CloudinarySettings>(
                 builder.Configuration.GetSection("CloudinarySettings"));
 
-            builder.Services
-                .AddSingleton(provider =>
+            // Register Cloudinary client as a singleton service for dependency injection
+            builder.Services.AddSingleton(provider =>
             {
+                // Resolve the configured CloudinarySettings instance
                 CloudinarySettings config 
                 = provider
-                .GetRequiredService<IOptions<CloudinarySettings>>().Value;
+                .GetRequiredService<IOptions<CloudinarySettings>>()
+                .Value;
 
+                // Create a new Cloudinary Account object using the configuration
                 Account account 
-                = new (config.CloudName, config.ApiKey, config.ApiSecret);
+                = new(config.CloudName, config.ApiKey, config.ApiSecret);
 
-                return new Cloudinary(account);
+                // Instantiate and return the Cloudinary client with HTTPS enforced
+                return new Cloudinary(account)
+                {
+                    Api = { Secure = true } // Ensures all URLs generated are HTTPS
+                };
             });
+
 
             WebApplication app = builder.Build();
 
