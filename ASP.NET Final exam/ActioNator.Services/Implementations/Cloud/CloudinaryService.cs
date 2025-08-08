@@ -1,103 +1,248 @@
+using ActioNator.Data;
+using ActioNator.Data.Models;
+using ActioNator.Services.Implementations.Cloud;
 using ActioNator.Services.Interfaces.Cloud;
 using CloudinaryDotNet;
 using CloudinaryDotNet.Actions;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Options;
-using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
-namespace ActioNator.Services.Implementations.Cloud
+using static ActioNator.GCommon.FileConstants.ContentTypes;
+
+/// <summary>
+/// Handles Cloudinary image uploads and deletions related to posts.
+/// </summary>
+public class CloudinaryService : ICloudinaryService
 {
-    public class CloudinaryService : ICloudinaryService
+    private readonly Cloudinary _cloudinary;
+    private readonly ICloudinaryUrlService _cloudinaryUrlService;
+    private readonly ActioNatorDbContext _dbContext;
+    private readonly ILogger<CloudinaryService> _logger;
+
+    //10 MB
+    private const int _maxFileSizeBytes = 10 * 1024 * 1024;
+
+    public CloudinaryService(Cloudinary cloudinary, ActioNatorDbContext dbContext, ILogger<CloudinaryService> logger, ICloudinaryUrlService cloudinaryUrlService)
     {
-        private readonly Cloudinary _cloudinary;
+        _cloudinary = cloudinary 
+            ?? throw new ArgumentNullException(nameof(cloudinary));
 
-        public CloudinaryService(Cloudinary cloudinary)
-        {
-            _cloudinary = cloudinary;
-        }
+        _cloudinaryUrlService = cloudinaryUrlService 
+            ?? throw new ArgumentNullException( nameof(cloudinaryUrlService));
 
-        // Allowed image types and maximum file size (5MB)
-        private readonly string[] _allowedImageTypes = { "image/jpeg", "image/png", "image/gif", "image/webp" };
-        private const int _maxFileSizeBytes = 5 * 1024 * 1024; // 5MB
-        
-        public async Task<string> UploadImageAsync(IFormFile file, Guid postId, string folder = "community")
-        {
-            if (file == null || file.Length == 0)
-            {
-                throw new ArgumentException("No file was provided", nameof(file));
-            }
+        _dbContext = dbContext 
+            ?? throw new ArgumentNullException(nameof(dbContext));
 
-            // Check if the file is an allowed image type
-            if (!_allowedImageTypes.Contains(file.ContentType.ToLower()))
-            {
-                throw new ArgumentException($"File type '{file.ContentType}' is not allowed. Allowed types: {string.Join(", ", _allowedImageTypes)}", nameof(file));
-            }
-            
-            // Check file size
-            if (file.Length > _maxFileSizeBytes)
-            {
-                throw new ArgumentException($"File size exceeds the maximum allowed size of {_maxFileSizeBytes / (1024 * 1024)}MB", nameof(file));
-            }
+        _logger = logger
+            ?? throw new ArgumentNullException(nameof(logger));
+    }
 
-            // Create a unique filename with timestamp to support multiple images per post
-            var timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmssfff");
-            var uniqueId = Guid.NewGuid().ToString().Substring(0, 8); // First 8 chars of a new GUID
-            var publicId = $"{folder}/{postId}/{timestamp}_{uniqueId}";
+    public async Task<string> UploadImageAsync
+    (
+        IFormFile file,
+        Guid postId,
+        string folder = "community",
+        CancellationToken cancellationToken = default
+    )
+    {
+        ValidateFile(file);
 
-            await using var stream = file.OpenReadStream();
+        string publicId = GeneratePublicId(folder, postId);
 
-            var uploadParams = new ImageUploadParams
+        await using Stream stream = file.OpenReadStream();
+
+        ImageUploadParams uploadParams
+            = new()
             {
                 File = new FileDescription(file.FileName, stream),
-
                 PublicId = publicId,
-
-                UseFilename = false,     
-                UniqueFilename = false,  
-                Overwrite = true,        
-
+                UseFilename = false,
+                UniqueFilename = false,
+                Overwrite = true,
                 Transformation = new Transformation()
-                    .Quality("auto")
-                    .FetchFormat("auto")
+                .Quality("auto")
+                .FetchFormat("auto")
             };
 
-            var uploadResult = await _cloudinary.UploadAsync(uploadParams);
+        ImageUploadResult uploadResult
+            = await _cloudinary
+            .UploadAsync(uploadParams, cancellationToken);
 
-            if (uploadResult.Error != null)
-                throw new InvalidOperationException($"Failed to upload image: {uploadResult.Error.Message}");
-
-            return uploadResult.SecureUrl.ToString();
-        }
-
-        public async Task<bool> DeleteImageAsync(string publicId)
+        if (uploadResult.Error != null)
         {
-            if (string.IsNullOrEmpty(publicId))
-            {
-                throw new ArgumentException("Public ID cannot be empty", nameof(publicId));
-            }
+            _logger.LogCritical(
+                "Image uploading failed for postId {PostId}. Error: {ErrorMessage}",
+                postId,
+                uploadResult.Error.Message);
 
-            DeletionParams deleteParams = new (publicId);
-            DeletionResult result = await _cloudinary.DestroyAsync(deleteParams);
-
-            return result.Result == "ok";
+            throw new ArgumentException($"Failed to upload image: {uploadResult.Error.Message}");
         }
 
-        public string GetPublicIdFromUrl(string cloudinaryUrl)
+        Post? post
+            = await
+            _dbContext
+            .Posts
+            .FirstOrDefaultAsync
+            (p => p.Id == postId, cancellationToken);
+
+        if (post == null)
         {
-            if (string.IsNullOrEmpty(cloudinaryUrl))
-            {
-                return string.Empty;
-            }
-
-            Match match 
-                = Regex.Match(cloudinaryUrl, @"\/v\d+\/(.+)\.");
-
-            if (match.Success && match.Groups.Count > 1)
-            {
-                return match.Groups[1].Value;
-            }
-
-            return string.Empty;
+            _logger.LogError("Post with id {PostId} was not found during image upload.", postId);
+            throw new ArgumentNullException($"Post with ID {postId} not found.");
         }
+
+        string imageUrl
+            = uploadResult.SecureUrl.ToString();
+        post.ImageUrl = imageUrl;
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        return imageUrl;
+    }
+
+    public async Task<IEnumerable<string>> UploadImagesAsync(IEnumerable<IFormFile> files, Guid postId, string folder = "community", CancellationToken cancellationToken = default)
+    {
+        if (files == null || !files.Any())
+            throw new ArgumentException("No files were provided", nameof(files));
+
+        List<string> uploadedUrls
+            = [];
+
+        foreach (IFormFile file in files)
+        {
+            uploadedUrls
+                .Add(
+                await
+                UploadImageAsync
+                (file, postId, folder, cancellationToken));
+        }
+
+        foreach (string url in uploadedUrls)
+        {
+            PostImage postImage = new()
+            {
+                Id = Guid.NewGuid(),
+                ImageUrl = url,
+                PostId = postId,
+            };
+
+            await 
+                _dbContext
+                .PostImages
+                .AddAsync(postImage, cancellationToken);
+        }
+
+        await
+            _dbContext
+            .SaveChangesAsync(cancellationToken);
+
+        return uploadedUrls;
+    }
+
+    public async Task<bool> DeleteImagesByPublicIdsAsync(Guid postId, List<string> publicIds, CancellationToken cancellationToken)
+    {
+        if (publicIds == null || publicIds.Count == 0)
+        {
+            return true; // Nothing to delete
+        }
+
+        DelResParams deleteParams = new()
+        {
+            PublicIds = publicIds
+        };
+
+        DelResResult deleteResult 
+            = await 
+            _cloudinary
+            .DeleteResourcesAsync(deleteParams, cancellationToken);
+
+        bool allDeleted 
+            = deleteResult
+            .Deleted?
+            .Values
+            .All(v => v == "deleted") ?? false;
+
+        if (allDeleted)
+        {
+            // Fetch all PostImage entities linked to the post
+            List<PostImage>? postImages 
+                = await _dbContext
+                .PostImages
+                .Where(pi => pi.PostId == postId)
+                .ToListAsync(cancellationToken);
+
+            // Filter the PostImages to delete based on matching publicIds
+            List<PostImage>? imagesToDelete 
+                = postImages
+                .Where(pi => publicIds
+                    .Contains(_cloudinaryUrlService
+                        .GetPublicId(pi.ImageUrl)))
+                .ToList();
+
+            if (imagesToDelete.Count != 0)
+            {
+                imagesToDelete
+                    .ForEach(itd =>
+                        _dbContext
+                        .PostImages
+                        .Remove(itd)
+                    );
+
+                await 
+                    _dbContext
+                    .SaveChangesAsync(cancellationToken);
+            }
+        }
+
+        return allDeleted;
+    }
+
+    #region Private Helper Methods
+    private static void ValidateFile(IFormFile image)
+    {
+        if (image == null || image.Length == 0)
+            throw new ArgumentException("No file was provided", nameof(image));
+
+        if (!IsSupported(image.ContentType))
+            throw new ArgumentException($"File type '{image.ContentType}' is not allowed. Allowed types: {string.Join(", ", Supported)}", nameof(image));
+
+        if (image.Length > _maxFileSizeBytes)
+            throw new ArgumentException($"File size exceeds the maximum allowed size of {_maxFileSizeBytes / (1024 * 1024)}MB", nameof(image));
+    }
+
+    private static string GeneratePublicId(string folder, Guid postId)
+    {
+        string timestamp = DateTime.UtcNow
+            .ToString("yyyyMMddHHmmssfff");
+        string uniqueId 
+            = Guid.NewGuid()
+            .ToString("N")
+            .Substring(0, 8);
+
+        return $"{folder}/{postId}/{timestamp}_{uniqueId}";
+    }
+    #endregion
+}
+
+public class ListResourcesWithPrefixParams : ListResourcesParams
+{
+    public string Prefix { get; }
+
+    public ListResourcesWithPrefixParams(string prefix)
+        => Prefix = prefix;
+   
+    public override SortedDictionary<string, object> ToParamsDictionary()
+    {
+        SortedDictionary<string, object> dict 
+            = base.ToParamsDictionary();
+
+        if (!string.IsNullOrWhiteSpace(Prefix))
+        {
+            // Add the prefix parameter manually
+            dict["prefix"] = Prefix;
+        }
+
+        return dict;
     }
 }

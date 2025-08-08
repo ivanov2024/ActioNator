@@ -110,7 +110,11 @@ namespace ActioNator
             // Register Cloudinary service
             builder.Services
                 .AddScoped<ICloudinaryService, CloudinaryService>();
-            
+
+            //Register Cloudinary URL service
+            builder.Services
+                .AddScoped<ICloudinaryUrlService, CloudinaryUrlService>();
+
             // Register file system and content inspectors
             builder.Services
                 .AddScoped<IFileSystem, FileSystemService>();

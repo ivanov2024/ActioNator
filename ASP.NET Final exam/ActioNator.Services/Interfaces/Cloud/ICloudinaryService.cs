@@ -21,7 +21,13 @@ namespace ActioNator.Services.Interfaces.Cloud
         /// <returns>
         /// The secure URL of the uploaded image.
         /// </returns>
-        Task<string> UploadImageAsync(IFormFile image, Guid postId, string folder = "community");
+        Task<string> UploadImageAsync
+        (
+            IFormFile file,
+            Guid postId,
+            string folder = "community",
+            CancellationToken cancellationToken = default
+        );
 
         /// <summary>
         /// Uploads multiple images to Cloudinary and associates them with a specific post.
@@ -35,7 +41,7 @@ namespace ActioNator.Services.Interfaces.Cloud
         /// <returns>
         /// A collection of secure URLs of the uploaded images.
         /// </returns>
-        Task<IEnumerable<string>> UploadImagesAsync(IEnumerable<IFormFile> images, Guid postId, string folder = "community");
+        Task<IEnumerable<string>> UploadImagesAsync(IEnumerable<IFormFile> files, Guid postId, string folder = "community", CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Deletes all images from Cloudinary that are associated with a specific post.
@@ -44,6 +50,6 @@ namespace ActioNator.Services.Interfaces.Cloud
         /// <returns>
         /// True if all deletions were successful; otherwise, false.
         /// </returns>
-        Task<bool> DeleteImagesByPostIdAsync(Guid postId);
+        Task<bool> DeleteImagesByPublicIdsAsync(Guid postId, List<string> publicIds, CancellationToken cancellationToken);
     }
 }

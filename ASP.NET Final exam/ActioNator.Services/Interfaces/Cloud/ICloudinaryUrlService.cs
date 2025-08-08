@@ -14,5 +14,4 @@
         /// </returns>
         string GetPublicId(string cloudinaryUrl);
     }
-
 }
