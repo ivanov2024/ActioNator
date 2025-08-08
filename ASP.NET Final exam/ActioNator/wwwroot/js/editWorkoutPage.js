@@ -4,14 +4,26 @@
  */
 
 // Store workout and exercise data globally to ensure it's accessible to Alpine components
-window.workoutData = window.workoutModelData || {};
-window.exerciseOptionsData = window.exerciseOptionsData || [];
+window.workoutData = {};
+window.exerciseOptionsData = [];
 
 // Initialize data when document is ready
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Document ready, initializing workout page');
+    
+    // Log the available data from the server
+    console.log('Server workout model data:', window.workoutModelData);
+    console.log('Server exercise options:', window.exerciseOptionsData);
+    
     // Ensure data is available globally
     window.workoutData = window.workoutModelData || {};
     window.exerciseOptionsData = window.exerciseOptionsData || [];
+    
+    // Make sure exercises array exists
+    if (!window.workoutData.exercises && window.workoutModelData && window.workoutModelData.exercises) {
+        window.workoutData.exercises = window.workoutModelData.exercises;
+        console.log('Initialized exercises from server model:', window.workoutData.exercises);
+    }
     
     // Set up image preview functionality
     setupImagePreview();
@@ -54,7 +66,7 @@ function setupWorkoutFormSubmission() {
     const saveWorkoutBtnLoading = document.getElementById('saveWorkoutBtnLoading');
     
     if (editWorkoutForm && saveWorkoutBtn) {
-        editWorkoutForm.addEventListener('submit', function(e) {
+        editWorkoutForm.onsubmit = function(e) {
             e.preventDefault();
             
             // Show loading state
@@ -64,6 +76,63 @@ function setupWorkoutFormSubmission() {
             
             // Get form data
             const formData = new FormData(editWorkoutForm);
+            
+            // Log all FormData values for debugging
+            console.log('Submitting workout form with data:');
+            for (const [key, value] of formData.entries()) {
+                console.log(`${key}: ${value}`);
+            }
+            
+            // Check for required fields
+            const title = formData.get('Title');
+            
+            // Get exercises from the correct global variable
+            const exercises = window.workoutModelData?.exercises || [];
+            const exercisesCount = exercises.length;
+            
+            console.log(`Title: ${title}, Exercises count: ${exercisesCount}`);
+            console.log('Exercises data:', exercises);
+            
+            // Validate required fields client-side
+            let hasErrors = false;
+            let errorMessages = [];
+            
+            if (!title || title.trim() === '') {
+                hasErrors = true;
+                errorMessages.push('Title is required');
+            }
+            
+            // Ensure exercises data is included in the form submission
+            const exercisesDataField = document.getElementById('exercisesData');
+            if (exercisesDataField && exercises.length > 0) {
+                try {
+                    // Serialize exercises to JSON and store in the hidden field
+                    const exercisesJson = JSON.stringify(exercises);
+                    exercisesDataField.value = exercisesJson;
+                    console.log('Serialized exercises JSON:', exercisesJson);
+                    
+                    // Also add each exercise as a form field for model binding
+                    exercises.forEach((exercise, index) => {
+                        Object.keys(exercise).forEach(key => {
+                            formData.append(`Exercises[${index}].${key}`, exercise[key] || '');
+                        });
+                    });
+                } catch (error) {
+                    console.error('Error serializing exercises:', error);
+                }
+            } else {
+                console.warn('No exercises found or exercises data field missing');
+            }
+            
+            if (exercisesCount === 0) {
+                hasErrors = true;
+                errorMessages.push('At least one exercise is required');
+            }
+            
+            if (hasErrors) {
+                console.warn('Client-side validation errors:', errorMessages);
+                // Show errors but continue with submission to see server response
+            }
             
             // Send AJAX request
             fetch(editWorkoutForm.action, {
@@ -75,66 +144,161 @@ function setupWorkoutFormSubmission() {
                 redirect: 'error'
             })
             .then(response => {
+                // Reset loading state
+                saveWorkoutBtnText.classList.remove('hidden');
+                saveWorkoutBtnLoading.classList.add('hidden');
+                saveWorkoutBtn.disabled = false;
+                
+                console.log(`Response status: ${response.status}`);
+                
                 if (!response.ok) {
-                    throw new Error('Network response was not ok');
-                }
-                return response.text();
-            })
-            .then(html => {
-                // Parse the HTML response
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
-                
-                // Extract toast data
-                const toastData = doc.querySelector('#toast-data');
-                if (!toastData) {
-                    console.error('Toast data not found in response');
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: { type: 'error', message: 'An error occurred while saving the workout.' }
-                    }));
-                    return;
+                    throw new Error(`Server returned ${response.status}: ${response.statusText}`);
                 }
                 
-                const success = toastData.dataset.success === 'true';
-                const toastType = toastData.dataset.toastType || 'info';
-                const toastMessage = toastData.dataset.toastMessage || 'Operation completed';
-                
-                // Show toast notification
-                window.dispatchEvent(new CustomEvent('show-toast', {
-                    detail: {
-                        type: toastType,
-                        message: toastMessage
-                    }
-                }));
-                
-                if (success) {
-                    // If successful, redirect to the workouts list after a short delay
-                    setTimeout(() => {
-                        window.location.href = '/User/Workout';
-                    }, 1000);
+                // Check content type to determine how to parse the response
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
                 } else {
-                    // Reset button state
-                    saveWorkoutBtnText.classList.remove('hidden');
-                    saveWorkoutBtnLoading.classList.add('hidden');
-                    saveWorkoutBtn.disabled = false;
-                    
-                    // Handle validation errors
-                    const validationErrors = doc.querySelectorAll('#validationErrors .validation-error');
-                    if (validationErrors && validationErrors.length > 0) {
-                        // Process validation errors - update the form with error messages
-                        validationErrors.forEach(error => {
-                            const field = error.dataset.field;
-                            const message = error.dataset.message;
-                            if (field && message) {
-                                const errorSpan = document.querySelector(`[data-valmsg-for="${field}"]`);
-                                if (errorSpan) {
-                                    errorSpan.textContent = message;
-                                }
-                            }
-                        });
-                    }
+                    return response.text();
                 }
             })
+            .then(data => {
+                try {
+                    // Check if the response is already parsed as JSON
+                    if (typeof data === 'object') {
+                        console.log('Processing JSON response:', data);
+                        
+                        // Handle JSON response
+                        if (data.success === false) {
+                            // Show error toast
+                            showToast(data.toastType || 'error', data.toastMessage || 'Please fix the validation errors');
+                            
+                            // Handle validation errors if provided
+                            if (data.validationErrors) {
+                                console.log('Validation errors:', data.validationErrors);
+                                
+                                // Display validation errors on the form
+                                Object.keys(data.validationErrors).forEach(key => {
+                                    const errorMessages = data.validationErrors[key];
+                                    if (errorMessages && errorMessages.length > 0) {
+                                        console.log(`Error for ${key}: ${errorMessages[0]}`);
+                                        // Find the field and show error
+                                        const field = document.querySelector(`[name="${key}"]`);
+                                        if (field) {
+                                            field.classList.add('border-red-500');
+                                            
+                                            // Add error message below the field
+                                            const errorDiv = document.createElement('div');
+                                            errorDiv.className = 'text-red-500 text-sm mt-1';
+                                            errorDiv.textContent = errorMessages[0];
+                                            field.parentNode.appendChild(errorDiv);
+                                        }
+                                    }
+                                });
+                            }
+                            return;
+                        } else if (data.success === true) {
+                            // Show success toast
+                            showToast(data.toastType || 'success', data.toastMessage || 'Workout saved successfully');
+                            
+                            // Redirect to the workout list page
+                            window.location.href = '/User/Workout';
+                            return;
+                        }
+                    } else if (typeof data === 'string') {
+                        // Try to parse the string as JSON
+                        try {
+                            const jsonData = JSON.parse(data);
+                            console.log('Parsed JSON from text response:', jsonData);
+                            
+                            // Handle JSON response
+                            if (jsonData.success === false) {
+                                // Show error toast
+                                showToast(jsonData.toastType || 'error', jsonData.toastMessage || 'Please fix the validation errors');
+                                
+                                // Handle validation errors if provided
+                                if (jsonData.validationErrors) {
+                                    console.log('Validation errors:', jsonData.validationErrors);
+                                }
+                                return;
+                            } else if (jsonData.success === true) {
+                                // Show success toast
+                                showToast(jsonData.toastType || 'success', jsonData.toastMessage || 'Workout saved successfully');
+                                
+                                // Redirect to the workout list page
+                                window.location.href = '/User/Workout';
+                                return;
+                            }
+                        } catch (e) {
+                            // Not JSON, continue with HTML processing
+                            console.log('Response is not JSON, processing as HTML');
+                        }
+                    }
+                    
+                    // Parse the HTML response
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(data, 'text/html');
+                    
+                    // Extract toast data
+                    const toastData = doc.querySelector('#toast-data');
+                    if (!toastData) {
+                        console.error('Toast data not found in response');
+                        window.dispatchEvent(new CustomEvent('show-toast', {
+                            detail: { type: 'error', message: 'An error occurred while saving the workout.' }
+                        }));
+                        return;
+                    }
+                    
+                    const success = toastData.dataset.success === 'true';
+                    const toastType = toastData.dataset.toastType || 'info';
+                    const toastMessage = toastData.dataset.toastMessage || 'Operation completed';
+                    
+                    // Show toast notification
+                    console.log(`[WORKOUT] Showing toast notification: ${toastType} - ${toastMessage}`);
+                    window.dispatchEvent(new CustomEvent('show-toast', {
+                        detail: {
+                            type: toastType,
+                            message: toastMessage
+                        }
+                    }));
+                    
+                    // Also try using the global showToast function if available
+                    if (typeof showToast === 'function') {
+                        console.log('[WORKOUT] Using global showToast function');
+                        showToast(toastType, toastMessage);
+                    }
+                    
+                    if (success) {
+                        // If successful, redirect to the workouts list after a short delay
+                        setTimeout(() => {
+                            window.location.href = '/User/Workout';
+                        }, 1000);
+                    } else {
+                        // Reset button state
+                        saveWorkoutBtnText.classList.remove('hidden');
+                        saveWorkoutBtnLoading.classList.add('hidden');
+                        saveWorkoutBtn.disabled = false;
+                        
+                        // Handle validation errors
+                        const validationErrors = doc.querySelectorAll('#validationErrors .validation-error');
+                        if (validationErrors && validationErrors.length > 0) {
+                            console.log(`[WORKOUT] Processing ${validationErrors.length} validation errors`);
+                            // Process validation errors - update the form with error messages
+                            validationErrors.forEach(error => {
+                                const field = error.dataset.field;
+                                const message = error.dataset.message;
+                                if (field && message) {
+                                    console.log(`[WORKOUT] Validation error for ${field}: ${message}`);
+                                    const errorSpan = document.querySelector(`[data-valmsg-for="${field}"]`);
+                                    if (errorSpan) {
+                                        errorSpan.textContent = message;
+                                    }
+                                }
+                            });
+                    }
+                }
+            )
             .catch(error => {
                 console.error('Error saving workout:', error);
                 
@@ -148,7 +312,7 @@ function setupWorkoutFormSubmission() {
                     detail: { type: 'error', message: 'An error occurred while saving the workout.' }
                 }));
             });
-        });
+        };
     }
 }
 
@@ -624,5 +788,5 @@ document.addEventListener('alpine:init', function() {
             // Sum all durations
             this.workout.duration = this.workout.exercises.reduce((sum, ex) => sum + (ex.duration || 0), 0);
         }
-    }));
+    });
 });

@@ -149,13 +149,13 @@ function likePost(postId) {
     const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
     
     // Make the AJAX call to the controller
-    fetch('/User/Community/ToggleLike', {
+    fetch(`/User/Community/ToggleLike`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'RequestVerificationToken': token
+            'X-CSRF-TOKEN': token
         },
-        body: JSON.stringify({ postId: postId })
+        body: JSON.stringify({ PostId: postId })
     })
     .then(response => {
         if (!response.ok) {
@@ -193,7 +193,7 @@ function likeComment(commentId) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'RequestVerificationToken': token
+            'X-CSRF-TOKEN': token
         },
         body: JSON.stringify({ commentId: commentId })
     })
@@ -682,28 +682,16 @@ document.addEventListener("alpine:init", () => {
     // Comment liking functionality
     function likeComment(commentId) {
         // Get the anti-forgery token
-        const token = document.querySelector('input[name="__RequestVerificationToken"]');
-        if (!token) {
-            console.error('Anti-forgery token not found');
-            window.dispatchEvent(new CustomEvent('show-toast', {
-                detail: {
-                    type: 'error',
-                    message: 'Security token missing. Please refresh the page and try again.'
-                }
-            }));
-            return;
-        }
+        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
         
         // Call the API to like/unlike the comment
         fetch(`/User/Community/ToggleLikeComment`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token
             },
-            body: JSON.stringify({ 
-                commentId: commentId,
-                __RequestVerificationToken: token.value 
-            })
+            body: JSON.stringify({ commentId: commentId })
         })
         .then(response => {
             if (!response.ok) {
@@ -783,13 +771,13 @@ document.addEventListener("alpine:init", () => {
         fetch(`/User/Community/AddComment`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token.value
             },
             body: JSON.stringify({
                 postId: postId,
                 content: content,
-                parentCommentId: parentCommentId,
-                __RequestVerificationToken: token.value
+                parentCommentId: parentCommentId
             })
         })
         .then(response => {
@@ -810,6 +798,7 @@ document.addEventListener("alpine:init", () => {
                         message: 'Comment added successfully.'
                     }
                 }));
+                // Do NOT update the UI here; SignalR will handle real-time updates.
             } else {
                 throw new Error(data.message || 'Failed to add comment');
             }
@@ -857,10 +846,10 @@ document.addEventListener("alpine:init", () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'RequestVerificationToken': token.value
+                'X-CSRF-TOKEN': token.value
             },
             body: JSON.stringify({ 
-                postId: postId
+                PostId: postId
             })
         })
         .then(response => {
@@ -925,12 +914,14 @@ document.addEventListener("alpine:init", () => {
     
     // Post deletion and reporting functions
     function deletePost(postId) {
+        // Get the anti-forgery token
+        const token = document.querySelector('input[name="__RequestVerificationToken"]');
         // Call the API to delete the post
         fetch(`/User/Community/DeletePost/${postId}`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                'X-CSRF-TOKEN': token ? token.value : ''
             }
         })
         .then(response => {
@@ -974,7 +965,7 @@ document.addEventListener("alpine:init", () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]').value
             }
         })
         .then(response => {
@@ -1052,11 +1043,11 @@ document.addEventListener("alpine:init", () => {
         fetch(`/User/Community/DeleteComment/${commentId}`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token.value
             },
             body: JSON.stringify({
-                postId: postId,
-                __RequestVerificationToken: token.value
+                PostId: postId
             })
         })
         .then(response => {
@@ -1160,7 +1151,7 @@ document.addEventListener("alpine:init", () => {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
+                'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]').value
             }
         })
         .then(response => {

@@ -742,5 +742,71 @@ namespace ActioNator.Services.Implementations.Community
                 throw;
             }
         }
+        
+        public async Task<PostCommentViewModel> RestoreCommentAsync(Guid commentId, Guid userId)
+        {
+            if (commentId == Guid.Empty || userId == Guid.Empty)
+            {
+                throw new ArgumentException(
+                    commentId == Guid.Empty ? nameof(commentId) : nameof(userId));
+            }
+
+            try
+            {
+                // Find the comment with its author and post
+                var comment = await _dbContext.Comments
+                    .Include(c => c.Author)
+                    .Include(c => c.Post)
+                    .FirstOrDefaultAsync(c => c.Id == commentId);
+                    
+                if (comment == null)
+                {
+                    _logger.LogWarning("Attempted to restore non-existent comment {CommentId} by user {UserId}", commentId, userId);
+                    return null; // Comment not found
+                }
+                
+                // Check if user is authorized to restore the comment (only administrators)
+                var user = await _dbContext.Users.FindAsync(userId);
+                bool isAdmin = user != null && await _dbContext.UserRoles
+                    .AnyAsync(ur => ur.UserId == userId && 
+                             _dbContext.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Administrator"));
+                             
+                if (!isAdmin)
+                {
+                    _logger.LogWarning("Unauthorized attempt to restore comment {CommentId} by non-admin user {UserId}", commentId, userId);
+                    return null; // Not authorized
+                }
+                
+                // Only restore if the comment is actually deleted
+                if (!comment.IsDeleted)
+                {
+                    _logger.LogInformation("Comment {CommentId} is not deleted, no need to restore", commentId);
+                    return MapCommentToViewModel(comment, userId); // Already active
+                }
+                
+                // Restore the comment
+                comment.IsDeleted = false;
+                
+                // Save changes
+                _dbContext.Comments.Update(comment);
+                await _dbContext.SaveChangesAsync();
+                
+                // Log the restoration
+                _logger.LogInformation("Comment {CommentId} restored by admin {UserId}", commentId, userId);
+                
+                // Map to view model
+                var commentViewModel = MapCommentToViewModel(comment, userId);
+                
+                // Notify via SignalR
+                await _signalRService.SendToAllAsync("ReceiveNewComment", commentViewModel);
+                
+                return commentViewModel;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error restoring comment {CommentId} by user {UserId}", commentId, userId);
+                throw;
+            }
+        }
     }
 }

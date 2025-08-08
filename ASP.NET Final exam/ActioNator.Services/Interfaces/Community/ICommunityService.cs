@@ -107,5 +107,13 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="userId">Current user ID</param>
         /// <returns>Comment view model</returns>
         Task<PostCommentViewModel> GetCommentByIdAsync(Guid commentId, Guid userId);
+        
+        /// <summary>
+        /// Restores a deleted comment
+        /// </summary>
+        /// <param name="commentId">Comment ID</param>
+        /// <param name="userId">User ID (for authorization)</param>
+        /// <returns>Restored comment view model</returns>
+        Task<PostCommentViewModel> RestoreCommentAsync(Guid commentId, Guid userId);
     }
 }
