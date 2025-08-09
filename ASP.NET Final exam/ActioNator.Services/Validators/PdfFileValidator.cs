@@ -4,8 +4,11 @@ using ActioNator.Services.Exceptions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Http;
-using ActioNator.GCommon;
 using ActioNator.Services.Interfaces.FileServices;
+
+using static ActioNator.GCommon.FileConstants.ContentTypes;
+using static ActioNator.GCommon.FileConstants.FileExtensions;
+using static ActioNator.GCommon.FileConstants.ErrorMessages;
 
 namespace ActioNator.Services.Validators
 {
@@ -37,7 +40,7 @@ namespace ActioNator.Services.Validators
         /// <param name="contentType">Content type to check</param>
         /// <returns>True if this validator can handle the content type, false otherwise</returns>
         public override bool CanHandleFileType(string contentType)
-            => _contentInspector.CanHandleContentType(contentType);
+            => IsSupported(contentType);
 
         /// <summary>
         /// Performs PDF-specific validation
@@ -56,7 +59,7 @@ namespace ActioNator.Services.Validators
                         = $"File '{file.FileName}' is not a PDF. All files must be PDFs in a single upload.";
                     _logger
                         .LogWarning(errorMessage);
-                    throw new FileContentTypeException(FileConstants.ErrorMessages.InvalidFileType);
+                    throw new FileContentTypeException(InvalidFileType);
                 }
 
                 // Check file extension
@@ -65,13 +68,13 @@ namespace ActioNator.Services.Validators
                     .GetExtension(file.FileName)
                     .ToLowerInvariant();
 
-                if (extension != FileConstants.FileExtensions.Pdf)
+                if (extension != Pdf)
                 {
                     string errorMessage 
                         = $"File extension '{extension}' is not allowed for PDFs. Only .pdf is allowed.";
                     _logger
                         .LogWarning(errorMessage);
-                    throw new FileContentTypeException(FileConstants.ErrorMessages.InvalidFileType);
+                    throw new FileContentTypeException(InvalidFileType);
                 }
 
                 // Verify actual file content matches PDF format
@@ -100,7 +103,7 @@ namespace ActioNator.Services.Validators
                         = $"File '{file.FileName}' is not a valid PDF document.";
                     _logger
                         .LogWarning(errorMessage);
-                    throw new FileContentTypeException(FileConstants.ErrorMessages.ContentTypeMismatch);
+                    throw new FileContentTypeException(ContentTypeMismatch);
                 }
             }
             catch (FileContentTypeException)

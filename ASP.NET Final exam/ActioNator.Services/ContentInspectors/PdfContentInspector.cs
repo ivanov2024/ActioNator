@@ -1,12 +1,10 @@
-using ActioNator.GCommon;
 using ActioNator.Services.Interfaces.FileServices;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using System;
-using System.IO;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
+
+using static ActioNator.GCommon.FileConstants.ContentTypes;
+using static ActioNator.GCommon.FileConstants.FileSignatures;
 
 namespace ActioNator.Services.ContentInspectors
 {
@@ -20,16 +18,16 @@ namespace ActioNator.Services.ContentInspectors
         /// <summary>
         /// Gets the content type this inspector handles
         /// </summary>
-        public string ContentType => FileConstants.ContentTypes.Pdf;
+        public string ContentType => Supported
+            .First(s => s == "application/pdf");
         
         /// <summary>
         /// Initializes a new instance of the PdfContentInspector class
         /// </summary>
         /// <param name="logger">Logger instance</param>
         public PdfContentInspector(ILogger<PdfContentInspector> logger)
-        {
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        }
+            => _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        
         
         /// <summary>
         /// Checks if the file content is valid PDF content
@@ -41,42 +39,52 @@ namespace ActioNator.Services.ContentInspectors
         {
             if (file == null)
             {
-                _logger.LogWarning("Cannot inspect null file");
+                _logger
+                    .LogWarning("Cannot inspect null file");
                 return false;
             }
             
             try
             {
-                using var stream = file.OpenReadStream();
+                using Stream stream = file.OpenReadStream();
                 
                 // Check PDF signature
-                byte[] header = new byte[FileConstants.FileSignatures.Pdf.Length];
-                await stream.ReadAsync(header, 0, header.Length, cancellationToken);
+                byte[] header = new byte[Pdf.Length];
+                await stream
+                    .ReadAsync(header, cancellationToken);
                 
-                bool isValidHeader = ByteArrayStartsWith(header, FileConstants.FileSignatures.Pdf);
+                bool isValidHeader 
+                    = ByteArrayStartsWith(header, Pdf);
                 
                 if (!isValidHeader)
                 {
-                    _logger.LogWarning("File {FileName} has invalid PDF header", file.FileName);
+                    _logger
+                        .LogWarning("File {FileName} has invalid PDF header", file.FileName);
                     return false;
                 }
-                
-                // Check for JavaScript content which could be malicious
-                // This is a simplified check - a real implementation would use a PDF parsing library
+
+                // Reset position
                 stream.Position = 0;
-                byte[] content = new byte[Math.Min(4096, stream.Length)]; // Read first 4KB or less
-                await stream.ReadAsync(content, 0, content.Length, cancellationToken);
-                
-                string contentString = Encoding.ASCII.GetString(content);
-                
-                // Simple checks for potentially malicious content
-                if (contentString.Contains("/JS") || contentString.Contains("/JavaScript") || 
-                    contentString.Contains("/Launch") || contentString.Contains("/RichMedia"))
+
+                // Read first N bytes (more than 4KB if possible, but still efficient)
+                byte[] buffer = new byte[Math.Min(16384, stream.Length)]; // 16 KB
+                await stream.ReadAsync(buffer, cancellationToken);
+
+                // Convert to lowercase to avoid missing case variants
+                string contentString = Encoding.UTF8.GetString(buffer).ToLowerInvariant();
+
+                // Suspicious patterns (lowercase)
+                string[] dangerousKeywords =
+                ["/js", "/javascript", "/launch", "/richmedia"];
+
+                // Check if any dangerous keyword is present
+                if (dangerousKeywords.Any(k => contentString.Contains(k)))
                 {
-                    _logger.LogWarning("File {FileName} contains potentially malicious JavaScript", file.FileName);
+                    _logger
+                        .LogWarning("File {FileName} contains potentially malicious JavaScript", file.FileName);
                     return false;
                 }
-                
+
                 return true;
             }
             catch (Exception ex)

@@ -4,8 +4,8 @@ using ActioNator.Services.Implementations.InputSanitization;
 using ActioNator.Services.Interfaces.Cloud;
 using ActioNator.Services.Interfaces.Communication;
 using ActioNator.Services.Interfaces.Community;
+using ActioNator.Services.Interfaces.InputSanitizationService;
 using ActioNator.ViewModels.Community;
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +24,7 @@ namespace ActioNator.Services.Implementations.Community
         private readonly ISignalRService _signalRService;
         private readonly ILogger<CommunityService> _logger;
         private readonly UserManager<ApplicationUser> _userManager;
-        private readonly InputSanitizationService _inputSanitizationService;
+        private readonly IInputSanitizationService _inputSanitizationService;
 
         public CommunityService(
             ActioNatorDbContext dbContext,
@@ -33,27 +33,27 @@ namespace ActioNator.Services.Implementations.Community
             ISignalRService signalRService,
             ILogger<CommunityService> logger,
             UserManager<ApplicationUser> userManager,
-            InputSanitizationService inputSanitizationService)
+            IInputSanitizationService inputSanitizationService)
         {
-            _dbContext = dbContext 
+            _dbContext = dbContext
                 ?? throw new ArgumentNullException(nameof(dbContext));
 
-            _cloudinaryService = cloudinaryService 
+            _cloudinaryService = cloudinaryService
                 ?? throw new ArgumentNullException(nameof(cloudinaryService));
 
             _cloudinaryUrlService = cloudinaryUrlService
                 ?? throw new ArgumentNullException(nameof(cloudinaryUrlService));
 
-            _signalRService = signalRService 
+            _signalRService = signalRService
                 ?? throw new ArgumentNullException(nameof(signalRService));
 
-            _logger = logger 
+            _logger = logger
                 ?? throw new ArgumentNullException(nameof(logger));
 
-            _userManager = userManager 
+            _userManager = userManager
                 ?? throw new ArgumentNullException(nameof(userManager));
 
-            _inputSanitizationService = inputSanitizationService 
+            _inputSanitizationService = inputSanitizationService
                 ?? throw new ArgumentNullException(nameof(inputSanitizationService));
         }
 
@@ -72,7 +72,7 @@ namespace ActioNator.Services.Implementations.Community
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize < 1 || pageSize > 100) pageSize = 20;
 
-            IQueryable<Post> query 
+            IQueryable<Post> query
                 = _dbContext
                 .Posts
                 .AsNoTracking();
@@ -103,7 +103,7 @@ namespace ActioNator.Services.Implementations.Community
             }
 
             // Projection: produce the minimal shape we need in SQL
-            var projected 
+            var projected
                 = query
                 .OrderByDescending(p => p.CreatedAt)
                 .Skip((pageNumber - 1) * pageSize)
@@ -133,30 +133,30 @@ namespace ActioNator.Services.Implementations.Community
                         .Any(l => l.UserId == userId && l.IsActive),
                 });
 
-            var rows 
-                = await 
+            var rows
+                = await
                 projected
                 .ToListAsync(cancellationToken);
 
             // Materialize into view models and do any non-translatable work (e.g., TimeAgo)
-            List<PostCardViewModel> results 
+            List<PostCardViewModel> results
                 = rows
                 .Select(r => new PostCardViewModel
-            {
-                Id = r.Id,
-                Content = r.Content,
-                CreatedAt = r.CreatedAt,
-                AuthorId = r.UserId,
-                AuthorName = r.AuthorName.UserName!,
-                AuthorProfilePicture = r.AuthorProfilePicture,
-                LikeCount = r.LikeCount,
-                CommentCount = r.CommentCount,
-                IsLiked = r.IsLiked,
-                IsAuthor = r.UserId == userId,
-                IsPublic = r.IsPublic,
-                IsDeleted = r.IsDeleted,
-                Comments = new List<PostCommentViewModel>(), // load on-demand or via separate query when client requests
-                Images = r
+                {
+                    Id = r.Id,
+                    Content = r.Content,
+                    CreatedAt = r.CreatedAt,
+                    AuthorId = r.UserId,
+                    AuthorName = r.AuthorName.UserName!,
+                    AuthorProfilePicture = r.AuthorProfilePicture,
+                    LikeCount = r.LikeCount,
+                    CommentCount = r.CommentCount,
+                    IsLiked = r.IsLiked,
+                    IsAuthor = r.UserId == userId,
+                    IsPublic = r.IsPublic,
+                    IsDeleted = r.IsDeleted,
+                    Comments = new List<PostCommentViewModel>(), // load on-demand or via separate query when client requests
+                    Images = r
                 .Images
                 .Select(i => new PostImageViewModel
                 {
@@ -165,7 +165,7 @@ namespace ActioNator.Services.Implementations.Community
                     ImageUrl = i.ImageUrl,
                     CreatedAt = DateTime.UtcNow // if you need accurate CreatedAt, add it to PostImage entity
                 }).ToList()
-            }).ToList();
+                }).ToList();
 
             return results;
         }
@@ -178,8 +178,8 @@ namespace ActioNator.Services.Implementations.Community
             if (userId == Guid.Empty)
                 throw new ArgumentException("User ID cannot be empty.", nameof(userId));
 
-            Post? post 
-                = await 
+            Post? post
+                = await
                 _dbContext
                 .Posts
                 .AsNoTracking()
@@ -204,8 +204,8 @@ namespace ActioNator.Services.Implementations.Community
             if (userId == Guid.Empty)
                 throw new ArgumentException("User ID cannot be empty", nameof(userId));
 
-            Comment? comment = 
-                await 
+            Comment? comment =
+                await
                 _dbContext
                 .Comments
                 .AsNoTracking()
@@ -219,7 +219,14 @@ namespace ActioNator.Services.Implementations.Community
             return MapCommentToViewModel(comment, userId)!;
         }
 
-        public async Task<PostCardViewModel> CreatePostAsync(string content, Guid userId, CancellationToken cancellationToken, List<IFormFile>? images = null)
+        public async Task<PostCardViewModel> CreatePostAsync
+        (
+            string content,
+            Guid userId,
+            CancellationToken
+            cancellationToken = default,
+            List<IFormFile>? images =null
+        )
         {
             if (string.IsNullOrWhiteSpace(content))
                 throw new ArgumentNullException(nameof(content), "Post content cannot be empty.");
@@ -229,22 +236,22 @@ namespace ActioNator.Services.Implementations.Community
 
             images ??= new List<IFormFile>();
 
-            ApplicationUser? user 
-                = await 
+            ApplicationUser? user
+                = await
                 _dbContext
                 .Users
-                .FindAsync(userId) 
+                .FindAsync(userId)
                 ?? throw new InvalidOperationException($"User with ID {userId} not found.");
-            
-            IDbContextTransaction? transaction 
-                = await 
+
+            IDbContextTransaction? transaction
+                = await
                 _dbContext
                 .Database
                 .BeginTransactionAsync(cancellationToken);
 
             try
             {
-                Post post = new ()
+                Post post = new()
                 {
                     Id = Guid.NewGuid(),
                     UserId = userId,
@@ -261,7 +268,7 @@ namespace ActioNator.Services.Implementations.Community
                 await _dbContext
                     .SaveChangesAsync(cancellationToken);
 
-                IEnumerable<Task> uploadTasks 
+                IEnumerable<Task> uploadTasks
                     = images
                     .Where(img => img != null && img.Length > 0)
                     .Select(async image =>
@@ -308,13 +315,13 @@ namespace ActioNator.Services.Implementations.Community
                 await _dbContext
                     .SaveChangesAsync(cancellationToken);
 
-                await 
+                await
                     _dbContext
                     .Entry(post)
                     .Reference(p => p.ApplicationUser)
                     .LoadAsync(cancellationToken);
 
-                await 
+                await
                     _dbContext
                     .Entry(post)
                     .Collection(p => p.PostImages)
@@ -323,10 +330,10 @@ namespace ActioNator.Services.Implementations.Community
                 await transaction
                     .CommitAsync(cancellationToken);
 
-                PostCardViewModel? postViewModel 
+                PostCardViewModel? postViewModel
                     = MapPostToViewModel(post, userId);
 
-                await 
+                await
                     _signalRService
                     .SendToAllAsync("ReceiveNewPost", postViewModel!);
 
@@ -340,11 +347,18 @@ namespace ActioNator.Services.Implementations.Community
             }
         }
 
-        public async Task<PostCommentViewModel> AddCommentAsync(Guid postId, string content, Guid userId, CancellationToken cancellationToken)
+        public async Task<PostCommentViewModel> AddCommentAsync
+        (Guid postId, 
+            string content,
+            Guid userId, 
+            CancellationToken 
+            cancellationToken =
+            default
+        )
         {
             if (postId == Guid.Empty)
                 throw new ArgumentException("Post ID cannot be empty", nameof(postId));
-            
+
 
             if (string.IsNullOrEmpty(content))
             {
@@ -355,24 +369,24 @@ namespace ActioNator.Services.Implementations.Community
                 throw new ArgumentNullException(nameof(content), "Comment content cannot be empty or whitespace.");
 
             // Verify that the post exists and is not deleted
-            Post? post 
-                = await 
+            Post? post
+                = await
                 _dbContext
                 .Posts
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.Id == postId 
+                .FirstOrDefaultAsync(p => p.Id == postId
                     && !p.IsDeleted, cancellationToken);
 
             if (post == null)
                 throw new InvalidOperationException($"Post with ID {postId} not found or has been deleted.");
 
             // Verify that the user exists
-            ApplicationUser? user 
-                = await 
+            ApplicationUser? user
+                = await
                 _dbContext
                 .Users
                 .AsNoTracking()
-                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken) 
+                .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
                 ?? throw new InvalidOperationException($"User with ID {userId} not found.");
 
             // Create the comment entity
@@ -400,9 +414,9 @@ namespace ActioNator.Services.Implementations.Community
                 .LoadAsync(cancellationToken);
 
             // Map to view model
-            PostCommentViewModel? commentViewModel 
+            PostCommentViewModel? commentViewModel
                 = MapCommentToViewModel(comment, userId)
-                ?? throw new InvalidOperationException("Failed to map comment to view model");      
+                ?? throw new InvalidOperationException("Failed to map comment to view model");
 
             // Broadcast the new comment to all connected clients
             await _signalRService
@@ -411,7 +425,14 @@ namespace ActioNator.Services.Implementations.Community
             return commentViewModel;
         }
 
-        public async Task<int> ToggleLikePostAsync(Guid postId, Guid userId, CancellationToken cancellationToken = default)
+        public async Task<int> ToggleLikePostAsync
+        (
+            Guid postId, 
+            Guid userId, 
+            CancellationToken
+            cancellationToken 
+            = default
+        )
         {
             if (postId == Guid.Empty)
                 throw new ArgumentException("Post ID cannot be empty", nameof(postId));
@@ -422,17 +443,17 @@ namespace ActioNator.Services.Implementations.Community
             try
             {
                 // Retrieve the post including its likes
-                Post? post 
-                    = await 
+                Post? post
+                    = await
                     _dbContext
                     .Posts
                     .Include(p => p.Likes)
-                    .FirstOrDefaultAsync(p => p.Id == postId 
-                        && !p.IsDeleted, cancellationToken) 
+                    .FirstOrDefaultAsync(p => p.Id == postId
+                        && !p.IsDeleted, cancellationToken)
                     ?? throw new InvalidOperationException($"Post with ID {postId} not found or deleted.");
 
                 // Find active like by the user if exists
-                Data.Models.PostLike? existingLike 
+                Data.Models.PostLike? existingLike
                     = post
                     .Likes
                     .FirstOrDefault(l => l.UserId == userId && l.IsActive);
@@ -446,12 +467,12 @@ namespace ActioNator.Services.Implementations.Community
                 else
                 {
                     // Check for an inactive like to reactivate
-                    Data.Models.PostLike? inactiveLike 
-                        = await 
+                    Data.Models.PostLike? inactiveLike
+                        = await
                         _dbContext
                         .PostLikes
-                        .FirstOrDefaultAsync(l => l.PostId == postId 
-                            && l.UserId == userId 
+                        .FirstOrDefaultAsync(l => l.PostId == postId
+                            && l.UserId == userId
                             && !l.IsActive, cancellationToken);
 
                     if (inactiveLike != null)
@@ -461,17 +482,17 @@ namespace ActioNator.Services.Implementations.Community
                     else
                     {
                         // Add new like
-                        Data.Models.PostLike newLike 
+                        Data.Models.PostLike newLike
                             = new()
-                        {
-                            Id = Guid.NewGuid(),
-                            PostId = postId,
-                            UserId = userId,
-                            CreatedAt = DateTime.UtcNow,
-                            IsActive = true
-                        };
+                            {
+                                Id = Guid.NewGuid(),
+                                PostId = postId,
+                                UserId = userId,
+                                CreatedAt = DateTime.UtcNow,
+                                IsActive = true
+                            };
 
-                        await 
+                        await
                             _dbContext
                             .PostLikes
                             .AddAsync(newLike, cancellationToken);
@@ -482,12 +503,12 @@ namespace ActioNator.Services.Implementations.Community
                 }
 
                 // Save changes with cancellation support
-                await 
+                await
                     _dbContext
                     .SaveChangesAsync(cancellationToken);
 
                 // Notify all connected clients about the like count update
-                await 
+                await
                     _signalRService
                     .SendToAllAsync("ReceivePostUpdate", postId, post.LikesCount);
 
@@ -500,7 +521,14 @@ namespace ActioNator.Services.Implementations.Community
             }
         }
 
-        public async Task<int> ToggleLikeCommentAsync(Guid commentId, Guid userId, CancellationToken cancellationToken = default)
+        public async Task<int> ToggleLikeCommentAsync
+        (
+            Guid commentId, 
+            Guid userId, 
+            CancellationToken 
+            cancellationToken 
+            = default
+        )
         {
             if (commentId == Guid.Empty)
                 throw new ArgumentException("Comment ID cannot be empty", nameof(commentId));
@@ -511,17 +539,17 @@ namespace ActioNator.Services.Implementations.Community
             try
             {
                 // Retrieve the comment with its likes
-                Comment? comment 
-                    = await 
+                Comment? comment
+                    = await
                     _dbContext
                     .Comments
                     .Include(c => c.Likes)
-                    .FirstOrDefaultAsync(c => c.Id == commentId 
+                    .FirstOrDefaultAsync(c => c.Id == commentId
                         && !c.IsDeleted, cancellationToken)
                     ?? throw new InvalidOperationException($"Comment with ID {commentId} not found or deleted.");
 
                 // Find active like by the user if exists
-                CommentLike? existingLike 
+                CommentLike? existingLike
                     = comment
                     .Likes
                     .FirstOrDefault(l => l.UserId == userId && l.IsActive);
@@ -535,12 +563,12 @@ namespace ActioNator.Services.Implementations.Community
                 else
                 {
                     // Check for an inactive like to reactivate
-                    CommentLike? inactiveLike 
-                        = await 
+                    CommentLike? inactiveLike
+                        = await
                         _dbContext
                         .CommentLikes
-                        .FirstOrDefaultAsync(l => l.CommentId == commentId 
-                            && l.UserId == userId 
+                        .FirstOrDefaultAsync(l => l.CommentId == commentId
+                            && l.UserId == userId
                             && !l.IsActive, cancellationToken);
 
                     if (inactiveLike != null)
@@ -550,17 +578,17 @@ namespace ActioNator.Services.Implementations.Community
                     else
                     {
                         // Add new like
-                        CommentLike newLike 
-                            = new ()
-                        {
-                            Id = Guid.NewGuid(),
-                            CommentId = commentId,
-                            UserId = userId,
-                            CreatedAt = DateTime.UtcNow,
-                            IsActive = true
-                        };
+                        CommentLike newLike
+                            = new()
+                            {
+                                Id = Guid.NewGuid(),
+                                CommentId = commentId,
+                                UserId = userId,
+                                CreatedAt = DateTime.UtcNow,
+                                IsActive = true
+                            };
 
-                        await 
+                        await
                             _dbContext
                             .CommentLikes
                             .AddAsync(newLike, cancellationToken);
@@ -571,12 +599,12 @@ namespace ActioNator.Services.Implementations.Community
                 }
 
                 // Save changes with cancellation support
-                await 
+                await
                     _dbContext
                     .SaveChangesAsync(cancellationToken);
 
                 // Notify all clients about the update
-                await 
+                await
                     _signalRService
                     .SendToAllAsync("ReceiveCommentUpdate", commentId, comment.LikesCount);
 
@@ -589,7 +617,14 @@ namespace ActioNator.Services.Implementations.Community
             }
         }
 
-        public async Task<bool> DeletePostAsync(Guid postId, Guid userId, CancellationToken cancellationToken = default)
+        public async Task<bool> DeletePostAsync
+        (   
+            Guid postId, 
+            Guid userId, 
+            CancellationToken 
+            cancellationToken =
+            default
+        )
         {
             if (postId == Guid.Empty)
                 throw new ArgumentException("Post ID cannot be empty", nameof(postId));
@@ -597,15 +632,15 @@ namespace ActioNator.Services.Implementations.Community
                 throw new ArgumentException("User ID cannot be empty", nameof(userId));
 
             ApplicationUser user =
-                await 
+                await
                 _dbContext
                 .Users
-                .FindAsync(userId, cancellationToken) 
+                .FindAsync(userId, cancellationToken)
                 ?? throw new InvalidOperationException($"User with ID {userId} not found.");
 
             // Retrieve post including related images
-            Post? post 
-                = await 
+            Post? post
+                = await
                 _dbContext
                 .Posts
                 .Include(p => p.PostImages)
@@ -621,7 +656,7 @@ namespace ActioNator.Services.Implementations.Community
             if (post.UserId != userId)
             {
                 bool isAdmin
-                    = await 
+                    = await
                     _userManager
                     .IsInRoleAsync(user, "Admin");
 
@@ -649,7 +684,7 @@ namespace ActioNator.Services.Implementations.Community
             if (!string.IsNullOrEmpty(post.ImageUrl))
             {
                 // Single image scenario
-                string publicId 
+                string publicId
                     = _cloudinaryUrlService
                     .GetPublicId(post.ImageUrl);
 
@@ -687,20 +722,27 @@ namespace ActioNator.Services.Implementations.Community
                 .Posts
                 .Update(post);
 
-            await 
+            await
                 _dbContext
                 .SaveChangesAsync(cancellationToken);
 
             return true;
         }
 
-        public async Task<bool> DeleteCommentAsync(Guid commentId, Guid userId, CancellationToken cancellationToken)
+        public async Task<bool> DeleteCommentAsync
+        (
+            Guid commentId, 
+            Guid userId, 
+            CancellationToken 
+            cancellationToken =
+            default
+        )
         {
             if (commentId == Guid.Empty) throw new ArgumentException(nameof(commentId));
             if (userId == Guid.Empty) throw new ArgumentException(nameof(userId));
 
-            Comment? comment 
-                = await 
+            Comment? comment
+                = await
                 _dbContext
                 .Comments
                 .FindAsync(commentId, cancellationToken);
@@ -712,14 +754,14 @@ namespace ActioNator.Services.Implementations.Community
                 return false; // Comment not found or already deleted
             }
 
-            ApplicationUser user = 
-                await 
+            ApplicationUser user =
+                await
                 _dbContext
                 .Users
-                .FindAsync(userId, cancellationToken) 
+                .FindAsync(userId, cancellationToken)
                 ?? throw new InvalidOperationException($"User with ID {userId} not found.");
 
-            bool isAuthorized = comment.AuthorId == userId 
+            bool isAuthorized = comment.AuthorId == userId
                 || await _userManager.IsInRoleAsync(user, "Admin");
 
             if (!isAuthorized)
@@ -733,11 +775,11 @@ namespace ActioNator.Services.Implementations.Community
             {
                 comment.IsDeleted = true;
 
-                await 
+                await
                     _dbContext
                     .SaveChangesAsync(cancellationToken);
 
-                await 
+                await
                     _signalRService
                     .SendToAllAsync("ReceiveCommentDeleted", comment.PostId.ToString()!, commentId);
             }
@@ -750,7 +792,16 @@ namespace ActioNator.Services.Implementations.Community
             return true; // Successfully deleted
         }
 
-        public async Task<bool> ReportPostAsync(Guid postId, string reason, CancellationToken cancellationToken, Guid userId, string details = "")
+        public async Task<bool> ReportPostAsync
+        (
+            Guid postId,
+            string reason,
+            Guid userId,
+            CancellationToken 
+            cancellationToken 
+            = default,
+            string details = ""
+        )
         {
             if (postId == Guid.Empty) throw new ArgumentException("Post ID cannot be empty", nameof(postId));
 
@@ -764,8 +815,8 @@ namespace ActioNator.Services.Implementations.Community
 
             try
             {
-                Post? post 
-                    = await 
+                Post? post
+                    = await
                     _dbContext
                     .Posts
                     .FindAsync(postId);
@@ -778,12 +829,12 @@ namespace ActioNator.Services.Implementations.Community
                     return false; // Post not found or already deleted
                 }
 
-                bool alreadyReported 
-                    = await 
+                bool alreadyReported
+                    = await
                     _dbContext
                     .PostReports
-                    .AnyAsync(r => r.PostId == postId 
-                        && r.ReportedByUserId == userId 
+                    .AnyAsync(r => r.PostId == postId
+                        && r.ReportedByUserId == userId
                         && r.Status == "Sent", cancellationToken);
 
                 if (alreadyReported)
@@ -793,24 +844,24 @@ namespace ActioNator.Services.Implementations.Community
                     return false; // User has already reported this post
                 }
 
-                PostReport? report 
+                PostReport? report
                     = new()
-                {
-                    Id = Guid.NewGuid(),
-                    PostId = postId,
-                    ReportedByUserId = userId,
-                    Reason = reason,
-                    Details = details ?? string.Empty,
-                    CreatedAt = DateTime.UtcNow,
-                    Status = "Pending" // Default status for new reports
-                };
+                    {
+                        Id = Guid.NewGuid(),
+                        PostId = postId,
+                        ReportedByUserId = userId,
+                        Reason = reason,
+                        Details = details ?? string.Empty,
+                        CreatedAt = DateTime.UtcNow,
+                        Status = "Pending" // Default status for new reports
+                    };
 
-                await 
+                await
                     _dbContext
                     .PostReports
                     .AddAsync(report, cancellationToken);
 
-                await 
+                await
                     _dbContext
                     .SaveChangesAsync(cancellationToken);
 
@@ -834,53 +885,112 @@ namespace ActioNator.Services.Implementations.Community
             }
         }
 
-        public async Task<bool> ReportCommentAsync(Guid commentId, string reason, Guid userId)
+        public async Task<bool> ReportCommentAsync
+        (
+            Guid commentId, 
+            string reason, 
+            Guid userId, 
+            CancellationToken
+            cancellationToken = default, 
+            string details = ""
+        )
         {
-            if (commentId == Guid.Empty || string.IsNullOrEmpty(reason) || userId == Guid.Empty)
+            if (commentId == Guid.Empty)
             {
-                throw new ArgumentException(
-                    commentId == Guid.Empty ? nameof(commentId) : 
-                    reason == null ? nameof(reason) : nameof(userId));
+                _logger
+                    .LogError("Comment ID cannot be empty when reporting a comment.");
+                throw new ArgumentException("Comment ID cannot be empty", nameof(commentId));
+            }
+
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                _logger
+                    .LogError("Reason cannot be empty when reporting a comment.");
+
+                throw new ArgumentException("Reason cannot be empty", nameof(reason));
+            }
+
+            if (userId == Guid.Empty)
+            {
+                _logger
+                   .LogError("Reason cannot be empty when reporting a comment.");
+                throw new ArgumentException("User ID cannot be empty", nameof(userId));
             }
 
             try
             {
                 // Find the comment
-                var comment = await _dbContext.Comments.FindAsync(commentId);
+                Comment? comment
+                    = await
+                    _dbContext
+                    .Comments
+                    .FindAsync(commentId);
+
                 if (comment == null || comment.IsDeleted)
                 {
+                    _logger
+                        .LogWarning("Attempted to report non-existent or already deleted comment {CommentId} by user {UserId}", commentId, userId);
                     return false; // Comment not found or already deleted
                 }
 
+                if (comment.AuthorId == userId)
+                {
+                    _logger
+                        .LogCritical("User {UserId} cannot report their own comment {CommentId}", userId, commentId);
+                    return false; // User cannot report their own comment
+                }
+
+                // Check for existing pending report by the same user
+                bool alreadyReported
+                    = await
+                    _dbContext
+                    .CommentReports
+                    .AnyAsync(r => r.CommentId == commentId
+                                && r.ReportedByUserId == userId
+                                && r.Status == "Sent");
+
+                if (alreadyReported)
+                {
+                    _logger
+                        .LogWarning("User {UserId} has already reported comment {CommentId}", userId, commentId);
+                    return false; // Prevent duplicate pending reports
+                }
+
                 // Create the report
-                var report = new CommentReport
+                CommentReport report = new()
                 {
                     Id = Guid.NewGuid(),
                     CommentId = commentId,
                     ReportedByUserId = userId,
                     Reason = reason,
-                    Details = string.Empty, // Could be expanded to accept details from UI
+                    Details = details ?? string.Empty,
                     CreatedAt = DateTime.UtcNow,
-                    Status = "Pending"
+                    Status = "Pending",
                 };
 
-                // Save to database
-                await _dbContext.CommentReports.AddAsync(report);
-                await _dbContext.SaveChangesAsync();
+                await
+                    _dbContext
+                    .CommentReports
+                    .AddAsync(report, cancellationToken);
 
-                // Log the report
-                _logger.LogInformation("Comment {CommentId} reported by user {UserId} for reason: {Reason}", 
+                await
+                    _dbContext
+                    .SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation("Comment {CommentId} reported by user {UserId} for reason: {Reason}",
                     commentId, userId, reason);
 
-                // Notify admins via SignalR (if admin hub group is set up)
-                await _signalRService.SendToGroupAsync("Admins", "ReceiveNewCommentReport", new
-                {
-                    ReportId = report.Id,
-                    CommentId = report.CommentId,
-                    ReportedBy = report.ReportedByUserId,
-                    Reason = report.Reason,
-                    CreatedAt = report.CreatedAt
-                });
+                report
+                    .Status = "Sent"; // Update status to indicate report has been sent
+
+                await
+                    _dbContext
+                    .SaveChangesAsync(cancellationToken);
+
+                // Send notification to admins
+                await 
+                    _signalRService
+                    .SendToGroupAsync("Admins", "ReceiveNewCommentReport", report);
 
                 return true;
             }
@@ -890,81 +1000,18 @@ namespace ActioNator.Services.Implementations.Community
                 throw;
             }
         }
-        
-        public async Task<PostCommentViewModel> RestoreCommentAsync(Guid commentId, Guid userId)
-        {
-            if (commentId == Guid.Empty || userId == Guid.Empty)
-            {
-                throw new ArgumentException(
-                    commentId == Guid.Empty ? nameof(commentId) : nameof(userId));
-            }
-
-            try
-            {
-                // Find the comment with its author and post
-                var comment = await _dbContext.Comments
-                    .Include(c => c.Author)
-                    .Include(c => c.Post)
-                    .FirstOrDefaultAsync(c => c.Id == commentId);
-                    
-                if (comment == null)
-                {
-                    _logger.LogWarning("Attempted to restore non-existent comment {CommentId} by user {UserId}", commentId, userId);
-                    return null; // Comment not found
-                }
-                
-                // Check if user is authorized to restore the comment (only administrators)
-                var user = await _dbContext.Users.FindAsync(userId);
-                bool isAdmin = user != null && await _dbContext.UserRoles
-                    .AnyAsync(ur => ur.UserId == userId && 
-                             _dbContext.Roles.Any(r => r.Id == ur.RoleId && r.Name == "Administrator"));
-                             
-                if (!isAdmin)
-                {
-                    _logger.LogWarning("Unauthorized attempt to restore comment {CommentId} by non-admin user {UserId}", commentId, userId);
-                    return null; // Not authorized
-                }
-                
-                // Only restore if the comment is actually deleted
-                if (!comment.IsDeleted)
-                {
-                    _logger.LogInformation("Comment {CommentId} is not deleted, no need to restore", commentId);
-                    return MapCommentToViewModel(comment, userId); // Already active
-                }
-                
-                // Restore the comment
-                comment.IsDeleted = false;
-                
-                // Save changes
-                _dbContext.Comments.Update(comment);
-                await _dbContext.SaveChangesAsync();
-                
-                // Log the restoration
-                _logger.LogInformation("Comment {CommentId} restored by admin {UserId}", commentId, userId);
-                
-                // Map to view model
-                var commentViewModel = MapCommentToViewModel(comment, userId);
-                
-                // Notify via SignalR
-                await _signalRService.SendToAllAsync("ReceiveNewComment", commentViewModel);
-                
-                return commentViewModel;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error restoring comment {CommentId} by user {UserId}", commentId, userId);
-                throw;
-            }
-        }
 
         #region Private Helper Methods
         private PostCardViewModel? MapPostToViewModel(Post post, Guid userId)
         {
             if (post == null) return null;
-            
-            // Check if the current user has liked this post
-            bool isLiked = post.Likes != null && 
-                          post.Likes.Any(l => l.UserId == userId && l.IsActive);
+
+            List<Comment>? filteredComments 
+                = post
+                .Comments?
+                .Where(c => !c.IsDeleted)
+                .OrderByDescending(c => c.CreatedAt)
+                .ToList();
 
             return new PostCardViewModel
             {
@@ -972,29 +1019,35 @@ namespace ActioNator.Services.Implementations.Community
                 Content = post.Content,
                 CreatedAt = post.CreatedAt,
                 AuthorId = post.UserId,
-                AuthorName = post.ApplicationUser?.UserName ?? "Unknown",
-                AuthorProfilePicture = post.ApplicationUser?.ProfilePictureUrl ?? "/img/default-profile.png",
+                AuthorName = post.ApplicationUser.UserName!,
+                AuthorProfilePicture 
+                    = post.ApplicationUser?
+                    .ProfilePictureUrl!,
                 LikeCount = post.LikesCount,
-                CommentCount = post.Comments?.Count(c => !c.IsDeleted) ?? 0,
-                IsLiked = isLiked,
+                CommentCount = filteredComments?.Count ?? 0,
+                IsLiked = post.Likes?
+                    .Any(l => l.UserId == userId 
+                        && l.IsActive) ?? false,
                 IsAuthor = post.UserId == userId,
                 IsPublic = post.IsPublic,
                 IsDeleted = post.IsDeleted,
-                Comments 
-                = post.Comments?
-                    .Where(c => !c.IsDeleted)
-                    .OrderByDescending(c => c.CreatedAt)
+                Comments = filteredComments?
                     .Select(c => MapCommentToViewModel(c, userId))
-                    .ToList(),
-                Images = post.PostImages?
-                    .Select(i => new PostImageViewModel
-                    {
-                        Id = i.Id,
-                        PostId = i.PostId ?? Guid.Empty,
-                        ImageUrl = i.ImageUrl,
-                        CreatedAt = DateTime.UtcNow // Default value since PostImage doesn't have CreatedAt
-                    })
-                    .ToList()
+                    .ToList()!,
+                Images = post
+                    .PostImages?
+                    .Select(MapImageToViewModel)
+                    .ToList()!,
+            };
+        }
+
+        private PostImageViewModel MapImageToViewModel(PostImage image)
+        {
+            return new PostImageViewModel
+            {
+                Id = image.Id,
+                PostId = image.PostId!.Value,
+                ImageUrl = image.ImageUrl,
             };
         }
 
@@ -1002,9 +1055,10 @@ namespace ActioNator.Services.Implementations.Community
         {
             if (comment == null) return null;
 
-            // Check if the current user has liked this comment
-            bool isLiked = comment.Likes != null && 
-                          comment.Likes.Any(l => l.UserId == userId && l.IsActive);
+            bool isLiked = comment
+                .Likes?
+                .Any(l => l.UserId == userId 
+                    && l.IsActive) ?? false;
 
             return new PostCommentViewModel
             {
@@ -1012,8 +1066,8 @@ namespace ActioNator.Services.Implementations.Community
                 Content = comment.Content,
                 CreatedAt = comment.CreatedAt,
                 AuthorId = comment.AuthorId,
-                AuthorName = comment.Author.UserName,
-                AuthorProfilePicture = comment.Author.ProfilePictureUrl ?? "/images/default-profile.png",
+                AuthorName = comment.Author?.UserName!,
+                AuthorProfilePicture = comment.Author?.ProfilePictureUrl!,
                 TimeAgo = GetTimeAgo(comment.CreatedAt),
                 LikeCount = comment.LikesCount,
                 IsAuthor = comment.AuthorId == userId,
@@ -1025,20 +1079,30 @@ namespace ActioNator.Services.Implementations.Community
 
         private string GetTimeAgo(DateTime dateTime)
         {
-            var timeSpan = DateTime.UtcNow - dateTime;
+            // Ensure UTC comparison to avoid time zone mismatches
+            if (dateTime.Kind != DateTimeKind.Utc)
+                dateTime = dateTime.ToUniversalTime();
 
-            if (timeSpan.TotalMinutes < 1)
+            TimeSpan timeSpan = DateTime.UtcNow - dateTime;
+
+            int minutes = (int)Math.Floor(timeSpan.TotalMinutes);
+            int hours = (int)Math.Floor(timeSpan.TotalHours);
+            int days = (int)Math.Floor(timeSpan.TotalDays);
+            int months = days / 30;
+            int years = days / 365;
+
+            if (minutes < 1)
                 return "Just now";
-            if (timeSpan.TotalMinutes < 60)
-                return $"{(int)timeSpan.TotalMinutes} minute{(timeSpan.TotalMinutes == 1 ? "" : "s")} ago";
-            if (timeSpan.TotalHours < 24)
-                return $"{(int)timeSpan.TotalHours} hour{(timeSpan.TotalHours == 1 ? "" : "s")} ago";
-            if (timeSpan.TotalDays < 30)
-                return $"{(int)timeSpan.TotalDays} day{(timeSpan.TotalDays == 1 ? "" : "s")} ago";
-            if (timeSpan.TotalDays < 365)
-                return $"{(int)(timeSpan.TotalDays / 30)} month{((int)(timeSpan.TotalDays / 30) == 1 ? "" : "s")} ago";
+            if (minutes < 60)
+                return $"{minutes} minute{(minutes == 1 ? "" : "s")} ago";
+            if (hours < 24)
+                return $"{hours} hour{(hours == 1 ? "" : "s")} ago";
+            if (days < 30)
+                return $"{days} day{(days == 1 ? "" : "s")} ago";
+            if (days < 365)
+                return $"{months} month{(months == 1 ? "" : "s")} ago";
 
-            return $"{(int)(timeSpan.TotalDays / 365)} year{((int)(timeSpan.TotalDays / 365) == 1 ? "" : "s")} ago";
+            return $"{years} year{(years == 1 ? "" : "s")} ago";
         }
 
         #endregion

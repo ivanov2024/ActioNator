@@ -4,8 +4,10 @@ using ActioNator.Services.Exceptions;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
-using ActioNator.GCommon;
 using ActioNator.Services.Interfaces.FileServices;
+
+using static ActioNator.GCommon.FileConstants.ContentTypes;
+using static ActioNator.GCommon.FileConstants.ErrorMessages;
 
 namespace ActioNator.Services.Validators
 {
@@ -41,7 +43,7 @@ namespace ActioNator.Services.Validators
         /// <param name="contentType">Content type to check</param>
         /// <returns>True if this validator can handle the content type, false otherwise</returns>
         public override bool CanHandleFileType(string contentType)
-            => _contentInspector.CanHandleContentType(contentType);
+            => IsSupported(contentType);
 
         /// <summary>
         /// Performs image-specific validation
@@ -83,7 +85,7 @@ namespace ActioNator.Services.Validators
                         = $"File extension '{extension}' is not allowed for images. Allowed extensions are: {string.Join(", ", _allowedExtensions)}";
                     _logger
                         .LogWarning(errorMessage);
-                    throw new FileContentTypeException(FileConstants.ErrorMessages.InvalidFileType);
+                    throw new FileContentTypeException(InvalidFileType);
                 }
 
                 // Verify actual file content matches claimed type
@@ -112,7 +114,7 @@ namespace ActioNator.Services.Validators
                         = $"File '{file.FileName}' content does not match its claimed type '{contentType}'.";
                     _logger
                         .LogWarning(errorMessage);
-                    throw new FileContentTypeException(FileConstants.ErrorMessages.ContentTypeMismatch);
+                    throw new FileContentTypeException(ContentTypeMismatch);
                 }
             }
             catch (FileContentTypeException)

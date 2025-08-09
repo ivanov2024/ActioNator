@@ -5,7 +5,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Http;
-using ActioNator.GCommon;
+
+using static ActioNator.GCommon.FileConstants.ContentTypes;
+using static ActioNator.GCommon.FileConstants.ErrorMessages;
 
 namespace ActioNator.Services.Implementations.FileServices
 {
@@ -216,7 +218,8 @@ namespace ActioNator.Services.Implementations.FileServices
             try
             {
                 // Get the full path
-                string fullPath = _fileSystem
+                string fullPath = 
+                    _fileSystem
                     .CombinePaths(_webHostEnvironment.ContentRootPath, filePath);
                 
                 // Check if file exists
@@ -224,23 +227,17 @@ namespace ActioNator.Services.Implementations.FileServices
                 {
                     _logger
                         .LogWarning("File {FilePath} not found", fullPath);
-                    throw new FileNotFoundException(FileConstants.ErrorMessages.FileNotFound, fullPath);
+                    throw new FileNotFoundException(FileNotFound, fullPath);
                 }
                 
                 // Determine content type based on extension
                 string extension = _fileSystem
-                    .GetExtension(fullPath).ToLowerInvariant();
-
-                string contentType = extension switch
-                {
-                    FileConstants.FileExtensions.Pdf => FileConstants.ContentTypes.Pdf,
-                    FileConstants.FileExtensions.Jpeg or FileConstants.FileExtensions.JpegAlt => FileConstants.ContentTypes.Jpeg,
-                    FileConstants.FileExtensions.Png => FileConstants.ContentTypes.Png,
-                    FileConstants.FileExtensions.Gif => FileConstants.ContentTypes.Gif,
-                    FileConstants.FileExtensions.Webp => FileConstants.ContentTypes.Webp,
-                    _ => "application/octet-stream"
-                };
+                    .GetExtension(fullPath)
+                    .ToLowerInvariant();
                 
+                string contentType =
+                    Supported.First(s => s == extension);
+
                 // Open file stream
                 Stream fileStream = _fileSystem.OpenRead(fullPath);
                 

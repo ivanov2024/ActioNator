@@ -115,8 +115,12 @@ namespace ActioNator.Areas.User.Controllers
                     }
                 }
                 
+                CancellationToken cancelationToken = new();
+
                 // Create the post with images
-                var post = await _communityService.CreatePostAsync(content, userId, images);
+                PostCardViewModel post 
+                    = await _communityService
+                    .CreatePostAsync(content, userId, cancelationToken,  images);
                 
                 // Broadcast the new post to all connected clients
                 if (post != null)

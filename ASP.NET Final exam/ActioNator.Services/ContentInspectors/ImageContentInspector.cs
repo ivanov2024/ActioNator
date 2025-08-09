@@ -1,7 +1,8 @@
+using ActioNator.Services.Interfaces.FileServices;
 using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
-using ActioNator.GCommon;
-using ActioNator.Services.Interfaces.FileServices;
+
+using static ActioNator.GCommon.FileConstants;
 
 namespace ActioNator.Services.ContentInspectors
 {
@@ -25,22 +26,17 @@ namespace ActioNator.Services.ContentInspectors
         public ImageContentInspector(ILogger<ImageContentInspector> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            
+
             // Initialize signature map for different image formats
-            _signatureMap 
-                = new (StringComparer.OrdinalIgnoreCase)
+            _signatureMap = new(StringComparer.OrdinalIgnoreCase)
             {
-                { FileConstants.ContentTypes.Jpeg, new[] { FileConstants.FileSignatures.Jpeg } },
-                { FileConstants.ContentTypes.Png, new[] { FileConstants.FileSignatures.Png } },
-
-                { FileConstants.ContentTypes.Gif, new[] 
-                { FileConstants.FileSignatures.Gif87a, FileConstants.FileSignatures.Gif89a } },
-
-                { FileConstants.ContentTypes.Webp, new[] { FileConstants.FileSignatures.WebP } },
-                { FileConstants.ContentTypes.Bmp, new[] { FileConstants.FileSignatures.Bmp } },
-
-                { FileConstants.ContentTypes.Tiff, new[] 
-                { FileConstants.FileSignatures.TiffI, FileConstants.FileSignatures.TiffM } }
+                { "image/jpeg", new[] { FileSignatures.Jpeg } },
+                { "image/png", new[] { FileSignatures.Png } },
+                { "image/gif", new[] { FileSignatures.Gif87a, FileSignatures.Gif89a } },
+                { "image/webp", new[] { FileSignatures.WebP } },
+                { "image/bmp", new[] { FileSignatures.Bmp } },
+                { "image/tiff", new[] { FileSignatures.TiffI, FileSignatures.TiffM } },
+                { "application/pdf", new[] { FileSignatures.Pdf } }
             };
         }
         
@@ -83,13 +79,16 @@ namespace ActioNator.Services.ContentInspectors
                 byte[] header = new byte[maxSignatureLength];
                 
                 // Read the header
-                await stream
-                    .ReadAsync(header, 0, maxSignatureLength, cancellationToken);
+                await 
+                    stream
+                    .ReadAsync(header.AsMemory
+                        (0, maxSignatureLength), cancellationToken);
                 
                 // Check if the header matches any of the signatures
                 bool isValidHeader 
                     = signatures
-                    .Any(signature => ByteArrayStartsWith(header, signature));
+                    .Any(signature 
+                        => ByteArrayStartsWith(header, signature));
                 
                 if (!isValidHeader)
                 {
@@ -107,24 +106,6 @@ namespace ActioNator.Services.ContentInspectors
                     .LogError(ex, "Error inspecting image content for file {FileName}", file.FileName);
                 return false;
             }
-        }
-        
-        /// <summary>
-        /// Determines if this inspector can handle the given content type
-        /// </summary>
-        /// <param name="contentType">Content type to check</param>
-        /// <returns>True if this inspector can handle the content type, false otherwise</returns>
-        public bool CanHandleContentType(string contentType)
-        {
-            if (string.IsNullOrEmpty(contentType))
-                return false;
-                
-            contentType = contentType.ToLowerInvariant();
-            
-            // Check if it's a specific image type we support 
-            // or if it's a generic image type
-            return _signatureMap.ContainsKey(contentType) || 
-            contentType.StartsWith("image/");
         }
 
         #region Private Helper Method

@@ -19,12 +19,5 @@ namespace ActioNator.Services.Interfaces.FileServices
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>True if the content is valid, false otherwise</returns>
         Task<bool> IsValidContentAsync(IFormFile file, CancellationToken cancellationToken = default);
-        
-        /// <summary>
-        /// Determines if this inspector can handle the given content type
-        /// </summary>
-        /// <param name="contentType">Content type to check</param>
-        /// <returns>True if this inspector can handle the content type, false otherwise</returns>
-        bool CanHandleContentType(string contentType);
     }
 }

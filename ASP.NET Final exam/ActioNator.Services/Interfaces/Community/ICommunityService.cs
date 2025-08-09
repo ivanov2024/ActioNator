@@ -16,7 +16,15 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="userId">Current user ID (used for personalization, e.g., like status).</param>
         /// <param name="status">Optional filter by post status (null for all posts).</param>
         /// <returns>Collection of post view models.</returns>
-        Task<IEnumerable<PostCardViewModel>> GetAllPostsAsync(Guid? userId, string status = null);
+        Task<IReadOnlyList<PostCardViewModel>> GetAllPostsAsync
+        (
+            Guid userId,
+            string status = null,
+            int pageNumber = 1,
+            int pageSize = 20,
+            bool isAdmin = false,
+            CancellationToken cancellationToken = default
+        );
 
         /// <summary>
         /// Gets a post by ID.
@@ -24,19 +32,11 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="postId">Post ID.</param>
         /// <param name="userId">Current user ID (used for personalization, e.g., like status).</param>
         /// <returns>Post view model.</returns>
-        Task<PostCardViewModel> GetPostByIdAsync(Guid postId, Guid? userId);
+        Task<PostCardViewModel?> GetPostByIdAsync(Guid postId, Guid userId);
 
         #endregion
 
         #region Post Creation
-
-        /// <summary>
-        /// Creates a new post.
-        /// </summary>
-        /// <param name="content">Post content.</param>
-        /// <param name="userId">Author ID.</param>
-        /// <returns>Created post view model.</returns>
-        Task<PostCardViewModel> CreatePostAsync(string content, Guid userId);
 
         /// <summary>
         /// Creates a new post with images.
@@ -45,7 +45,14 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="userId">Author ID.</param>
         /// <param name="images">List of image files to upload.</param>
         /// <returns>Created post view model.</returns>
-        Task<PostCardViewModel> CreatePostAsync(string content, Guid userId, List<IFormFile> images);
+        Task<PostCardViewModel> CreatePostAsync
+        (
+            string content,
+            Guid userId,
+            CancellationToken
+            cancellationToken,
+            List<IFormFile>? images = null
+        );
 
         #endregion
 
@@ -57,7 +64,14 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="postId">Post ID.</param>
         /// <param name="userId">User ID performing the action.</param>
         /// <returns>New likes count.</returns>
-        Task<int> ToggleLikePostAsync(Guid postId, Guid userId);
+        Task<int> ToggleLikePostAsync
+        (
+            Guid postId,
+            Guid userId,
+            CancellationToken
+            cancellationToken
+            = default
+        );
 
         /// <summary>
         /// Reports a post.
@@ -66,7 +80,16 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="reason">Report reason.</param>
         /// <param name="userId">User ID submitting the report.</param>
         /// <returns>Success status.</returns>
-        Task<bool> ReportPostAsync(Guid postId, string reason, Guid userId);
+        Task<bool> ReportPostAsync
+         (
+             Guid postId,
+             string reason,
+             Guid userId,
+             CancellationToken
+             cancellationToken
+             = default,
+             string details = ""
+         );
 
         #endregion
 
@@ -78,7 +101,14 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="commentId">Comment ID.</param>
         /// <param name="userId">User ID performing the action.</param>
         /// <returns>New likes count.</returns>
-        Task<int> ToggleLikeCommentAsync(Guid commentId, Guid userId);
+        Task<int> ToggleLikeCommentAsync
+        (
+            Guid commentId,
+            Guid userId,
+            CancellationToken
+            cancellationToken
+            = default
+        );
 
         /// <summary>
         /// Reports a comment.
@@ -87,7 +117,15 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="reason">Report reason.</param>
         /// <param name="userId">User ID submitting the report.</param>
         /// <returns>Success status.</returns>
-        Task<bool> ReportCommentAsync(Guid commentId, string reason, Guid userId);
+        Task<bool> ReportCommentAsync
+        (
+            Guid commentId,
+            string reason,
+            Guid userId,
+            CancellationToken
+            cancellationToken = default,
+            string details = ""
+        );
 
         #endregion
 
@@ -100,7 +138,14 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="content">Comment content.</param>
         /// <param name="userId">Author ID.</param>
         /// <returns>Created comment view model.</returns>
-        Task<PostCommentViewModel> AddCommentAsync(Guid postId, string content, Guid userId);
+        Task<PostCommentViewModel> AddCommentAsync
+        (Guid postId,
+            string content,
+            Guid userId,
+            CancellationToken
+            cancellationToken =
+            default
+        );
 
         /// <summary>
         /// Gets a comment by ID.
@@ -109,14 +154,6 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="userId">Current user ID (for personalization).</param>
         /// <returns>Comment view model.</returns>
         Task<PostCommentViewModel> GetCommentByIdAsync(Guid commentId, Guid userId);
-
-        /// <summary>
-        /// Restores a deleted comment.
-        /// </summary>
-        /// <param name="commentId">Comment ID.</param>
-        /// <param name="userId">User ID (for authorization).</param>
-        /// <returns>Restored comment view model.</returns>
-        Task<PostCommentViewModel> RestoreCommentAsync(Guid commentId, Guid userId);
 
         #endregion
 
@@ -128,7 +165,14 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="postId">Post ID.</param>
         /// <param name="userId">User ID (for authorization).</param>
         /// <returns>Success status.</returns>
-        Task<bool> DeletePostAsync(Guid postId, Guid userId);
+        Task<bool> DeletePostAsync
+        (
+            Guid postId,
+            Guid userId,
+            CancellationToken
+            cancellationToken =
+            default
+        );
 
         /// <summary>
         /// Deletes a comment.
@@ -136,7 +180,14 @@ namespace ActioNator.Services.Interfaces.Community
         /// <param name="commentId">Comment ID.</param>
         /// <param name="userId">User ID (for authorization).</param>
         /// <returns>Success status.</returns>
-        Task<bool> DeleteCommentAsync(Guid commentId, Guid userId);
+        Task<bool> DeleteCommentAsync
+        (
+            Guid commentId,
+            Guid userId,
+            CancellationToken
+            cancellationToken =
+            default
+        );
 
         #endregion
     }

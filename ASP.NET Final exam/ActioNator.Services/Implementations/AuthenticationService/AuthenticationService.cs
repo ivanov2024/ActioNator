@@ -43,7 +43,8 @@ namespace ActioNator.Services.Implementations.AuthenticationService
             {
                 // Find user by email
                 ApplicationUser? user 
-                    = await _userManager.FindByEmailAsync(email);
+                    = await _userManager
+                    .FindByEmailAsync(email);
 
                 if (user == null)
                 {
@@ -123,9 +124,10 @@ namespace ActioNator.Services.Implementations.AuthenticationService
                 user.Id = Guid.NewGuid();
 
                 await _userStore
-                    .SetUserNameAsync(user, firstName + lastName, CancellationToken.None);
+                    .SetUserNameAsync(user,email, CancellationToken.None);
 
-                await _emailStore.SetEmailAsync(user, email, CancellationToken.None);
+                await _emailStore
+                    .SetEmailAsync(user, email, CancellationToken.None);
 
                 user.FirstName = firstName;
                 user.LastName = lastName;
@@ -142,7 +144,11 @@ namespace ActioNator.Services.Implementations.AuthenticationService
                     return (false, string.Empty, result.Errors.Select(e => e.Description));
                 }
 
-                IdentityResult roleResult = await _userManager.AddToRoleAsync(user, RoleConstants.User);
+                IdentityResult roleResult = 
+                    await 
+                    _userManager
+                    .AddToRoleAsync(user, RoleConstants.User);
+
                 if (!roleResult.Succeeded)
                 {
                     _logger.LogWarning("Adding role failed: {Errors}",

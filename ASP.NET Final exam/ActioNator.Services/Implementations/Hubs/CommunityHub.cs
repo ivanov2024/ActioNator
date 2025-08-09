@@ -165,51 +165,5 @@ namespace ActioNator.Hubs
                 throw new HubException($"Error deleting comment: {ex.Message}");
             }
         }
-        
-        /// <summary>
-        /// Restores a deleted comment
-        /// </summary>
-        /// <param name="commentId">The ID of the comment to restore</param>
-        public async Task RestoreComment(Guid commentId)
-        {
-            try
-            {
-                // Get the current user ID from the connection context
-                var userId = Context.GetHttpContext().User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-                if (string.IsNullOrEmpty(userId))
-                {
-                    throw new HubException("User not authenticated");
-                }
-                
-                // Check if user is an administrator (only admins can restore comments)
-                var isAdmin = Context.GetHttpContext().User.IsInRole("Administrator");
-                if (!isAdmin)
-                {
-                    throw new HubException("Only administrators can restore comments");
-                }
-                
-                // Get the comment to restore
-                var comment = await _communityService.GetCommentByIdAsync(commentId, Guid.Parse(userId));
-                if (comment == null)
-                {
-                    throw new HubException("Comment not found");
-                }
-                
-                // Restore the comment using the community service
-                // Assuming there's a RestoreCommentAsync method in the service
-                var restoredComment = await _communityService.RestoreCommentAsync(commentId, Guid.Parse(userId));
-                if (restoredComment == null)
-                {
-                    throw new HubException("Failed to restore comment");
-                }
-                
-                // Broadcast the restored comment to all clients
-                await BroadcastNewComment(restoredComment);
-            }
-            catch (Exception ex)
-            {
-                throw new HubException($"Error restoring comment: {ex.Message}");
-            }
-        }
     }
 }
