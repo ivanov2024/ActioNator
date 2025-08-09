@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 
 using ActioNator.GCommon;
 using static ActioNator.GCommon.ValidationConstants.ApplicationUser;
+using ActioNator.Services.Interfaces.InputSanitizationService;
+using System.Reflection;
 
 namespace ActioNator.Areas.Identity.Pages.Account
 {
@@ -17,6 +19,7 @@ namespace ActioNator.Areas.Identity.Pages.Account
     {
         private readonly IAuthenticationService _authService;
         private readonly ILogger<AccessModel> _logger;
+        private readonly IInputSanitizationService _inputSanitizationService;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="AccessModel"/> class.
@@ -25,10 +28,16 @@ namespace ActioNator.Areas.Identity.Pages.Account
         /// <param name="logger">The logger</param>
         public AccessModel(
             IAuthenticationService authService,
-            ILogger<AccessModel> logger)
+            ILogger<AccessModel> logger, IInputSanitizationService inputSanitizationService)
         {
-            _authService = authService ?? throw new ArgumentNullException(nameof(authService));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _authService = authService 
+                ?? throw new ArgumentNullException(nameof(authService));
+
+            _logger = logger 
+                ?? throw new ArgumentNullException(nameof(logger));
+
+            _inputSanitizationService = inputSanitizationService
+                ?? throw new ArgumentNullException(nameof(inputSanitizationService));
         }
 
 
@@ -104,6 +113,22 @@ namespace ActioNator.Areas.Identity.Pages.Account
                     return Page();
                 }
 
+                foreach (PropertyInfo prop in typeof(RegisterInputModel).GetProperties())
+                {
+                    // Sanitize each property value
+                    string value 
+                        = prop
+                        .GetValue(RegisterInput)?
+                        .ToString() ?? string.Empty;
+
+                    string sanitizedValue = 
+                        _inputSanitizationService
+                        .SanitizeString(value);
+
+                    prop
+                        .SetValue(RegisterInput, sanitizedValue);
+                }
+
                 // Register user
                 var (succeeded, redirectPath, errorMessages) 
                     = await _authService
@@ -161,6 +186,22 @@ namespace ActioNator.Areas.Identity.Pages.Account
                 if (!ModelState.IsValid)
                 {
                     return Page();
+                }
+
+                foreach (PropertyInfo prop in typeof(LoginInputModel).GetProperties())
+                {
+                    // Sanitize each property value
+                    string value
+                        = prop
+                        .GetValue(LoginInput)?
+                        .ToString() ?? string.Empty;
+
+                    string sanitizedValue =
+                        _inputSanitizationService
+                        .SanitizeString(value);
+
+                    prop
+                        .SetValue(LoginInput, sanitizedValue);
                 }
 
                 // Authenticate user
