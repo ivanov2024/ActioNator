@@ -17,14 +17,13 @@ namespace ActioNator.Services.Implementations.UserDashboard
             => _dbContext = dbContext 
             ?? throw new ArgumentNullException(nameof(dbContext));
         
-
         public async Task<DashboardViewModel> GetDashboardDataAsync(Guid userId, ApplicationUser user)
         {
             DashboardViewModel dashboardViewModel 
                 = new ()
             {
                 UserName 
-                    = user.UserName!,
+                    = user.FirstName + " " + user.LastName,
                 ActiveGoalsCount 
                     = await GetActiveGoalsCountAsync(userId),
                 JournalEntriesCount 
@@ -46,123 +45,148 @@ namespace ActioNator.Services.Implementations.UserDashboard
             .Where(g => g.ApplicationUserId == userId 
                 && !g.IsCompleted)
             .CountAsync();
-        
 
         private async Task<int> GetJournalEntriesCountAsync(Guid userId)
             => await _dbContext
             .JournalEntries
+            .AsNoTracking()
             .Where(j => j.UserId == userId)
             .CountAsync();
-        
-
-        private int CalculateUserStreak(ApplicationUser user)
-        {
-            if (user.LastLoginAt == null)
-                return 0;
-            
-            // Get the current date at midnight for comparison
-            DateTime today = DateTime.Today;
-            DateTime? lastLogin = user.LastLoginAt.Value.Date;
-
-            // If the user hasn't logged in today or yesterday, streak is broken
-            if (lastLogin < today.AddDays(-1))
-                 return 0;
-            
-            // Count consecutive days logged in by checking login history
-            int streakCount = 0;
-            DateTime currentDate = today;
-
-            // Only checking up to 100 days back to avoid excessive processing :)
-            for (int i = 0; i < 100; i++)
-            {
-                // Check if there's a login record for this date
-                bool hasLoginForDate 
-                    = _dbContext
-                    .UserLoginHistories
-                    .Any(uhl => uhl.UserId == user.Id 
-                    && uhl.LoginDate.Date == currentDate.AddDays(-i));
-
-                if (hasLoginForDate)
-                {
-                    streakCount++;
-                }
-                else
-                {
-                    // Break the streak if a day was missed
-                    break;
-                }
-            }
-
-            return streakCount;
-        }
 
         private async Task<IEnumerable<WorkoutCardViewModel>> GetRecentWorkoutsAsync(Guid userId)
-            =>  await _dbContext
-                .Workouts
-                .Where(w => w.UserId == userId)
-                .OrderByDescending(w => w.CompletedAt)
-                .Take(3)
-                .Select(w => new WorkoutCardViewModel
-                    {
-                        Id = w.Id,
-                        Title = w.Title,
-                        Duration = w.Duration,
-                        CompletedAt = w.CompletedAt
-                    })
-                .ToListAsync();
-
+            =>  await 
+            _dbContext
+            .Workouts
+            .AsNoTracking()
+            .Where(w => w.UserId == userId)
+            .OrderByDescending(w => w.CompletedAt)
+            .Take(3)
+            .Select(w => new WorkoutCardViewModel
+                {
+                    Id = w.Id,
+                    Title = w.Title,
+                    Duration = w.Duration,
+                    CompletedAt = w.CompletedAt
+                })
+            .ToListAsync();
 
         private async Task<IEnumerable<PostCardViewModel>> GetRecentPostsAsync(Guid userId)
-            => await _dbContext
+        {
+            List<Post>? posts 
+                = await 
+                _dbContext
                 .Posts
+                .AsNoTracking()
                 .Where(p => p.UserId == userId)
                 .OrderByDescending(p => p.CreatedAt)
                 .Take(3)
                 .Include(p => p.ApplicationUser)
                 .Include(p => p.PostImages)
-                .Include(p => p.Comments).ThenInclude(c => c.Author)
+                .Include(p => p.Comments)
+                .ThenInclude(c => c.Author)
                 .AsSplitQuery()
+                .ToListAsync();
+
+            // Map to view models in memory to safely use GetTimeAgo()
+            IEnumerable<PostCardViewModel>? result 
+                = posts
                 .Select(p => new PostCardViewModel
                 {
                     Id = p.Id,
                     Content = p.Content!,
                     AuthorId = p.UserId,
-                    AuthorName = p.ApplicationUser.UserName!,
-                    ProfilePictureUrl = p.ApplicationUser.ProfilePictureUrl,
+                    AuthorName 
+                        = p.ApplicationUser?.UserName!,
+                    ProfilePictureUrl 
+                        = p.ApplicationUser?.ProfilePictureUrl!,
                     CreatedAt = p.CreatedAt,
                     LikesCount = p.LikesCount,
-                    CommentsCount = p.Comments.Count,
+                    CommentsCount 
+                        = p.Comments?
+                        .Count(c => !c.IsDeleted) ?? 0,
                     SharesCount = p.SharesCount,
                     TimeAgo = GetTimeAgo(p.CreatedAt),
                     IsAuthor = p.UserId == userId,
                     IsPublic = p.IsPublic,
                     IsDeleted = p.IsDeleted,
                     ImageUrl = p.ImageUrl,
-                    Images = p.PostImages
+                    Images = p.PostImages?
                         .Select(pi => new PostImagesViewModel
-                    {
-                        Id = pi.Id,
-                        ImageUrl = pi.ImageUrl,
-                        PostId = pi.PostId,
-                    }),
-                    Comments = p.Comments
+                        {
+                            Id = pi.Id,
+                            ImageUrl = pi.ImageUrl,
+                            PostId = pi.PostId ?? Guid.Empty,
+                        }).ToList() ?? [],
+                    Comments 
+                        = p.Comments?
+                        .Where(c => !c.IsDeleted)
                         .Select(c => new PostCommentsViewModel
                         {
                             Id = c.Id,
                             Content = c.Content,
-                            AuthorName = c.Author.UserName!,
+                            AuthorName = c.Author?.UserName!,
                             AuthorId = c.AuthorId,
-                            ProfilePictureUrl = c.Author.ProfilePictureUrl,
+                            ProfilePictureUrl = c.Author?.ProfilePictureUrl!,
                             CreatedAt = c.CreatedAt,
                             LikesCount = c.LikesCount,
                             TimeAgo = GetTimeAgo(c.CreatedAt),
                             IsDeleted = c.IsDeleted,
                             IsAuthor = c.AuthorId == userId,
-                        })
-                })
-                .ToListAsync();
-        
+                        }).ToList() ?? []
+                });
+
+            return result;
+        }
+
         #region Helper Method
+
+        private int CalculateUserStreak(ApplicationUser user)
+        {
+            if (user.LastLoginAt == null)
+                return 0;
+
+            DateTime today = DateTime.Today;
+
+            // Fetch all login dates for this user from last 100 days (or since earliest allowed date)
+            DateTime cutoffDate = today
+                .AddDays(-99); // including today counts as day 0
+
+            List<DateTime>? loginDates 
+                = _dbContext
+                .UserLoginHistories
+                .Where(uhl => uhl.UserId == user.Id 
+                    && uhl.LoginDate.Date >= cutoffDate)
+                .Select(uhl => uhl.LoginDate.Date)
+                .Distinct()
+                .OrderByDescending(d => d)
+                .ToList();
+
+            if (loginDates.Count == 0 
+                || loginDates.First() < today.AddDays(-1))
+                return 0; // Streak broken if last login is before yesterday
+
+            int streakCount = 0;
+            DateTime streakDate = today;
+
+            foreach (DateTime loginDate in loginDates)
+            {
+                if (loginDate == streakDate 
+                    || loginDate == streakDate.AddDays(-1))
+                {
+                    streakCount++;
+                    streakDate = streakDate.AddDays(-1);
+                }
+                else if (loginDate < streakDate.AddDays(-1))
+                {
+                    // Missed a day - streak ends
+                    break;
+                }
+                // If loginDate > streakDate, just continue (could be multiple logins same day)
+            }
+
+            return streakCount;
+        }
+
         private static string GetTimeAgo(DateTime dateTime)
         {
             TimeSpan timeSpan 
@@ -177,6 +201,7 @@ namespace ActioNator.Services.Implementations.UserDashboard
                 _ => dateTime.ToString("D", CultureInfo.CurrentCulture),
             };
         }
+
         #endregion
     }
 }
