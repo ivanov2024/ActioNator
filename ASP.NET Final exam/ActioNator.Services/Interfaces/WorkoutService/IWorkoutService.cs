@@ -21,7 +21,7 @@ namespace ActioNator.Services.Interfaces.WorkoutService
         /// <param name="workoutId">The workout ID</param>
         /// <param name="userId">The user's ID (for authorization)</param>
         /// <returns>The workout view model if found, null otherwise</returns>
-        Task<WorkoutCardViewModel?> GetWorkoutByIdAsync(Guid workoutId, Guid? userId);
+        Task<WorkoutCardViewModel?> GetWorkoutByIdAsync(Guid? workoutId, Guid? userId);
 
         /// <summary>
         /// Creates a new workout
@@ -44,7 +44,7 @@ namespace ActioNator.Services.Interfaces.WorkoutService
         /// <param name="workoutId">The workout ID to delete</param>
         /// <param name="userId">The user's ID (for authorization)</param>
         /// <returns>True if successful, false otherwise</returns>
-        Task<bool> DeleteWorkoutAsync(Guid workoutId, Guid? userId);
+        Task<bool> DeleteWorkoutAsync(Guid? workoutId, Guid? userId);
 
         /// <summary>
         /// Adds an exercise to a workout
@@ -68,7 +68,7 @@ namespace ActioNator.Services.Interfaces.WorkoutService
         /// <param name="exerciseId">The exercise ID to delete</param>
         /// <param name="userId">The user's ID (for authorization)</param>
         /// <returns>True if successful, false otherwise</returns>
-        Task<bool> DeleteExerciseAsync(Guid exerciseId, Guid? userId);
+        Task<bool> DeleteExerciseAsync(Guid? exerciseId, Guid? userId);
 
         /// <summary>
         /// Gets all available exercise templates
@@ -82,6 +82,18 @@ namespace ActioNator.Services.Interfaces.WorkoutService
         /// <param name="workoutId">The workout ID to check</param>
         /// <param name="userId">The user ID to check</param>
         /// <returns>True if successful, false otherwise</returns>
-        Task<bool> VerifyWorkoutOwnershipAsync(Guid workoutId, Guid? userId);
+        Task<bool> VerifyWorkoutOwnershipAsync
+        (
+            Guid? workoutId,
+            Guid? userId,
+            CancellationToken cancellationToken = default
+        );
+
+        Task<bool> VerifyExerciseOwnershipAsync
+        (
+            Guid? exerciseId,
+            Guid? userId,
+            CancellationToken cancellationToken = default
+        );
     }
 }

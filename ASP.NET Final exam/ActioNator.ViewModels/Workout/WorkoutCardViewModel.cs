@@ -49,8 +49,8 @@ namespace ActioNator.ViewModels.Workouts
         /// <summary>
         /// Formatted display of the workout duration
         /// </summary>
-        [Display(Name = "Duration")]
-        public string DurationDisplay => $"{(int)Duration.TotalMinutes} mins";
+        //[Display(Name = "Duration")]
+        //public string DurationDisplay => $"{(int)Duration.TotalMinutes} mins";
 
         /// <summary>
         /// Date and time when the workout was completed
@@ -64,8 +64,22 @@ namespace ActioNator.ViewModels.Workouts
         /// </summary>
         [Display(Name = "Completed On")]
         [DataType(DataType.Date)]
-        public string? CompletedDateDisplay => CompletedAt?.ToString("D");
-        
+        public string? CompletedDateDisplay => CompletedAt?.ToString("d");
+
+        [Display(Name = "Completed")]
+        public bool IsCompleted { get; set; }
+
+        [Display(Name = "Created On")]
+        [DataType(DataType.Date)]
+        [Required(ErrorMessage = "Please enter a valid date")]
+        [CustomValidation(typeof(WorkoutCardViewModel), nameof(ValidateDate))]
+        public DateTime? Date { get; set; }
+
+        [Display(Name = "Created On")]
+        [DataType(DataType.Date)]
+        public string? DateDisplay 
+            => Date?.ToString("d");
+
         /// <summary>
         /// Additional notes about the workout
         /// </summary>
@@ -78,11 +92,37 @@ namespace ActioNator.ViewModels.Workouts
         /// Collection of exercises included in this workout
         /// </summary>
         [Display(Name = "Exercises")]
-        [MinLength(1, ErrorMessage = "At least one exercise is required")]
         public IEnumerable<ExerciseViewModel> Exercises 
         { 
             get => _exercises; 
             set => _exercises = value as ICollection<ExerciseViewModel> ?? new HashSet<ExerciseViewModel>(value); 
+        }
+
+        /// <summary>
+        /// Custom validator to ensure a user-provided date is present and valid.
+        /// Enforces: no missing, unparseable, or default(DateTime) values.
+        /// </summary>
+        /// <param name="value">The Date property value (boxed)</param>
+        /// <param name="context">Validation context</param>
+        /// <returns>ValidationResult indicating success or error message</returns>
+        public static ValidationResult? ValidateDate(object value, ValidationContext context)
+        {
+            if (value == null)
+            {
+                return new ValidationResult("Please enter a valid date", new[] { nameof(Date) });
+            }
+
+            if (value is DateTime dt)
+            {
+                if (dt == default(DateTime))
+                {
+                    return new ValidationResult("Please enter a valid date", new[] { nameof(Date) });
+                }
+                return ValidationResult.Success;
+            }
+
+            // Any non-DateTime type is invalid for this property
+            return new ValidationResult("Please enter a valid date", new[] { nameof(Date) });
         }
     }
 }

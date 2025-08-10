@@ -12,7 +12,5 @@ namespace ActioNator.ViewModels.Community
         public string ImageUrl { get; set; } = null!;
         
         public Guid PostId { get; set; }
-        
-        public DateTime CreatedAt { get; set; }
     }
 }

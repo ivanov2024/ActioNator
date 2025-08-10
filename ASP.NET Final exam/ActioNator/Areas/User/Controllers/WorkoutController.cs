@@ -1,5 +1,8 @@
 using ActioNator.Controllers;
+using ActioNator.Data.Models;
 using ActioNator.Extensions;
+using ActioNator.Infrastructure.Attributes;
+using ActioNator.Models;
 using ActioNator.Services.Interfaces.InputSanitizationService;
 using ActioNator.Services.Interfaces.WorkoutService;
 using ActioNator.ViewModels.Workout;
@@ -7,10 +10,11 @@ using ActioNator.ViewModels.Workouts;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Text.Json;
 
 namespace ActioNator.Areas.User.Controllers
 {
-    
+
     [Authorize]
     [Area("User")]
     public class WorkoutController : BaseController
@@ -23,17 +27,886 @@ namespace ActioNator.Areas.User.Controllers
             UserManager<Data.Models.ApplicationUser> userManager,
             IWorkoutService workoutService,
             IInputSanitizationService sanitizationService,
-            ILogger<WorkoutController> logger) 
+            ILogger<WorkoutController> logger)
             : base(userManager)
         {
-            _workoutService = workoutService 
+            _workoutService = workoutService
                 ?? throw new ArgumentNullException(nameof(workoutService));
             _sanitizationService = sanitizationService
                 ?? throw new ArgumentNullException(nameof(sanitizationService));
-            _logger = logger 
+            _logger = logger
                 ?? throw new ArgumentNullException(nameof(logger));
         }
-        
+
+        [HttpGet]
+        public async Task<IActionResult> GetWorkoutJson(Guid id)
+        {
+            Guid? userId = GetUserId();
+            if (userId == null || userId == Guid.Empty)
+            {
+                return Json(new { success = false, toastType = "error", toastMessage = "User not authenticated." });
+            }
+
+            try
+            {
+                var workout = await _workoutService.GetWorkoutByIdAsync(id, userId);
+                if (workout == null)
+                {
+                    return Json(new { success = false, toastType = "error", toastMessage = "Workout not found." });
+                }
+
+                // Load templates to enrich exercises with resolved imageUrl
+                IEnumerable<ExerciseTemplateViewModel> templates = await _workoutService.GetExerciseTemplatesAsync();
+                var templateMap = templates.ToDictionary(t => t.Id, t => t.ImageUrl);
+
+                var exercises = (workout.Exercises ?? Enumerable.Empty<ExerciseViewModel>())
+                    .Select(e => new
+                    {
+                        id = e.Id,
+                        workoutId = e.WorkoutId,
+                        name = e.Name,
+                        sets = e.Sets,
+                        reps = e.Reps,
+                        weight = e.Weight,
+                        notes = e.Notes,
+                        duration = e.Duration,
+                        exerciseTemplateId = e.ExerciseTemplateId,
+                        targetedMuscle = e.TargetedMuscle,
+                        imageUrl = templateMap.TryGetValue(e.ExerciseTemplateId, out var url) && !string.IsNullOrWhiteSpace(url)
+                            ? Url.Content(url!)
+                            : null
+                    })
+                    .ToArray();
+
+                var workoutDto = new
+                {
+                    id = workout.Id,
+                    title = workout.Title,
+                    // Return duration in minutes for easier client handling
+                    duration = (int)workout.Duration.TotalMinutes,
+                    notes = workout.Notes,
+                    date = workout.Date,
+                    completedAt = workout.CompletedAt,
+                    isCompleted = workout.CompletedAt.HasValue,
+                    exercises
+                };
+
+                return Json(new { success = true, workout = workoutDto });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving workout {WorkoutId} for user {UserId}: {ErrorMessage}", id, userId, ex.Message);
+                return Json(new { success = false, toastType = "error", toastMessage = "Error loading workout." });
+            }
+        }
+
+        private async Task<string?> ResolveExerciseImageUrl(Guid templateId)
+        {
+            try
+            {
+                if (templateId == Guid.Empty) return null;
+                IEnumerable<ExerciseTemplateViewModel> templates = await _workoutService.GetExerciseTemplatesAsync();
+                var template = templates.FirstOrDefault(t => t.Id == templateId);
+                if (template == null || string.IsNullOrWhiteSpace(template.ImageUrl)) return null;
+                return Url.Content(template.ImageUrl);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error resolving image URL for template {TemplateId}: {ErrorMessage}", templateId, ex.Message);
+                return null;
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Index()
+        {
+            Guid? userId = GetUserId();
+
+            if (userId == null || userId == Guid.Empty)
+            {
+                return Unauthorized();
+            }
+
+            try
+            {
+                IEnumerable<WorkoutCardViewModel>? workouts
+                    = await
+                    _workoutService
+                    .GetAllWorkoutsAsync(userId.Value);
+
+                return View(workouts);
+            }
+            catch (Exception ex)
+            {
+                _logger
+                    .LogError(ex, "Failed to retrieve workouts for user {UserId}", userId);
+                return View("Error", "Unable to load workouts at this time.");
+            }
+        }
+
+        [HttpGet]
+        public IActionResult New()
+        {
+            return View("NewEditWorkout", new WorkoutCardViewModel());
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetWorkouts()
+        {
+            Guid? userId = GetUserId();
+
+            bool isAjax
+                = Request.Headers.XRequestedWith == "XMLHttpRequest";
+
+            if (userId == null || userId == Guid.Empty)
+            {
+                _logger
+                    .LogCritical("User not authenticated when attempting to get workouts");
+
+                if (isAjax)
+                {
+                    ViewData["Success"] = false;
+                    ViewData["ToastType"] = "error";
+                    ViewData["ToastMessage"] = "Authentication error. Please log in again.";
+
+                    return PartialView("_WorkoutResponsePartial", null);
+                }
+
+                return RedirectToAction("Login", "Account", new { area = "Identity" });
+            }
+
+            try
+            {
+                IEnumerable<WorkoutCardViewModel>? workouts
+                    = await
+                    _workoutService
+                    .GetAllWorkoutsAsync(userId);
+
+                _logger
+                    .LogInformation("Retrieved {Count} workouts for user {UserId}", workouts?.Count() ?? 0, userId);
+
+                if (isAjax)
+                {
+                    return PartialView("_WorkoutsPartial", workouts);
+                }
+
+                return View("Index", workouts);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving workouts for user {UserId}: {ErrorMessage}", userId, ex.Message);
+
+                if (isAjax)
+                {
+                    ViewData["Success"] = false;
+                    ViewData["ToastType"] = "error";
+                    ViewData["ToastMessage"] = "Error retrieving workouts. Please try again.";
+                    return PartialView("_WorkoutResponsePartial", null);
+                }
+
+                return View("Error");
+            }
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> Edit(Guid? id)
+        {
+            if (id == null || id == Guid.Empty)
+            {
+                return BadRequest();
+            }
+
+            Guid? userId = GetUserId();
+
+            WorkoutCardViewModel? workout
+                = await
+                _workoutService
+                .GetWorkoutByIdAsync(id, userId);
+
+            if (workout == null)
+            {
+                return NotFound();
+            }
+
+            // Get exercise templates for the dropdown
+            IEnumerable<ExerciseTemplateViewModel> exerciseTemplates
+                = await
+                _workoutService
+                .GetExerciseTemplatesAsync();
+
+            ViewBag
+                .ExerciseOptions = exerciseTemplates;
+
+            return View("NewEditWorkout", workout);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryTokenFromJson]
+        [Consumes("application/json")]
+        public async Task<IActionResult> Edit([FromBody] WorkoutCardViewModel model)
+        {
+            Guid? userId = GetUserId();
+            bool isAjax = Request.Headers.XRequestedWith == "XMLHttpRequest";
+
+            if (userId == null || userId == Guid.Empty)
+            {
+                _logger.LogWarning("Unauthorized workout edit attempt.");
+                if (isAjax)
+                {
+                    return Json(new { success = false, message = "Unauthorized access." });
+                }
+                return Unauthorized();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Validation failed for workout edit for user {UserId}", userId);
+
+                if (isAjax)
+                {
+                    var errors = ModelState.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
+                    );
+                    return Json(new
+                    {
+                        success = false,
+                        toastType = "error",
+                        toastMessage = "Please fix the validation errors.",
+                        validationErrors = errors
+                    });
+                }
+
+                IEnumerable<ExerciseTemplateViewModel> exerciseTemplates = await _workoutService.GetExerciseTemplatesAsync();
+                ViewBag.ExerciseOptions = exerciseTemplates;
+                return View("NewEditWorkout", model);
+            }
+
+            try
+            {
+                await _workoutService.UpdateWorkoutAsync(model, userId);
+                _logger.LogInformation("Workout {WorkoutId} updated successfully for user {UserId}", model.Id, userId);
+
+                if (isAjax)
+                {
+                    return Json(new
+                    {
+                        success = true,
+                        toastType = "success",
+                        toastMessage = "Workout updated successfully!"
+                    });
+                }
+
+                TempData["SuccessMessage"] = "Workout updated successfully!";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating workout {WorkoutId} for user {UserId}: {ErrorMessage}",
+                    model.Id, userId, ex.Message);
+
+                if (isAjax)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        toastType = "error",
+                        toastMessage = $"Error updating workout: {ex.Message}"
+                    });
+                }
+
+                ModelState.AddModelError("", $"Error updating workout: {ex.Message}");
+                IEnumerable<ExerciseTemplateViewModel> exerciseTemplates = await _workoutService.GetExerciseTemplatesAsync();
+                ViewBag.ExerciseOptions = exerciseTemplates;
+                return View("NewEditWorkout", model);
+            }
+        }
+
+        // Handles standard form submissions (application/x-www-form-urlencoded or multipart/form-data)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        [ActionName("Edit")]
+        [Consumes("application/x-www-form-urlencoded", "multipart/form-data")]
+        public async Task<IActionResult> EditForm(WorkoutCardViewModel model)
+        {
+            Guid? userId = GetUserId();
+            bool isAjax = Request.Headers.XRequestedWith == "XMLHttpRequest";
+
+            if (userId == null || userId == Guid.Empty)
+            {
+                _logger.LogWarning("Unauthorized workout edit attempt (form submission).");
+                if (isAjax)
+                {
+                    return Json(new { success = false, message = "Unauthorized access." });
+                }
+                return Unauthorized();
+            }
+
+            if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Validation failed for workout edit (form) for user {UserId}", userId);
+
+                if (isAjax)
+                {
+                    var errors = ModelState.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
+                    );
+                    return Json(new
+                    {
+                        success = false,
+                        toastType = "error",
+                        toastMessage = "Please fix the validation errors.",
+                        validationErrors = errors
+                    });
+                }
+
+                IEnumerable<ExerciseTemplateViewModel> exerciseTemplates = await _workoutService.GetExerciseTemplatesAsync();
+                ViewBag.ExerciseOptions = exerciseTemplates;
+                return View("NewEditWorkout", model);
+            }
+
+            try
+            {
+                await _workoutService.UpdateWorkoutAsync(model, userId);
+                _logger.LogInformation("Workout {WorkoutId} updated successfully (form) for user {UserId}", model.Id, userId);
+
+                if (isAjax)
+                {
+                    return Json(new
+                    {
+                        success = true,
+                        toastType = "success",
+                        toastMessage = "Workout updated successfully!"
+                    });
+                }
+
+                TempData["SuccessMessage"] = "Workout updated successfully!";
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating workout (form) {WorkoutId} for user {UserId}: {ErrorMessage}",
+                    model.Id, userId, ex.Message);
+
+                if (isAjax)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        toastType = "error",
+                        toastMessage = $"Error updating workout: {ex.Message}"
+                    });
+                }
+
+                ModelState.AddModelError("", $"Error updating workout: {ex.Message}");
+                IEnumerable<ExerciseTemplateViewModel> exerciseTemplates = await _workoutService.GetExerciseTemplatesAsync();
+                ViewBag.ExerciseOptions = exerciseTemplates;
+                return View("NewEditWorkout", model);
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryTokenFromJson]
+        public async Task<IActionResult> DeleteWorkout(Guid id)
+        {
+            Guid? userId = GetUserId();
+            bool isAjax = Request.Headers.XRequestedWith == "XMLHttpRequest";
+
+            if (userId == null || userId == Guid.Empty)
+            {
+                _logger
+                    .LogWarning("Unauthorized attempt to delete workout {WorkoutId} due to missing user ID", id);
+
+                if (isAjax)
+                {
+                    return Json(new { success = false, toastType = "error", toastMessage = "Unauthorized access." });
+                }
+
+                return Unauthorized();
+            }
+
+            try
+            {
+                _logger.LogInformation("Attempting to delete workout {WorkoutId} for user {UserId}", id, userId);
+
+                bool isOwner
+                    = await
+                    _workoutService
+                    .VerifyWorkoutOwnershipAsync(id, userId);
+
+                if (!isOwner)
+                {
+                    _logger.LogWarning("Unauthorized workout deletion attempt for user {UserId}", userId);
+                    if (isAjax)
+                    {
+                        return Json(new { success = false, toastType = "error", toastMessage = "Unauthorized operation." });
+                    }
+                    return Unauthorized();
+                }
+
+                bool result = await _workoutService.DeleteWorkoutAsync(id, userId);
+
+                if (isAjax)
+                {
+                    if (result)
+                    {
+                        _logger.LogInformation("Workout {WorkoutId} deleted successfully for user {UserId}", id, userId);
+                        return Json(new { success = true, toastType = "success", toastMessage = "Workout deleted successfully!" });
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Failed to delete workout {WorkoutId} for user {UserId}", id, userId);
+                        return Json(new { success = false, toastType = "error", toastMessage = "Error deleting workout. Please try again." });
+                    }
+                }
+
+                TempData["ToastType"] = result ? "success" : "error";
+                TempData["ToastMessage"] = result ? "Workout deleted successfully!" : "Error deleting workout. Please try again.";
+
+                return RedirectToAction(nameof(Index));
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Invalid operation when deleting workout {WorkoutId} for user {UserId}: {ErrorMessage}",
+                    id, userId, ex.Message);
+
+                return HandleExceptionResponse(isAjax, "Cannot delete this workout. It may be in use or already deleted.");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting workout {WorkoutId} for user {UserId}: {ErrorMessage}",
+                    id, userId, ex.Message);
+
+                return HandleExceptionResponse(isAjax, "An unexpected error occurred while deleting the workout. Please try again.");
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryTokenFromJson]
+        public async Task<IActionResult> AddExercise([FromBody] ExerciseViewModel model)
+        {
+            Guid? userId = GetUserId();
+
+            if (userId == null || userId == Guid.Empty)
+            {
+                _logger
+                    .LogWarning("Unauthorized attempt to add exercise to workout {WorkoutId}", model.WorkoutId);
+
+                return Json(new { success = false, toastType = "error", toastMessage = "Unauthorized access." });
+            }
+
+            // Patch: If Name is missing but ExerciseTemplateId is present, set Name from template
+            if (string.IsNullOrWhiteSpace(model.Name)
+                    && model.ExerciseTemplateId != Guid.Empty)
+            {
+                try
+                {
+                    IEnumerable<ExerciseTemplateViewModel> templates
+                        = await
+                        _workoutService
+                        .GetExerciseTemplatesAsync();
+
+                    ExerciseTemplateViewModel? template
+                        = templates
+                        .FirstOrDefault(t => t.Id == model.ExerciseTemplateId);
+
+                    if (template != null)
+                    {
+                        model.Name = template.Name;
+                        model.TargetedMuscle = template.TargetedMuscle;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching exercise templates for user {UserId}: {ErrorMessage}",
+                        userId, ex.Message);
+                }
+            }
+
+            if (!ModelState.IsValid || string.IsNullOrWhiteSpace(model.Name))
+            {
+                _logger.LogWarning("Validation failed for adding exercise to workout {WorkoutId} for user {UserId}",
+                    model.WorkoutId, userId);
+
+                return Json(new
+                {
+                    success = false,
+                    toastType = "error",
+                    toastMessage = "Please provide all required exercise information.",
+                    errors = ModelState.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray())
+                });
+            }
+
+            try
+            {
+                ExerciseViewModel result
+                    = await
+                    _workoutService
+                    .AddExerciseAsync(model, userId);
+
+                _logger
+                    .LogInformation("Exercise added successfully to workout {WorkoutId} for user {UserId}",
+                    model.WorkoutId, userId);
+
+                int duration = 0;
+                try
+                {
+                    WorkoutCardViewModel? workout
+                        = await
+                        _workoutService
+                        .GetWorkoutByIdAsync(model.WorkoutId, userId);
+                }
+                catch (Exception ex)
+                {
+                    _logger
+                        .LogError(ex, "Error getting workout duration for workout {WorkoutId}: {ErrorMessage}",
+                        model.WorkoutId, ex.Message);
+                }
+
+                // Resolve exercise image URL from template (if available)
+                string? imageUrlResolved = await ResolveExerciseImageUrl(result.ExerciseTemplateId);
+
+                // Shape the exercise for JSON with camelCase + imageUrl
+                var exerciseDto = new
+                {
+                    id = result.Id,
+                    workoutId = result.WorkoutId,
+                    name = result.Name,
+                    sets = result.Sets,
+                    reps = result.Reps,
+                    weight = result.Weight,
+                    notes = result.Notes,
+                    duration = result.Duration,
+                    exerciseTemplateId = result.ExerciseTemplateId,
+                    targetedMuscle = result.TargetedMuscle,
+                    imageUrl = imageUrlResolved
+                };
+
+                return Json(new
+                {
+                    success = true,
+                    toastType = "success",
+                    toastMessage = "Exercise added successfully!",
+                    exercise = exerciseDto,
+                    duration
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger
+                    .LogError(ex, "Error adding exercise to workout {WorkoutId} for user {UserId}: {ErrorMessage}",
+                    model.WorkoutId, userId, ex.Message);
+
+                return Json(new
+                {
+                    success = false,
+                    toastType = "error",
+                    toastMessage = "An unexpected error occurred while adding the exercise. Please try again."
+                });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryTokenFromJson]
+        public async Task<IActionResult> UpdateExercise([FromBody] ExerciseViewModel model)
+        {
+            Guid? userId = GetUserId();
+
+            // Patch: If Name is missing but ExerciseTemplateId is present, set Name from template
+            if (string.IsNullOrWhiteSpace(model.Name) && model.ExerciseTemplateId != Guid.Empty)
+            {
+                try
+                {
+                    IEnumerable<ExerciseTemplateViewModel> templates
+                        = await
+                        _workoutService
+                        .GetExerciseTemplatesAsync();
+
+                    ExerciseTemplateViewModel? template
+                        = templates
+                        .FirstOrDefault(t => t.Id == model.ExerciseTemplateId);
+                    if (template != null)
+                    {
+                        model.Name = template.Name;
+                        model.TargetedMuscle = template.TargetedMuscle;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching exercise templates for user {UserId}: {ErrorMessage}",
+                        userId, ex.Message);
+                }
+            }
+
+            if (!ModelState.IsValid || string.IsNullOrWhiteSpace(model.Name))
+            {
+                _logger.LogWarning("Validation failed for updating exercise {ExerciseId} for user {UserId}",
+                    model.Id, userId);
+
+                // Return JSON with validation errors (consistent with AddExercise)
+                return Json(new
+                {
+                    success = false,
+                    toastType = "error",
+                    toastMessage = "Please provide all required exercise information.",
+                    errors = ModelState.ToDictionary(
+                        kvp => kvp.Key,
+                        kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
+                    )
+                });
+            }
+
+            try
+            {
+                ExerciseViewModel result
+                    = await
+                    _workoutService
+                    .UpdateExerciseAsync(model, userId);
+
+                _logger
+                    .LogInformation("Exercise {ExerciseId} updated successfully for workout {WorkoutId} for user {UserId}",
+                    model.Id, model.WorkoutId, userId);
+
+                // Get updated workout duration with defensive coding
+                WorkoutCardViewModel? workout
+                    = await
+                    _workoutService
+                    .GetWorkoutByIdAsync(model.WorkoutId, userId);
+
+                // Resolve exercise image URL from template (if available)
+                string? imageUrlResolved = await ResolveExerciseImageUrl(result.ExerciseTemplateId);
+
+                // Return JSON response for AJAX (consistent with AddExercise) with enriched exercise
+                var exerciseDto = new
+                {
+                    id = result.Id,
+                    workoutId = result.WorkoutId,
+                    name = result.Name,
+                    sets = result.Sets,
+                    reps = result.Reps,
+                    weight = result.Weight,
+                    notes = result.Notes,
+                    duration = result.Duration,
+                    exerciseTemplateId = result.ExerciseTemplateId,
+                    targetedMuscle = result.TargetedMuscle,
+                    imageUrl = imageUrlResolved
+                };
+
+                return Json(new
+                {
+                    success = true,
+                    toastType = "success",
+                    toastMessage = "Exercise updated successfully!",
+                    exercise = exerciseDto,
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger
+                    .LogError(ex, "Error updating exercise {ExerciseId} for workout {WorkoutId} for user {UserId}: {ErrorMessage}",
+                    model.Id, model.WorkoutId, userId, ex.Message);
+
+                // Return error response in JSON format (consistent with AddExercise)
+                return Json(new
+                {
+                    success = false,
+                    toastType = "error",
+                    toastMessage = $"Error updating exercise: {ex.Message}"
+                });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryTokenFromJson]
+        public async Task<IActionResult> DeleteExercise([FromBody] ExerciseDeleteViewModel model)
+        {
+            Guid? userId = GetUserId();
+
+            if (userId == null || userId == Guid.Empty)
+            {
+                return Json(new
+                {
+                    success = false,
+                    toastType = "error",
+                    toastMessage = "User not authenticated."
+                });
+            }
+
+            try
+            {
+                // Verify ownership by exercise, not workout. The incoming model carries an exercise Id.
+                bool isOwner =
+                    await
+                    _workoutService
+                    .VerifyExerciseOwnershipAsync(model.Id, userId);
+
+                if (!isOwner) return Unauthorized();
+
+                bool result
+                    = await
+                    _workoutService
+                    .DeleteExerciseAsync(model.Id, userId);
+
+                if (result)
+                {
+                    _logger.LogInformation("Exercise {ExerciseId} deleted successfully for user {UserId}", model.Id, userId);
+
+                    return Json(new
+                    {
+                        success = true,
+                        toastType = "success",
+                        toastMessage = "Exercise deleted successfully!"
+                    });
+                }
+                else
+                {
+                    _logger.LogWarning("Failed to delete exercise {ExerciseId} for user {UserId}", model.Id, userId);
+
+                    return Json(new
+                    {
+                        success = false,
+                        toastType = "error",
+                        toastMessage = "Error deleting exercise. Please try again."
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting exercise {ExerciseId} for user {UserId}: {ErrorMessage}",
+                    model.Id, userId, ex.Message);
+
+                return Json(new
+                {
+                    success = false,
+                    toastType = "error",
+                    toastMessage = "Error deleting exercise. Please try again."
+                });
+            }
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryTokenFromJson]
+        public async Task<IActionResult> CreateWorkout([FromBody] WorkoutCardViewModel model)
+        {
+            Guid? userId = GetUserId();
+            bool isAjaxRequest = Request.Headers.XRequestedWith == "XMLHttpRequest";
+
+            if (userId == null || userId == Guid.Empty)
+            {
+                _logger.LogWarning("CreateWorkout called without authenticated user");
+                if (isAjaxRequest)
+                {
+                    return Json(new { success = false, toastType = "error", toastMessage = "User not authenticated." });
+                }
+                return Unauthorized(new { success = false, message = "User not authenticated." });
+            }
+
+            if (model == null)
+            {
+                _logger.LogWarning("CreateWorkout received null model. ContentType={ContentType}", Request.ContentType);
+                if (isAjaxRequest)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        toastType = "error",
+                        toastMessage = "Invalid request body. Please try again.",
+                    });
+                }
+                return BadRequest(new { success = false, message = "Invalid request body." });
+            }
+
+            _logger.LogInformation("Received workout creation request from user {UserId} with title '{Title}' and {ExerciseCount} exercises",
+                userId, model.Title, model.Exercises?.Count() ?? 0);
+
+            // Sanitize user-provided input to prevent XSS/injection before validation and persistence
+            SanitizeWorkoutModel(model);
+            _logger.LogDebug("Workout model sanitized for user {UserId}", userId);
+
+            // Re-validate model after sanitization so ModelState reflects the sanitized values
+            ModelState.Clear();
+            TryValidateModel(model);
+
+            if (!ModelState.IsValid)
+            {
+                _logger.LogWarning("Validation failed during workout creation for user {UserId}", userId);
+
+                var errors = ModelState.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
+                );
+
+                if (isAjaxRequest)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        toastType = "error",
+                        toastMessage = "Please fix the validation errors.",
+                        validationErrors = errors
+                    });
+                }
+
+                return View("NewEditWorkout", model);
+            }
+
+            try
+            {
+                WorkoutCardViewModel workout
+                    = await
+                    _workoutService
+                    .CreateWorkoutAsync(model, userId);
+
+                _logger.LogInformation("Workout {WorkoutId} created successfully for user {UserId}", workout.Id, userId);
+
+                if (isAjaxRequest)
+                {
+                    IEnumerable<WorkoutCardViewModel>? workouts
+                        = await
+                        _workoutService
+                        .GetAllWorkoutsAsync(userId);
+
+                    string? workoutsHtml
+                        = await
+                        this.RenderPartialViewToStringAsync("_WorkoutsPartial", workouts);
+
+                    return Json(new
+                    {
+                        success = true,
+                        toastType = "success",
+                        toastMessage = "Workout created successfully!",
+                        workoutsHtml
+                    });
+                }
+
+                TempData["SuccessMessage"] = "Workout created successfully!";
+                TempData["ToastType"] = "success";
+                TempData["ToastMessage"] = "Workout created successfully!";
+
+                return RedirectToAction(nameof(Index));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating workout for user {UserId}: {ErrorMessage}", userId, ex.Message);
+
+                if (isAjaxRequest)
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        toastType = "error",
+                        toastMessage = $"Error creating workout: {ex.Message}"
+                    });
+                }
+
+                ModelState.AddModelError("", "An error occurred while creating the workout. Please try again.");
+                return View("NewEditWorkout", model);
+            }
+        }
+
         /// <summary>
         /// Sanitizes all user-provided string inputs in a workout model to prevent XSS and injection attacks
         /// </summary>
@@ -44,13 +917,18 @@ namespace ActioNator.Areas.User.Controllers
             {
                 return;
             }
-            
+
             try
             {
                 // Sanitize workout properties
-                model.Title = _sanitizationService.SanitizeString(model.Title);
-                model.Notes = _sanitizationService.SanitizeString(model.Notes);
-                
+                model.Title =
+                    _sanitizationService
+                    .SanitizeString(model.Title);
+
+                model.Notes =
+                    _sanitizationService
+                    .SanitizeString(model.Notes!);
+
                 // Sanitize each exercise in the workout
                 if (model.Exercises != null)
                 {
@@ -67,7 +945,7 @@ namespace ActioNator.Areas.User.Controllers
                 // The model validation will catch any issues with the data
             }
         }
-        
+
         /// <summary>
         /// Sanitizes all user-provided string inputs in an exercise model
         /// </summary>
@@ -78,874 +956,51 @@ namespace ActioNator.Areas.User.Controllers
             {
                 return;
             }
-            
+
             try
             {
-                model.Name = _sanitizationService.SanitizeString(model.Name);
-                model.Notes = _sanitizationService.SanitizeString(model.Notes);
-                model.ImageUrl = _sanitizationService.SanitizeString(model.ImageUrl);
-                model.TargetedMuscle = _sanitizationService.SanitizeString(model.TargetedMuscle);
+                model.Name =
+                    _sanitizationService
+                    .SanitizeString(model.Name);
+
+                model.Notes =
+                    _sanitizationService
+                    .SanitizeString(model.Notes!);
+
+                model.TargetedMuscle =
+                    _sanitizationService
+                    .SanitizeString(model.TargetedMuscle!);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error sanitizing exercise model");
-                // Continue processing - we don't want to block the request due to sanitization errors
             }
         }
 
-        [HttpGet]
-        public async Task<IActionResult> Index()
-        {
-            Guid? userId = GetUserId();
-            
-            var workouts 
-                = await _workoutService.GetAllWorkoutsAsync(userId);
-            return View(workouts);
-        }
-        
-        [HttpGet]
-        public IActionResult New()
-        {
-            return View("NewEditWorkout", new WorkoutCardViewModel());
-        }
-        
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(WorkoutCardViewModel model)
-        {
-            Guid? userId = GetUserId();
-            string userIdString = userId?.ToString() ?? "Unknown";
-            
-            _logger.LogInformation("Attempting to create new workout for user {UserId}", userIdString);
-            
-            // Use the shared method to process the workout creation
-            return await ProcessWorkoutSaveAsync(model, userId, userIdString, "Workout created successfully!", "Error creating workout. Please try again.");
-        }
-        
         /// <summary>
-        /// Shared method to process workout creation or update
+        /// Helper method to handle exception responses consistently across controller actions.
+        /// Returns JSON error for AJAX requests or redirects with error messages for standard requests.
         /// </summary>
-        /// <param name="model">The workout model to create or update</param>
-        /// <param name="userId">The current user ID</param>
-        /// <param name="userIdString">String representation of the user ID for logging</param>
-        /// <param name="successMessage">Success message to display</param>
-        /// <param name="errorMessage">Error message to display</param>
-        /// <returns>Action result based on the operation outcome</returns>
-        private async Task<IActionResult> ProcessWorkoutSaveAsync(
-            WorkoutCardViewModel model, 
-            Guid? userId, 
-            string userIdString,
-            string successMessage,
-            string errorMessage)
+        /// <param name="isAjaxRequest">Indicates whether the request is an AJAX request.</param>
+        /// <param name="errorMessage">The error message to display to the user.</param>
+        /// <returns>Appropriate IActionResult based on request type.</returns>
+        private IActionResult HandleExceptionResponse(bool isAjaxRequest, string errorMessage)
         {
-            try
-            {
-                // Sanitize user inputs
-                SanitizeWorkoutModel(model);
-                
-                // Validate model state
-                if (!ModelState.IsValid)
-                {
-                    _logger.LogWarning("Validation failed for workout operation for user {UserId}", userIdString);
-                    
-                    // For AJAX requests, return validation errors
-                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                    {
-                        // Collect validation errors for the response
-                        var errors = ModelState.ToDictionary(
-                            // Keep the original property name casing for client-side matching
-                            kvp => kvp.Key,
-                            kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
-                        );
-                        
-                        // Log the validation errors
-                        _logger.LogWarning("Validation errors for workout: {@ValidationErrors}", errors);
-                        
-                        return Json(new { 
-                            success = false, 
-                            toastType = "error", 
-                            toastMessage = "Please fix the validation errors.",
-                            validationErrors = errors
-                        });
-                    }
-                    
-                    // For regular form submissions, return the view with errors
-                    return View("NewEditWorkout", model);
-                }
-                
-                // Verify ownership if this is an update operation
-                if (model.Id != Guid.Empty)
-                {
-                    bool isOwner = await _workoutService
-                        .VerifyWorkoutOwnershipAsync(model.Id, userId);
-                    if (!isOwner)
-                    {
-                        _logger.LogWarning("Unauthorized workout update attempt for user {UserId}", userIdString);
-                        return Unauthorized();
-                    }
-                }
-                
-                // Create or update the workout
-                var workout = await _workoutService.CreateWorkoutAsync(model, userId);
-                
-                if (workout != null)
-                {
-                    _logger.LogInformation("Workout operation successful for user {UserId}", userIdString);
-                    
-                    // For AJAX requests, return success JSON with updated workouts list
-                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                    {
-                        // Get updated workouts list
-                        var workouts = await _workoutService.GetAllWorkoutsAsync(userId);
-                        
-                        // Render the partial view to HTML string
-                        var workoutsHtml = await this.RenderPartialViewToStringAsync("_WorkoutsPartial", workouts);
-                        
-                        // Return JSON response with success data and HTML
-                        return Json(new { 
-                            success = true, 
-                            toastType = "success", 
-                            toastMessage = successMessage,
-                            workoutsHtml = workoutsHtml
-                        });
-                    }
-                    
-                    // For regular form submissions, redirect with success message
-                    TempData["SuccessMessage"] = successMessage;
-                    TempData["ToastType"] = "success";
-                    TempData["ToastMessage"] = successMessage;
-                    return RedirectToAction(nameof(Index));
-                }
-                else
-                {
-                    _logger.LogWarning("Failed workout operation for user {UserId}", userIdString);
-                    
-                    // For AJAX requests, return error JSON
-                    if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                    {
-                        return Json(new { 
-                            success = false, 
-                            toastType = "error", 
-                            toastMessage = errorMessage
-                        });
-                    }
-                    
-                    // For regular form submissions, return the view with error
-                    ModelState.AddModelError("", errorMessage);
-                    return View("NewEditWorkout", model);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error during workout operation for user {UserId}: {ErrorMessage}", userIdString, ex.Message);
-                
-                // For AJAX requests, return error JSON
-                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                {
-                    return Json(new { 
-                        success = false, 
-                        toastType = "error", 
-                        toastMessage = "An unexpected error occurred. Please try again."
-                    });
-                }
-                
-                // For regular form submissions, return the view with error
-                ModelState.AddModelError("", "An unexpected error occurred. Please try again.");
-                return View("NewEditWorkout", model);
-            }
-        }
-        
-        [HttpGet]
-        public async Task<IActionResult> GetWorkouts()
-        {
-            Guid? userId = GetUserId();
-            string userIdString = userId?.ToString() ?? "Unknown";
-            
-            if (userId == null)
-            {
-                _logger.LogWarning("User not authenticated when attempting to get workouts");
-                
-                // Check if this is an AJAX request
-                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                {
-                    // For AJAX requests, return error data in a partial view
-                    ViewData["Success"] = false;
-                    ViewData["ToastType"] = "error";
-                    ViewData["ToastMessage"] = "Authentication error. Please log in again.";
-                    return PartialView("_WorkoutResponsePartial", null);
-                }
-                
-                // For non-AJAX requests, redirect to login
-                return RedirectToAction("Login", "Account", new { area = "Identity" });
-            }
-            
-            try
-            {
-                var workouts = await _workoutService.GetAllWorkoutsAsync(userId);
-                _logger.LogInformation("Retrieved {Count} workouts for user {UserId}", workouts?.Count() ?? 0, userIdString);
-                
-                // For AJAX requests, return partial view without layout
-                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                {
-                    return PartialView("_WorkoutsPartial", workouts);
-                }
-                
-                // For non-AJAX requests, return full view with layout
-                return View("Index", workouts);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving workouts for user {UserId}: {ErrorMessage}", userIdString, ex.Message);
-                
-                // For AJAX requests, return error data in a partial view
-                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                {
-                    ViewData["Success"] = false;
-                    ViewData["ToastType"] = "error";
-                    ViewData["ToastMessage"] = "Error retrieving workouts. Please try again.";
-                    return PartialView("_WorkoutResponsePartial", null);
-                }
-                
-                // For non-AJAX requests, return error view
-                return View("Error");
-            }
-        }
-
-        [HttpGet]
-        public async Task<IActionResult> Edit(Guid id)
-        {
-            Guid? userId = GetUserId();
-            WorkoutCardViewModel? workout 
-                = await _workoutService
-                .GetWorkoutByIdAsync(id, userId);
-            
-            if (workout == null)
-            {
-                return NotFound();
-            }
-
-            // Defensive coding: ensure we have valid durations
-            if (workout != null && workout.Exercises != null && workout.Exercises.Any())
-            {
-                // Always recalculate duration to ensure accuracy
-                TimeSpan totalDuration = TimeSpan.FromMinutes(workout.Exercises.Sum(e => e.Duration));
-                workout.Duration = totalDuration;
-            }
-            
-            // Get exercise templates for the dropdown
-            IEnumerable<ExerciseTemplateViewModel> exerciseTemplates 
-                = await _workoutService.GetExerciseTemplatesAsync();
-            
-            ViewBag
-                .ExerciseOptions = exerciseTemplates;
-            
-            return View("NewEditWorkout", workout);
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(WorkoutCardViewModel model)
-        {
-            Guid? userId = GetUserId();
-            string userIdString = userId?.ToString() ?? "Unknown";
-
-            if (!ModelState.IsValid)
-            {
-                _logger.LogWarning("Validation failed for workout edit for user {UserId}", userIdString);
-                
-                // Prepare validation errors for the partial view
-                ViewData["Success"] = false;
-                ViewData["ToastType"] = "error";
-                ViewData["ToastMessage"] = "Please fix the validation errors.";
-                ViewData["Errors"] = ModelState.ToDictionary(
-                    // Keep the original property name casing for client-side matching
-                    kvp => kvp.Key,
-                    kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
-                );
-                
-                // For AJAX requests, return validation errors partial
-                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                {
-                    return PartialView("_WorkoutResponsePartial", null);
-                }
-                
-                // For regular form submissions, return to the view with the model
-                // Get exercise templates for the dropdown to ensure proper model is passed
-                IEnumerable<ExerciseTemplateViewModel> exerciseTemplates 
-                    = await _workoutService.GetExerciseTemplatesAsync();
-                
-                ViewBag.ExerciseOptions = exerciseTemplates;
-                return View("NewEditWorkout", model);
-            }
-
-            try
-            {
-                await _workoutService.UpdateWorkoutAsync(model, userId);
-                _logger.LogInformation("Workout {WorkoutId} updated successfully for user {UserId}", model.Id, userIdString);
-
-                // Prepare success data for the partial view
-                ViewData["Success"] = true;
-                ViewData["ToastType"] = "success";
-                ViewData["ToastMessage"] = "Workout updated successfully!";
-                
-                // For AJAX requests, return success partial view
-                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                {
-                    return PartialView("_WorkoutResponsePartial", null);
-                }
-                
-                // For regular form submissions, redirect with success message
-                TempData["SuccessMessage"] = "Workout updated successfully!";
-                return RedirectToAction(nameof(Index));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating workout {WorkoutId} for user {UserId}: {ErrorMessage}", 
-                    model.Id, userIdString, ex.Message);
-                
-                // Prepare error data for the partial view
-                ViewData["Success"] = false;
-                ViewData["ToastType"] = "error";
-                ViewData["ToastMessage"] = $"Error updating workout: {ex.Message}";
-                
-                // For AJAX requests, return error partial view
-                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                {
-                    return PartialView("_WorkoutResponsePartial", null);
-                }
-                
-                // For regular form submissions, return to view with error
-                ModelState.AddModelError("", $"Error updating workout: {ex.Message}");
-                // Get exercise templates for the dropdown to ensure proper model is passed
-                IEnumerable<ExerciseTemplateViewModel> exerciseTemplates 
-                    = await _workoutService.GetExerciseTemplatesAsync();
-                
-                ViewBag.ExerciseOptions = exerciseTemplates;
-                return View("NewEditWorkout", model);
-            }
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteWorkout(Guid id)
-        {
-            Guid? userId = GetUserId();
-            string userIdString = userId?.ToString() ?? "Unknown";
-            
-            try
-            {
-                _logger.LogInformation("Attempting to delete workout {WorkoutId} for user {UserId}", id, userIdString);
-                
-                // Verify ownership before deletion
-                bool isOwner = await _workoutService
-                    .VerifyWorkoutOwnershipAsync(id, userId);
-                if (!isOwner)
-                {
-                    _logger.LogWarning("Unauthorized workout deletion attempt for user {UserId}", userIdString);
-                    return Unauthorized();
-                }
-                
-                bool result = await _workoutService.DeleteWorkoutAsync(id, userId);
-
-                // For AJAX requests, return JSON response instead of partial view
-                // This prevents potential issues with partial view rendering and Alpine.js reinitialization
-                if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-                {
-                    if (result)
-                    {
-                        _logger.LogInformation("Workout {WorkoutId} deleted successfully for user {UserId}", id, userIdString);
-                        
-                        // Return success JSON response
-                        return Json(new { 
-                            success = true, 
-                            toastType = "success", 
-                            toastMessage = "Workout deleted successfully!" 
-                        });
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Failed to delete workout {WorkoutId} for user {UserId}", id, userIdString);
-                        
-                        // Return error JSON response
-                        return Json(new { 
-                            success = false, 
-                            toastType = "error", 
-                            toastMessage = "Error deleting workout. Please try again." 
-                        });
-                    }
-                }
-                
-                // For regular form submissions, redirect with appropriate message
-                if (result)
-                {
-                    _logger.LogInformation("Workout {WorkoutId} deleted successfully for user {UserId}", id, userIdString);
-                    TempData["SuccessMessage"] = "Workout deleted successfully!";
-                    // Add toast notification for success
-                    TempData["ToastType"] = "success";
-                    TempData["ToastMessage"] = "Workout deleted successfully!";
-                }
-                else
-                {
-                    _logger.LogWarning("Failed to delete workout {WorkoutId} for user {UserId}", id, userIdString);
-                    TempData["ErrorMessage"] = "Error deleting workout. Please try again.";
-                    // Add toast notification for error
-                    TempData["ToastType"] = "error";
-                    TempData["ToastMessage"] = "Error deleting workout. Please try again.";
-                }
-
-                return RedirectToAction(nameof(Index));
-            }
-            catch (InvalidOperationException ex)
-            {
-                // Handle specific exception type for business logic errors
-                _logger.LogWarning(ex, "Invalid operation when deleting workout {WorkoutId} for user {UserId}: {ErrorMessage}", 
-                    id, userIdString, ex.Message);
-                
-                return HandleExceptionResponse(
-                    isAjax: Request.Headers["X-Requested-With"] == "XMLHttpRequest",
-                    errorMessage: "Cannot delete this workout. It may be in use or already deleted.");
-            }
-            catch (Exception ex)
-            {
-                // Handle general exceptions
-                _logger.LogError(ex, "Error deleting workout {WorkoutId} for user {UserId}: {ErrorMessage}", 
-                    id, userIdString, ex.Message);
-                
-                return HandleExceptionResponse(
-                    isAjax: Request.Headers["X-Requested-With"] == "XMLHttpRequest",
-                    errorMessage: "An unexpected error occurred while deleting the workout. Please try again.");
-            }
-        }
-        
-        /// <summary>
-        /// Helper method to handle exception responses consistently across controller actions
-        /// </summary>
-        /// <param name="isAjax">Whether the request is an AJAX request</param>
-        /// <param name="errorMessage">Error message to display</param>
-        /// <returns>Appropriate action result based on request type</returns>
-        private IActionResult HandleExceptionResponse(bool isAjax, string errorMessage)
-        {
-            if (isAjax)
+            if (isAjaxRequest)
             {
                 // Return JSON error response for AJAX requests
-                return Json(new { 
-                    success = false, 
-                    toastType = "error", 
-                    toastMessage = errorMessage 
+                return Json(new
+                {
+                    success = false,
+                    toastType = "error",
+                    toastMessage = errorMessage
                 });
             }
-            
-            // For regular form submissions
-            TempData["ErrorMessage"] = errorMessage;
+
+            // For regular form submissions, set TempData for toast notification and redirect
             TempData["ToastMessage"] = errorMessage;
             TempData["ToastType"] = "error";
             return RedirectToAction(nameof(Index));
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> AddExercise([FromBody] ExerciseViewModel model)
-        {
-            Guid? userId = GetUserId();
-            string userIdString = userId?.ToString() ?? "Unknown";
-            
-            // Patch: If Name is missing but ExerciseTemplateId is present, set Name from template
-            if (string.IsNullOrWhiteSpace(model.Name) && model.ExerciseTemplateId != Guid.Empty)
-            {
-                try {
-                    // Get exercise templates (from service or cache)
-                    var templates = await _workoutService.GetExerciseTemplatesAsync();
-                    var template = templates.FirstOrDefault(t => t.Id == model.ExerciseTemplateId);
-                    if (template != null)
-                    {
-                        model.Name = template.Name;
-                        model.ImageUrl = template.ImageUrl;
-                        model.TargetedMuscle = template.TargetedMuscle;
-                    }
-                } catch (Exception ex) {
-                    _logger.LogError(ex, "Error fetching exercise templates for user {UserId}: {ErrorMessage}", 
-                        userIdString, ex.Message);
-                }
-            }
-
-            if (!ModelState.IsValid || string.IsNullOrWhiteSpace(model.Name))
-            {
-                _logger.LogWarning("Validation failed for adding exercise to workout {WorkoutId} for user {UserId}", 
-                    model.WorkoutId, userIdString);
-                
-                // Return JSON with validation errors
-                return Json(new { 
-                    success = false, 
-                    toastType = "error", 
-                    toastMessage = "Please provide all required exercise information.",
-                    errors = ModelState.ToDictionary(
-                        kvp => kvp.Key,
-                        kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
-                    )
-                });
-            }
-
-            try
-            {
-                ExerciseViewModel result = await _workoutService.AddExerciseAsync(model, userId);
-                _logger.LogInformation("Exercise added successfully to workout {WorkoutId} for user {UserId}", 
-                    model.WorkoutId, userIdString);
-                
-                // Get updated workout duration with defensive coding
-                int duration = 0;
-                try {
-                    var workout = await _workoutService.GetWorkoutByIdAsync(model.WorkoutId, userId);
-                    
-                    if (workout != null)
-                    {
-                        // Use the duration from the service if available
-                        duration = (int)workout.Duration.TotalMinutes;
-                        
-                        // If we need to recalculate it client-side as a fallback
-                        if (workout.Exercises != null)
-                        {
-                            // Calculate duration client-side to avoid EF Core translation issues
-                            duration = workout.Exercises.Sum(e => e.Duration);
-                        }
-                    }
-                } catch (Exception ex) {
-                    _logger.LogError(ex, "Error getting workout duration for workout {WorkoutId}: {ErrorMessage}", 
-                        model.WorkoutId, ex.Message);
-                    // Continue with duration = 0, client can recalculate
-                }
-                
-                // Return JSON response for AJAX
-                return Json(new { 
-                    success = true, 
-                    toastType = "success", 
-                    toastMessage = "Exercise added successfully!",
-                    exercise = result,
-                    duration = duration
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error adding exercise to workout {WorkoutId} for user {UserId}: {ErrorMessage}", 
-                    model.WorkoutId, userIdString, ex.Message);
-                
-                // Return error response in JSON format
-                return Json(new { 
-                    success = false, 
-                    toastType = "error", 
-                    toastMessage = $"Error adding exercise: {ex.Message}"
-                });
-            }
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> UpdateExercise([FromBody] ExerciseViewModel model)
-        {
-            Guid? userId = GetUserId();
-            string userIdString = userId?.ToString() ?? "Unknown";
-
-            // Patch: If Name is missing but ExerciseTemplateId is present, set Name from template
-            if (string.IsNullOrWhiteSpace(model.Name) && model.ExerciseTemplateId != Guid.Empty)
-            {
-                try {
-                    // Get exercise templates (from service or cache)
-                    var templates = await _workoutService.GetExerciseTemplatesAsync();
-                    var template = templates.FirstOrDefault(t => t.Id == model.ExerciseTemplateId);
-                    if (template != null)
-                    {
-                        model.Name = template.Name;
-                        model.ImageUrl = template.ImageUrl;
-                        model.TargetedMuscle = template.TargetedMuscle;
-                    }
-                } catch (Exception ex) {
-                    _logger.LogError(ex, "Error fetching exercise templates for user {UserId}: {ErrorMessage}", 
-                        userIdString, ex.Message);
-                }
-            }
-
-            if (!ModelState.IsValid || string.IsNullOrWhiteSpace(model.Name))
-            {
-                _logger.LogWarning("Validation failed for updating exercise {ExerciseId} for user {UserId}", 
-                    model.Id, userIdString);
-            
-            // Return JSON with validation errors (consistent with AddExercise)
-            return Json(new { 
-                success = false, 
-                toastType = "error", 
-                toastMessage = "Please provide all required exercise information.",
-                errors = ModelState.ToDictionary(
-                    kvp => kvp.Key,
-                    kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
-                )
-            });
-        }
-
-            try
-            {
-                ExerciseViewModel result = await _workoutService.UpdateExerciseAsync(model, userId);
-                _logger.LogInformation("Exercise {ExerciseId} updated successfully for workout {WorkoutId} for user {UserId}", 
-                    model.Id, model.WorkoutId, userIdString);
-                
-                // Get updated workout duration with defensive coding
-                var workout = await _workoutService.GetWorkoutByIdAsync(model.WorkoutId, userId);
-                
-                // Defensive coding: ensure we have a valid duration
-                int duration = 0;
-                if (workout != null)
-                {
-                    // Use the duration from the service if available
-                    duration = (int)workout.Duration.TotalMinutes;
-                    
-                    // Always recalculate client-side to ensure accuracy
-                    if (workout.Exercises != null)
-                    {
-                        // Calculate duration client-side to avoid EF Core translation issues
-                        duration = workout.Exercises.Sum(e => e.Duration);
-                    }
-                }
-                
-                // Return JSON response for AJAX (consistent with AddExercise)
-        return Json(new { 
-            success = true, 
-            toastType = "success", 
-            toastMessage = "Exercise updated successfully!",
-            exercise = result,
-            duration = duration
-        });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating exercise {ExerciseId} for workout {WorkoutId} for user {UserId}: {ErrorMessage}", 
-                    model.Id, model.WorkoutId, userIdString, ex.Message);
-                
-                // Return error response in JSON format (consistent with AddExercise)
-        return Json(new { 
-            success = false, 
-            toastType = "error", 
-            toastMessage = $"Error updating exercise: {ex.Message}"
-        });
-            }
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> DeleteExercise([FromBody] ExerciseDeleteViewModel model)
-        {
-            if (model == null || model.Id == Guid.Empty)
-            {
-                // Return JSON error response (consistent with other methods)
-                return Json(new { 
-                    success = false, 
-                    toastType = "error", 
-                    toastMessage = "Invalid exercise ID."
-                });
-            }
-            
-            Guid? userId = GetUserId();
-            string userIdString = userId?.ToString() ?? "Unknown";
-            
-            if (userId == null)
-            {
-                // Return JSON error response (consistent with other methods)
-                return Json(new { 
-                    success = false, 
-                    toastType = "error", 
-                    toastMessage = "User not authenticated."
-                });
-            }
-            
-            // Note: This is a simplified implementation that doesn't check if the exercise belongs
-            // to the user. In a real application, we would need to verify ownership and potentially
-            // to include the WorkoutId in the future. For now, we'll rely on client-side recalculation.
-            
-            try
-            {
-                bool result = await _workoutService.DeleteExerciseAsync(model.Id, userId);
-
-                if (result)
-                {
-                    _logger.LogInformation("Exercise {ExerciseId} deleted successfully for user {UserId}", model.Id, userIdString);
-                    
-                    // Return JSON success response (consistent with other methods)
-                    return Json(new { 
-                        success = true, 
-                        toastType = "success", 
-                        toastMessage = "Exercise deleted successfully!"
-                    });
-                }
-                else
-                {
-                    _logger.LogWarning("Failed to delete exercise {ExerciseId} for user {UserId}", model.Id, userIdString);
-                    
-                    // Return JSON error response (consistent with other methods)
-                    return Json(new { 
-                        success = false, 
-                        toastType = "error", 
-                        toastMessage = "Error deleting exercise. Please try again."
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting exercise {ExerciseId} for user {UserId}: {ErrorMessage}", 
-                    model.Id, userIdString, ex.Message);
-                
-                // Return JSON error response (consistent with other methods)
-                return Json(new { 
-                    success = false, 
-                    toastType = "error", 
-                    toastMessage = "Error deleting exercise. Please try again."
-                });
-            }
-        }
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreateWorkout(WorkoutCardViewModel model, string exercisesJson)
-        {
-            Guid? userId = GetUserId();
-            string userIdString = userId?.ToString() ?? "Unknown";
-
-            // Check if this is an AJAX request
-            bool isAjaxRequest = Request.Headers["X-Requested-With"] == "XMLHttpRequest";
-            
-            // Log the received exercisesJson
-            _logger.LogInformation("Received exercisesJson: {ExercisesJson}", 
-                exercisesJson?.Length > 100 ? exercisesJson.Substring(0, 100) + "..." : exercisesJson ?? "null");
-                
-            // Try to deserialize exercises from JSON if provided
-            if (!string.IsNullOrEmpty(exercisesJson) && (model.Exercises == null || !model.Exercises.Any()))
-            {
-                try
-                {
-                    var exercises = System.Text.Json.JsonSerializer.Deserialize<List<ExerciseViewModel>>(exercisesJson);
-                    if (exercises != null && exercises.Any())
-                    {
-                        _logger.LogInformation("Successfully deserialized {Count} exercises from JSON", exercises.Count);
-                        model.Exercises = exercises;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error deserializing exercises from JSON: {ErrorMessage}", ex.Message);
-                }
-            }
-            
-            // Log the full input model data for debugging
-            _logger.LogInformation("Received workout data for user {UserId}: {@WorkoutData}", 
-                userIdString, new { 
-                    Title = model.Title, 
-                    Notes = model.Notes,
-                    ExercisesCount = model.Exercises?.Count() ?? 0,
-                    HasExercises = model.Exercises != null && model.Exercises.Any(),
-                    FirstExerciseName = model.Exercises?.FirstOrDefault()?.Name,
-                    ModelState = ModelState.IsValid,
-                    ModelStateKeys = string.Join(", ", ModelState.Keys)
-                });
-                
-            // Log all form values for debugging
-            foreach (var key in Request.Form.Keys)
-            {
-                var values = Request.Form[key];
-                _logger.LogInformation("Form value {Key}: {Value}", key, string.Join(", ", values));
-            }
-
-            if (!ModelState.IsValid)
-            {
-                // Log all model state errors
-                foreach (var modelStateKey in ModelState.Keys)
-                {
-                    var modelStateVal = ModelState[modelStateKey];
-                    foreach (var error in modelStateVal.Errors)
-                    {
-                        _logger.LogWarning("Validation error for {Key}: {ErrorMessage}", 
-                            modelStateKey, error.ErrorMessage);
-                    }
-                }
-                
-                _logger.LogWarning("Validation failed for workout creation for user {UserId}", userIdString);
-                
-                // Prepare validation errors for the response
-                ViewData["Success"] = false;
-                ViewData["ToastType"] = "error";
-                ViewData["ToastMessage"] = "Please fix the validation errors.";
-                var errors = ModelState.ToDictionary(
-                    // Keep the original property name casing for client-side matching
-                    kvp => kvp.Key,
-                    kvp => kvp.Value.Errors.Select(e => e.ErrorMessage).ToArray()
-                );
-                ViewData["Errors"] = errors;
-                
-                // Log the validation errors dictionary
-                _logger.LogWarning("Validation errors: {@ValidationErrors}", errors);
-                
-                // For AJAX requests, return partial view with validation errors
-                if (isAjaxRequest)
-                {
-                    return Json(new { 
-                        success = false, 
-                        toastType = "error", 
-                        toastMessage = "Please fix the validation errors.",
-                        validationErrors = errors
-                    });
-                }
-                
-                // For non-AJAX requests, return to the form with model state errors
-                return View("Index", await _workoutService.GetAllWorkoutsAsync(userId));
-            }
-
-            try
-            {
-                var workout = await _workoutService.CreateWorkoutAsync(model, userId);
-                
-                _logger.LogInformation("Workout {WorkoutId} created successfully for user {UserId}", workout.Id, userIdString);
-                
-                // Prepare success data for the response
-                ViewData["Success"] = true;
-                ViewData["ToastType"] = "success";
-                ViewData["ToastMessage"] = "Workout created successfully!";
-                
-                // For AJAX requests, return JSON with success data and updated workout list
-                if (isAjaxRequest)
-                {
-                    // Get the updated list of workouts to include in the response
-                    var workouts = await _workoutService.GetAllWorkoutsAsync(userId);
-                    
-                    // Render the partial view to HTML string
-                    var workoutsHtml = await this.RenderPartialViewToStringAsync("_WorkoutsPartial", workouts);
-                    
-                    // Return JSON response with success data and HTML for client-side update
-                    return Json(new { 
-                        success = true, 
-                        toastType = "success", 
-                        toastMessage = "Workout created successfully!",
-                        workoutsHtml = workoutsHtml
-                    });
-                }
-                
-                // For non-AJAX requests, redirect to index with success message in TempData
-                TempData["SuccessMessage"] = "Workout created successfully!";
-                return RedirectToAction(nameof(Index));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error creating workout for user {UserId}: {ErrorMessage}", userIdString, ex.Message);
-                
-                // Prepare error data for the response
-                ViewData["Success"] = false;
-                ViewData["ToastType"] = "error";
-                ViewData["ToastMessage"] = "An error occurred while creating the workout. Please try again.";
-                
-                // For AJAX requests, return partial view with error data
-                if (isAjaxRequest)
-                {
-                    return PartialView("_WorkoutResponsePartial", null);
-                }
-                
-                // For non-AJAX requests, return to the form with error message
-                ModelState.AddModelError("", "An error occurred while creating the workout. Please try again.");
-                return View("Index", await _workoutService.GetAllWorkoutsAsync(userId));
-            }
         }
     }
 }

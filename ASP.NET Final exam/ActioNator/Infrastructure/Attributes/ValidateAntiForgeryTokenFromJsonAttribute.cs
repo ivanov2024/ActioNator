@@ -2,6 +2,10 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using System.IO;
+using System.Linq;
+using System.Text;
 
 namespace ActioNator.Infrastructure.Attributes
 {
@@ -31,29 +35,98 @@ namespace ActioNator.Infrastructure.Attributes
             {
                 try
                 {
-                    // Always check for X-CSRF-TOKEN header for JSON requests
-                    if (context.HttpContext.Request.HasJsonContentType())
+                    var httpContext = context.HttpContext;
+                    var request = httpContext.Request;
+
+                    // JSON requests: prefer header, but support JSON body too
+                    if (request.HasJsonContentType())
                     {
-                        var csrfHeader = context.HttpContext.Request.Headers["X-CSRF-TOKEN"].FirstOrDefault();
-                        if (!string.IsNullOrEmpty(csrfHeader))
+                        string? token = request.Headers["X-CSRF-TOKEN"].FirstOrDefault();
+                        if (string.IsNullOrEmpty(token))
                         {
-                            context.HttpContext.Request.Headers["RequestVerificationToken"] = csrfHeader;
+                            token = request.Headers["RequestVerificationToken"].FirstOrDefault();
+                        }
+
+                        // If not present in headers, try to read from JSON body
+                        if (string.IsNullOrEmpty(token))
+                        {
                             try
                             {
-                                await _antiforgery.ValidateRequestAsync(context.HttpContext);
-                                _logger.LogInformation("Anti-forgery token validated via X-CSRF-TOKEN header");
-                                return;
+                                // Enable buffering so the body can be read again by model binding
+                                request.EnableBuffering();
+
+                                // Ensure position at start before reading
+                                if (request.Body.CanSeek)
+                                {
+                                    request.Body.Position = 0;
+                                }
+
+                                using var reader = new StreamReader(request.Body, Encoding.UTF8, detectEncodingFromByteOrderMarks: false, leaveOpen: true);
+                                var body = await reader.ReadToEndAsync();
+
+                                // Rewind for the model binder
+                                if (request.Body.CanSeek)
+                                {
+                                    request.Body.Position = 0;
+                                }
+
+                                if (!string.IsNullOrWhiteSpace(body))
+                                {
+                                    try
+                                    {
+                                        using var doc = JsonDocument.Parse(body);
+                                        var root = doc.RootElement;
+                                        // Common property names that might carry the antiforgery token
+                                        var candidates = new[]
+                                        {
+                                            "__RequestVerificationToken",
+                                            "RequestVerificationToken",
+                                            "X-CSRF-TOKEN",
+                                            "AntiForgeryToken",
+                                            "AntiForgery"
+                                        };
+                                        foreach (var name in candidates)
+                                        {
+                                            if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty(name, out var prop) && prop.ValueKind == JsonValueKind.String)
+                                            {
+                                                token = prop.GetString();
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    catch (JsonException jex)
+                                    {
+                                        _logger.LogDebug(jex, "Request body is not valid JSON while searching for antiforgery token");
+                                    }
+                                }
+                            }
+                            catch (Exception readEx)
+                            {
+                                _logger.LogWarning(readEx, "Failed to read request body for antiforgery token extraction");
+                                // Even if body read fails, continue to try validation which will likely fail below
+                            }
+                        }
+
+                        if (!string.IsNullOrEmpty(token))
+                        {
+                            // Normalize into the expected header for antiforgery validation
+                            request.Headers["RequestVerificationToken"] = token;
+                            try
+                            {
+                                await _antiforgery.ValidateRequestAsync(httpContext);
+                                _logger.LogInformation("Anti-forgery token validated for JSON request");
+                                return; // allow pipeline to continue
                             }
                             catch (AntiforgeryValidationException ex)
                             {
-                                _logger.LogWarning("Anti-forgery validation failed via X-CSRF-TOKEN header: {Message}", ex.Message);
+                                _logger.LogWarning("Anti-forgery validation failed for JSON request: {Message}", ex.Message);
                                 context.Result = new JsonResult(new { success = false, message = "Invalid or expired anti-forgery token." }) { StatusCode = StatusCodes.Status403Forbidden };
                                 return;
                             }
                         }
                         else
                         {
-                            _logger.LogWarning("Missing X-CSRF-TOKEN header for JSON request");
+                            _logger.LogWarning("Missing anti-forgery token in headers or JSON body for JSON request");
                             context.Result = new JsonResult(new { success = false, message = "Missing anti-forgery token. Please refresh and try again." }) { StatusCode = StatusCodes.Status403Forbidden };
                             return;
                         }
@@ -63,7 +136,7 @@ namespace ActioNator.Infrastructure.Attributes
                         // Fallback to standard validation for non-JSON requests
                         try
                         {
-                            await _antiforgery.ValidateRequestAsync(context.HttpContext);
+                            await _antiforgery.ValidateRequestAsync(httpContext);
                             _logger.LogInformation("Anti-forgery token validated via standard method");
                             return;
                         }

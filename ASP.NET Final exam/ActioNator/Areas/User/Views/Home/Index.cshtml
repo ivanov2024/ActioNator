@@ -1,118 +1,119 @@
 @using ActioNator.ViewModels.Dashboard
 @model DashboardViewModel
 @{
-    ViewData["Title"] = "ActioNator Dashboard";
+	ViewData["Title"] = "ActioNator Dashboard";
 }
 
 @section Styles {
-    <style>
-        [x-cloak] {
-            display: none !important;
-        }
-    </style>
+	<style>
+		[x-cloak] {
+			display: none !important;
+		}
+	</style>
 }
 
 @section Scripts {
-    <!-- Tailwind CSS v3 CDN -->
-    <script src="https://cdn.tailwindcss.com/3.3.0"></script>
-    <!-- Alpine.js CDN -->
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+	<!-- Tailwind CSS v3 CDN -->
+	<script src="https://cdn.tailwindcss.com/3.3.0"></script>
+	<!-- Alpine.js CDN -->
+	<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 }
 
 <div>
-    <!-- Main Content -->
-    <main class="pt-20 pb-8 px-2 md:px-6 max-w-7xl mx-auto">
-        <div class="flex flex-col md:flex-row gap-6">
-            <!-- Left Panel -->
-            <section class="w-full md:w-1/3 p-4 bg-white rounded-xl shadow-md flex flex-col gap-6 flex-1">
-                <!-- Welcome Message -->
-                <div>
-                    <h2 class="text-xl font-semibold mb-1">Welcome, @Model.UserName</h2>
-                    <p class="text-gray-500">Here's your progress so far.</p>
-                </div>
-                <!-- Stats Cards -->
-                <div class="flex flex-col gap-4">
-                    <div class="flex flex-col md:flex-row md:flex-wrap gap-4 min-w-0">
-                        <!-- Active Goals -->
-                        <div class="flex-1 bg-blue-50 rounded-lg p-4 shadow flex flex-col items-center">
-                            <span class="text-2xl font-bold text-blue-600">@Model.ActiveGoalsCount</span>
-                            <span class="text-gray-600 text-sm mt-1">Active Goals</span>
-                        </div>
-                        <!-- Journal Entries -->
-                        <div class="flex-1 bg-purple-50 rounded-lg p-4 shadow flex flex-col items-center">
-                            <span class="text-2xl font-bold text-purple-600">@Model.JournalEntriesCount</span>
-                            <span class="text-gray-600 text-sm mt-1">Journal Entries</span>
-                        </div>
-                        <!-- Current Streak -->
-                        <div class="flex-1 bg-green-50 rounded-lg p-4 shadow flex flex-col items-center">
-                            <span class="text-2xl font-bold text-green-600">@Model.CurrentStreakCount</span>
-                            <span class="text-gray-600 text-sm mt-1">Current Streak</span>
-                        </div>
-                    </div>
-                </div>
-                <!-- Add New Goal Button -->
-                <a asp-controller="Goal" asp-action="Index" asp-area="User"
-                        class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow transition text-center block">
-                    Add New Goal
-                </a>
-            </section>
+	<!-- Main Content -->
+	<main class="pt-20 pb-8 px-2 md:px-6 max-w-7xl mx-auto">
+		<div class="flex flex-col md:flex-row gap-6">
+			<!-- Left Panel -->
+			<section class="w-full md:w-1/3 p-4 bg-white rounded-xl shadow-md flex flex-col gap-6 flex-1">
+				<!-- Welcome Message -->
+				<div>
+					<h2 class="text-xl font-semibold mb-1">Welcome, @Model.UserName</h2>
+					<p class="text-gray-500">Here's your progress so far.</p>
+				</div>
+				<!-- Stats Cards -->
+				<div class="flex flex-col gap-4">
+					<div class="flex flex-col md:flex-row md:flex-wrap gap-4 min-w-0">
+						<!-- Active Goals -->
+						<div class="flex-1 bg-blue-50 rounded-lg p-4 shadow flex flex-col items-center">
+							<span class="text-2xl font-bold text-blue-600">@Model.ActiveGoalsCount</span>
+							<span class="text-gray-600 text-sm mt-1">Active Goals</span>
+						</div>
+						<!-- Journal Entries -->
+						<div class="flex-1 bg-purple-50 rounded-lg p-4 shadow flex flex-col items-center">
+							<span class="text-2xl font-bold text-purple-600">@Model.JournalEntriesCount</span>
+							<span class="text-gray-600 text-sm mt-1">Journal Entries</span>
+						</div>
+						<!-- Current Streak -->
+						<div class="flex-1 bg-green-50 rounded-lg p-4 shadow flex flex-col items-center">
+							<span class="text-2xl font-bold text-green-600">@Model.CurrentStreakCount</span>
+							<span class="text-gray-600 text-sm mt-1">Current Streak</span>
+						</div>
+					</div>
+				</div>
+				<!-- Add New Goal Button -->
+				<a asp-controller="Goal" asp-action="Index" asp-area="User"
+				   class="mt-4 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-lg shadow transition text-center block">
+					Add New Goal
+				</a>
+			</section>
 
-            <!-- Right Panel -->
-            <section class="w-full md:w-2/3 p-4 bg-white rounded-xl shadow-md flex flex-col gap-6">
-                <h2 class="text-xl font-semibold mb-4">Recent Workouts</h2>
-                <div class="flex flex-col gap-4">
-                    @if (Model.RecentWorkouts != null && Model.RecentWorkouts.Any())
-                    {
-                        @foreach (var workout in Model.RecentWorkouts)
-                        {
-                            <div class="bg-gray-50 rounded-lg p-4 shadow flex flex-col gap-2">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-semibold text-gray-800">@workout.Title</span>
-                                    <span class="ml-auto text-xs text-gray-400">@workout.DurationDisplay</span>
-                                </div>
-                            </div>
-                        }
-                    }
-                    else
-                    {
-                        <div class="text-center text-gray-500 py-4">
-                            No recent workouts found.
-                        </div>
-                    }
-                </div>
-                <div class="mt-2 text-right">
-                    <a asp-controller="Workout" asp-action="Index" asp-area="User" class="text-blue-600 hover:underline font-medium text-sm">View All Workouts</a>
-                </div>
-            </section>
-        </div>
+			<!-- Right Panel -->
+			<section class="w-full md:w-2/3 p-4 bg-white rounded-xl shadow-md flex flex-col gap-6">
+				<h2 class="text-xl font-semibold mb-4">Recent Workouts</h2>
+				<div class="flex flex-col gap-4">
+					@if (Model.RecentWorkouts != null && Model.RecentWorkouts.Any())
+					{
+						@foreach (var workout in Model.RecentWorkouts)
+						{
+							<div class="bg-gray-50 rounded-lg p-4 shadow flex flex-col gap-2">
+								<div class="flex items-center gap-2">
+									<span class="font-semibold text-gray-800">@workout.Title</span>
+									<span class="ml-auto text-xs text-gray-400">@workout.Duration</span>
+								</div>
+							</div>
+						}
+					}
+					else
+					{
+						<div class="text-center text-gray-500 py-4">
+							No recent workouts found.
+						</div>
+					}
+				</div>
+				<div class="mt-2 text-right">
+					<a asp-controller="Workout" asp-action="Index" asp-area="User" class="text-blue-600 hover:underline font-medium text-sm">View All Workouts</a>
+				</div>
+			</section>
+		</div>
 
-        <!-- Social Feed Section -->
-        <div class="mt-8">
-            @if (ViewBag.ConvertedRecentPosts != null && ((IEnumerable<ActioNator.ViewModels.Community.PostCardViewModel>)ViewBag.ConvertedRecentPosts).Any())
-            {
-                <h2 class="text-xl font-semibold mb-4">Recent Posts</h2>
-                <div class="max-w-3xl mx-auto flex flex-col gap-4">
-                    @foreach (var post in (IEnumerable<ActioNator.ViewModels.Community.PostCardViewModel>)ViewBag.ConvertedRecentPosts)
-                    {
-                        @await Html.PartialAsync("_PostCardPartial", post)
-                    }
-                </div>
-                <div class="mt-4 text-right max-w-3xl mx-auto">
-                    <a href="#" class="text-blue-600 hover:underline font-medium text-sm">View All Posts</a>
-                </div>
-            }
-            else if (Model.RecentPosts != null && Model.RecentPosts.Any())
-            {
-                <div class="text-center text-gray-500 py-4 max-w-3xl mx-auto">
-                    Posts are available but could not be displayed due to model conversion issues.
-                </div>
-            }
-            else
-            {
-                <div class="text-center text-gray-500 py-4 max-w-3xl mx-auto">
-                    No recent posts found.
-                </div>
-            }
-        </div>
-    </main>
+		<!-- Social Feed Section -->
+		<div class="mt-8">
+			@if (Model.ConvertedRecentPosts != null && Model.ConvertedRecentPosts.Any())
+			{
+				<h2 class="text-xl font-semibold mb-4">Recent Posts</h2>
+				<div class="max-w-3xl mx-auto flex flex-col gap-4">
+					@foreach (var post in Model.ConvertedRecentPosts)
+					{
+						@await Html.PartialAsync("_PostCardPartial", post)
+					}
+				</div>
+				<div class="mt-4 text-right max-w-3xl mx-auto">
+					<a href="#" class="text-blue-600 hover:underline font-medium text-sm">View All Posts</a>
+				</div>
+			}
+			else if (Model.RecentPosts != null && Model.RecentPosts.Any())
+			{
+				<div class="text-center text-gray-500 py-4 max-w-3xl mx-auto">
+					Posts are available but could not be displayed due to model conversion issues.
+				</div>
+			}
+			else
+			{
+				<div class="text-center text-gray-500 py-4 max-w-3xl mx-auto">
+					No recent posts found.
+				</div>
+			}
+		</div>
+
+	</main>
 </div>

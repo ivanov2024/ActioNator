@@ -19,12 +19,12 @@
                         </button>
                     </div>
                 </div>
-                
+
                 <div class="flex items-center text-gray-600 mb-2">
-                    <i class="far fa-clock mr-2"></i>
-                    <span>@workout.DurationDisplay</span>
+                    <i class="fa-solid fa-calendar mr-2"></i>
+                    <span>@workout.DateDisplay</span>
                 </div>
-                
+
                 @if (!string.IsNullOrEmpty(workout.CompletedDateDisplay))
                 {
                     <div class="flex items-center text-green-600 mb-2">
@@ -32,11 +32,25 @@
                         <span>Completed: @workout.CompletedDateDisplay</span>
                     </div>
                 }
+                else
+                {
+                    <div class="flex items-center text-red-600 mb-2">
+                        <i class="far fa-calendar-times  mr-2"></i>
+                        <span>Not completed</span>
+                    </div>
+                }
+
+                <div class="flex items-center text-gray-600 mb-2">
+                    <i class="far fa-clock mr-2"></i>
+                    <span>@workout.Duration</span>
+                </div>
                 
-                @if (!string.IsNullOrEmpty(workout.Notes))
+                @if (!string.IsNullOrWhiteSpace(workout.Notes) && !string.Equals(workout.Notes.Trim(), "None", StringComparison.OrdinalIgnoreCase))
                 {
                     <div class="mt-4 text-gray-600">
-                        <p class="text-sm">@workout.Notes</p>
+                        <p class="text-sm overflow-hidden break-words" style="display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;">
+                            <span class="font-medium">Notes: </span>@workout.Notes
+                        </p>
                     </div>
                 }
                 
@@ -50,6 +64,7 @@
             </div>
         </div>
     }
+
 </div>
 
 @if (!Model.Any())

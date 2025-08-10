@@ -22,7 +22,6 @@ namespace ActioNator.ViewModels.Workout
         /// Name of the exercise
         /// </summary>
         [Required(ErrorMessage = "Exercise name is required")]
-        [StringLength(100, MinimumLength = 2, ErrorMessage = "Name must be between 2 and 100 characters")]
         [Display(Name = "Exercise Name")]
         public string Name { get; set; } = null!;
 
@@ -71,12 +70,6 @@ namespace ActioNator.ViewModels.Workout
         /// </summary>
         [Display(Name = "Exercise Template")]
         public Guid ExerciseTemplateId { get; set; }
-
-        /// <summary>
-        /// URL to the image representing this exercise
-        /// </summary>
-        [Url(ErrorMessage = "Please provide a valid URL")]
-        public string? ImageUrl { get; set; }
         
         /// <summary>
         /// Primary muscle group targeted by this exercise

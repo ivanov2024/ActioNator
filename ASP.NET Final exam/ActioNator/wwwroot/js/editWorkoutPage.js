@@ -4,32 +4,168 @@
  */
 
 // Store workout and exercise data globally to ensure it's accessible to Alpine components
-window.workoutData = {};
-window.exerciseOptionsData = [];
+window.workoutData = window.workoutData || {};
+window.exerciseOptionsData = window.exerciseOptionsData || [];
+
+// Shared API + toast helpers (re-uses global if present)
+const Api = window.Api || {
+    getToken() {
+        const el = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (el && el.value) return el.value;
+        // Fallback to meta tags if present
+        const meta = document.querySelector('meta[name="csrf-token"], meta[name="RequestVerificationToken"]');
+        return meta ? meta.getAttribute('content') : null;
+    },
+    async withTimeout(promise, ms, controller) {
+        let timeoutId;
+        const timeout = new Promise((_, reject) => {
+            timeoutId = setTimeout(() => {
+                try { controller && controller.abort(); } catch (_) {}
+                reject(new Error(`Timeout after ${ms}ms`));
+            }, ms);
+        });
+        try {
+            return await Promise.race([promise, timeout]);
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    },
+    async get(url, { headers = {}, timeoutMs = 10000 } = {}) {
+        const token = this.getToken();
+        const controller = new AbortController();
+        const res = await this.withTimeout(fetch(url, {
+            method: 'GET',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                ...(token ? { 'RequestVerificationToken': token } : {}),
+                ...headers
+            },
+            signal: controller.signal
+        }), timeoutMs, controller);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res;
+    },
+    async postForm(url, formData, { headers = {}, timeoutMs = 10000, redirect = 'manual' } = {}) {
+        const token = this.getToken();
+        const controller = new AbortController();
+        const res = await this.withTimeout(fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                ...(token ? { 'RequestVerificationToken': token } : {}),
+                ...headers
+            },
+            redirect,
+            signal: controller.signal
+        }), timeoutMs, controller);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res;
+    },
+    async postUrlEncoded(url, data, { headers = {}, timeoutMs = 10000, redirect = 'manual' } = {}) {
+        const token = this.getToken();
+        const controller = new AbortController();
+        const res = await this.withTimeout(fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/x-www-form-urlencoded',
+                ...headers
+            },
+            redirect,
+            body: new URLSearchParams({
+                ...(token ? { __RequestVerificationToken: token } : {}),
+                ...data
+            }).toString(),
+            signal: controller.signal
+        }), timeoutMs, controller);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res;
+    },
+    async postJson(url, json, { headers = {}, timeoutMs = 10000, redirect = 'manual' } = {}) {
+        const token = this.getToken();
+        const controller = new AbortController();
+        const res = await this.withTimeout(fetch(url, {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest',
+                'Content-Type': 'application/json',
+                // Send both common header names for maximum compatibility
+                ...(token ? { 'RequestVerificationToken': token, 'X-CSRF-TOKEN': token } : {}),
+                ...headers
+            },
+            redirect,
+            // Also include the token in the JSON body as a fallback; extra props are ignored by model binding
+            body: JSON.stringify(token ? { __RequestVerificationToken: token, ...json } : json),
+            signal: controller.signal
+        }), timeoutMs, controller);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res;
+    }
+};
+
+let __emitToastGuard = false;
+const emitToast = window.emitToast || function(type, message) {
+    if (__emitToastGuard) return;
+    __emitToastGuard = true;
+    try {
+        // Prefer direct showToast if available; otherwise, emit a single event.
+        if (typeof window.showToast === 'function') {
+            try {
+                console.debug('[TOAST] showToast invoked:', { type, message });
+                window.showToast(type, message);
+            } catch (e) {
+                console.warn('[TOAST] window.showToast failed, falling back to event:', e);
+                window.dispatchEvent(new CustomEvent('show-toast', { detail: { type, message } }));
+            }
+        } else {
+            console.debug('[TOAST] dispatching show-toast event:', { type, message });
+            window.dispatchEvent(new CustomEvent('show-toast', { detail: { type, message } }));
+        }
+    } catch (err) {
+        console.error('[TOAST] Error dispatching toast:', err);
+        try { alert(`${String(type || 'info').toUpperCase()}: ${message}`); } catch (_) {}
+    } finally {
+        setTimeout(() => { __emitToastGuard = false; }, 0);
+    }
+};
 
 // Initialize data when document is ready
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Document ready, initializing workout page');
-    
+
     // Log the available data from the server
-    console.log('Server workout model data:', window.workoutModelData);
+    console.log('Server workout data:', window.workoutData);
     console.log('Server exercise options:', window.exerciseOptionsData);
-    
+
     // Ensure data is available globally
-    window.workoutData = window.workoutModelData || {};
+    window.workoutData = window.workoutData || {};
     window.exerciseOptionsData = window.exerciseOptionsData || [];
-    
+
     // Make sure exercises array exists
-    if (!window.workoutData.exercises && window.workoutModelData && window.workoutModelData.exercises) {
-        window.workoutData.exercises = window.workoutModelData.exercises;
-        console.log('Initialized exercises from server model:', window.workoutData.exercises);
+    if (!window.workoutData.exercises || !Array.isArray(window.workoutData.exercises)) {
+        window.workoutData.exercises = [];
     }
-    
+
     // Set up image preview functionality
     setupImagePreview();
-    
-    // Set up workout form submission
-    setupWorkoutFormSubmission();
+    // Keep normal POST submission; do not hijack via AJAX. Only ensure hidden JSON is set.
+    const editWorkoutForm = document.getElementById('editWorkoutForm');
+    if (editWorkoutForm) {
+        editWorkoutForm.addEventListener('submit', function() {
+            try {
+                const exercises = Array.isArray(window.workoutData?.exercises)
+                    ? window.workoutData.exercises
+                    : (Array.isArray(window.workoutData?.Exercises) ? window.workoutData.Exercises : []);
+                const exercisesDataField = document.getElementById('exercisesData');
+                if (exercisesDataField) {
+                    exercisesDataField.value = JSON.stringify(exercises);
+                }
+            } catch (e) {
+                console.warn('Could not prepare exercisesJson for submit:', e);
+            }
+        });
+    }
 });
 
 // Setup image preview functionality
@@ -51,7 +187,9 @@ function updateImagePreview(exerciseSelect, imagePreview) {
     const imageUrl = selectedOption ? selectedOption.getAttribute('data-img') : null;
     
     if (imageUrl) {
-        imagePreview.src = imageUrl;
+        // Normalize potential application-root URLs like "~/images/..."
+        const normalized = imageUrl.replace(/^~\//, '/');
+        imagePreview.src = normalized;
         imagePreview.style.display = 'block';
     } else {
         imagePreview.style.display = 'none';
@@ -60,259 +198,10 @@ function updateImagePreview(exerciseSelect, imagePreview) {
 
 // Setup workout form submission via AJAX
 function setupWorkoutFormSubmission() {
+    // Disabled: Keep normal form POST submission as per project preference.
     const editWorkoutForm = document.getElementById('editWorkoutForm');
-    const saveWorkoutBtn = document.getElementById('saveWorkoutBtn');
-    const saveWorkoutBtnText = document.getElementById('saveWorkoutBtnText');
-    const saveWorkoutBtnLoading = document.getElementById('saveWorkoutBtnLoading');
-    
-    if (editWorkoutForm && saveWorkoutBtn) {
-        editWorkoutForm.onsubmit = function(e) {
-            e.preventDefault();
-            
-            // Show loading state
-            saveWorkoutBtnText.classList.add('hidden');
-            saveWorkoutBtnLoading.classList.remove('hidden');
-            saveWorkoutBtn.disabled = true;
-            
-            // Get form data
-            const formData = new FormData(editWorkoutForm);
-            
-            // Log all FormData values for debugging
-            console.log('Submitting workout form with data:');
-            for (const [key, value] of formData.entries()) {
-                console.log(`${key}: ${value}`);
-            }
-            
-            // Check for required fields
-            const title = formData.get('Title');
-            
-            // Get exercises from the correct global variable
-            const exercises = window.workoutModelData?.exercises || [];
-            const exercisesCount = exercises.length;
-            
-            console.log(`Title: ${title}, Exercises count: ${exercisesCount}`);
-            console.log('Exercises data:', exercises);
-            
-            // Validate required fields client-side
-            let hasErrors = false;
-            let errorMessages = [];
-            
-            if (!title || title.trim() === '') {
-                hasErrors = true;
-                errorMessages.push('Title is required');
-            }
-            
-            // Ensure exercises data is included in the form submission
-            const exercisesDataField = document.getElementById('exercisesData');
-            if (exercisesDataField && exercises.length > 0) {
-                try {
-                    // Serialize exercises to JSON and store in the hidden field
-                    const exercisesJson = JSON.stringify(exercises);
-                    exercisesDataField.value = exercisesJson;
-                    console.log('Serialized exercises JSON:', exercisesJson);
-                    
-                    // Also add each exercise as a form field for model binding
-                    exercises.forEach((exercise, index) => {
-                        Object.keys(exercise).forEach(key => {
-                            formData.append(`Exercises[${index}].${key}`, exercise[key] || '');
-                        });
-                    });
-                } catch (error) {
-                    console.error('Error serializing exercises:', error);
-                }
-            } else {
-                console.warn('No exercises found or exercises data field missing');
-            }
-            
-            if (exercisesCount === 0) {
-                hasErrors = true;
-                errorMessages.push('At least one exercise is required');
-            }
-            
-            if (hasErrors) {
-                console.warn('Client-side validation errors:', errorMessages);
-                // Show errors but continue with submission to see server response
-            }
-            
-            // Send AJAX request
-            fetch(editWorkoutForm.action, {
-                method: 'POST',
-                body: formData,
-                headers: {
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                redirect: 'error'
-            })
-            .then(response => {
-                // Reset loading state
-                saveWorkoutBtnText.classList.remove('hidden');
-                saveWorkoutBtnLoading.classList.add('hidden');
-                saveWorkoutBtn.disabled = false;
-                
-                console.log(`Response status: ${response.status}`);
-                
-                if (!response.ok) {
-                    throw new Error(`Server returned ${response.status}: ${response.statusText}`);
-                }
-                
-                // Check content type to determine how to parse the response
-                const contentType = response.headers.get('content-type');
-                if (contentType && contentType.includes('application/json')) {
-                    return response.json();
-                } else {
-                    return response.text();
-                }
-            })
-            .then(data => {
-                try {
-                    // Check if the response is already parsed as JSON
-                    if (typeof data === 'object') {
-                        console.log('Processing JSON response:', data);
-                        
-                        // Handle JSON response
-                        if (data.success === false) {
-                            // Show error toast
-                            showToast(data.toastType || 'error', data.toastMessage || 'Please fix the validation errors');
-                            
-                            // Handle validation errors if provided
-                            if (data.validationErrors) {
-                                console.log('Validation errors:', data.validationErrors);
-                                
-                                // Display validation errors on the form
-                                Object.keys(data.validationErrors).forEach(key => {
-                                    const errorMessages = data.validationErrors[key];
-                                    if (errorMessages && errorMessages.length > 0) {
-                                        console.log(`Error for ${key}: ${errorMessages[0]}`);
-                                        // Find the field and show error
-                                        const field = document.querySelector(`[name="${key}"]`);
-                                        if (field) {
-                                            field.classList.add('border-red-500');
-                                            
-                                            // Add error message below the field
-                                            const errorDiv = document.createElement('div');
-                                            errorDiv.className = 'text-red-500 text-sm mt-1';
-                                            errorDiv.textContent = errorMessages[0];
-                                            field.parentNode.appendChild(errorDiv);
-                                        }
-                                    }
-                                });
-                            }
-                            return;
-                        } else if (data.success === true) {
-                            // Show success toast
-                            showToast(data.toastType || 'success', data.toastMessage || 'Workout saved successfully');
-                            
-                            // Redirect to the workout list page
-                            window.location.href = '/User/Workout';
-                            return;
-                        }
-                    } else if (typeof data === 'string') {
-                        // Try to parse the string as JSON
-                        try {
-                            const jsonData = JSON.parse(data);
-                            console.log('Parsed JSON from text response:', jsonData);
-                            
-                            // Handle JSON response
-                            if (jsonData.success === false) {
-                                // Show error toast
-                                showToast(jsonData.toastType || 'error', jsonData.toastMessage || 'Please fix the validation errors');
-                                
-                                // Handle validation errors if provided
-                                if (jsonData.validationErrors) {
-                                    console.log('Validation errors:', jsonData.validationErrors);
-                                }
-                                return;
-                            } else if (jsonData.success === true) {
-                                // Show success toast
-                                showToast(jsonData.toastType || 'success', jsonData.toastMessage || 'Workout saved successfully');
-                                
-                                // Redirect to the workout list page
-                                window.location.href = '/User/Workout';
-                                return;
-                            }
-                        } catch (e) {
-                            // Not JSON, continue with HTML processing
-                            console.log('Response is not JSON, processing as HTML');
-                        }
-                    }
-                    
-                    // Parse the HTML response
-                    const parser = new DOMParser();
-                    const doc = parser.parseFromString(data, 'text/html');
-                    
-                    // Extract toast data
-                    const toastData = doc.querySelector('#toast-data');
-                    if (!toastData) {
-                        console.error('Toast data not found in response');
-                        window.dispatchEvent(new CustomEvent('show-toast', {
-                            detail: { type: 'error', message: 'An error occurred while saving the workout.' }
-                        }));
-                        return;
-                    }
-                    
-                    const success = toastData.dataset.success === 'true';
-                    const toastType = toastData.dataset.toastType || 'info';
-                    const toastMessage = toastData.dataset.toastMessage || 'Operation completed';
-                    
-                    // Show toast notification
-                    console.log(`[WORKOUT] Showing toast notification: ${toastType} - ${toastMessage}`);
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: {
-                            type: toastType,
-                            message: toastMessage
-                        }
-                    }));
-                    
-                    // Also try using the global showToast function if available
-                    if (typeof showToast === 'function') {
-                        console.log('[WORKOUT] Using global showToast function');
-                        showToast(toastType, toastMessage);
-                    }
-                    
-                    if (success) {
-                        // If successful, redirect to the workouts list after a short delay
-                        setTimeout(() => {
-                            window.location.href = '/User/Workout';
-                        }, 1000);
-                    } else {
-                        // Reset button state
-                        saveWorkoutBtnText.classList.remove('hidden');
-                        saveWorkoutBtnLoading.classList.add('hidden');
-                        saveWorkoutBtn.disabled = false;
-                        
-                        // Handle validation errors
-                        const validationErrors = doc.querySelectorAll('#validationErrors .validation-error');
-                        if (validationErrors && validationErrors.length > 0) {
-                            console.log(`[WORKOUT] Processing ${validationErrors.length} validation errors`);
-                            // Process validation errors - update the form with error messages
-                            validationErrors.forEach(error => {
-                                const field = error.dataset.field;
-                                const message = error.dataset.message;
-                                if (field && message) {
-                                    console.log(`[WORKOUT] Validation error for ${field}: ${message}`);
-                                    const errorSpan = document.querySelector(`[data-valmsg-for="${field}"]`);
-                                    if (errorSpan) {
-                                        errorSpan.textContent = message;
-                                    }
-                                }
-                            });
-                    }
-                }
-            )
-            .catch(error => {
-                console.error('Error saving workout:', error);
-                
-                // Reset button state
-                saveWorkoutBtnText.classList.remove('hidden');
-                saveWorkoutBtnLoading.classList.add('hidden');
-                saveWorkoutBtn.disabled = false;
-                
-                // Show error toast
-                window.dispatchEvent(new CustomEvent('show-toast', {
-                    detail: { type: 'error', message: 'An error occurred while saving the workout.' }
-                }));
-            });
-        };
+    if (editWorkoutForm) {
+        console.info('[EDIT WORKOUT] Using normal form POST; AJAX hijack disabled.');
     }
 }
 
@@ -347,24 +236,14 @@ document.addEventListener('alpine:init', function() {
         init() {
             // Load workout data from server with defensive initialization
             try {
-                // Initialize workout with safe defaults first
-                this.workout = {
-                    id: window.workoutData.id || "",
-                    title: window.workoutData.title || "",
-                    duration: window.workoutData.duration || 0,
-                    exercises: []
+                const src = window.workoutData || {};
+                const normalized = {
+                    id: (src.id ?? src.Id ?? ""),
+                    title: (src.title ?? src.Title ?? ""),
+                    duration: (src.duration ?? src.Duration ?? 0),
+                    exercises: Array.isArray(src.exercises ?? src.Exercises) ? (src.exercises ?? src.Exercises) : []
                 };
-                
-                // Then try to load from window data if available
-                if (window.workoutData) {
-                    this.workout = {
-                        id: window.workoutData.id || this.workout.id,
-                        title: window.workoutData.title || this.workout.title,
-                        duration: window.workoutData.duration || this.workout.duration,
-                        exercises: Array.isArray(window.workoutData.exercises) ? 
-                            window.workoutData.exercises : []
-                    };
-                }
+                this.workout = normalized;
                 
                 // Load exercise options with defensive check
                 this.exerciseOptions = [];
@@ -406,6 +285,60 @@ document.addEventListener('alpine:init', function() {
                     }, 100);
                 }
             });
+
+            // Ensure the shared delete modal can invoke the correct handler on this page.
+            // The shared _ModalPartial calls window.handlePostDeletion() when type === 'delete'.
+            // Bind it here so it calls this.confirmDelete() in the context of this Alpine component.
+            try {
+                window.handlePostDeletion = () => {
+                    try {
+                        console.debug('[EDIT WORKOUT] handlePostDeletion invoked');
+                        this.confirmDelete();
+                    } catch (e) {
+                        console.error('[EDIT WORKOUT] Error executing confirmDelete from handlePostDeletion:', e);
+                    }
+                };
+                console.log('[EDIT WORKOUT] Bound global handlePostDeletion for exercise deletion');
+            } catch (e) {
+                console.error('[EDIT WORKOUT] Failed to bind handlePostDeletion:', e);
+            }
+        },
+
+        // Helper: normalize URLs that may include application root prefix (~/)
+        _normalizeUrl(url) {
+            if (!url || typeof url !== 'string') return url;
+            return url.replace(/^~\//, '/');
+        },
+
+        // Fetch latest workout state from server and update local state
+        async refreshWorkoutFromServer() {
+            if (!this.workout?.id) return;
+            try {
+                const res = await Api.get(`/User/Workout/GetWorkoutJson?id=${encodeURIComponent(this.workout.id)}`);
+                const data = await res.json();
+                if (data && data.success && data.workout) {
+                    const w = data.workout;
+                    // Ensure exercises array and normalize any image URLs if present
+                    const exercises = Array.isArray(w.exercises) ? w.exercises.map(ex => ({
+                        ...ex,
+                        imageUrl: this._normalizeUrl(ex.imageUrl)
+                    })) : [];
+                    this.workout = {
+                        id: w.id || this.workout.id,
+                        title: w.title || this.workout.title,
+                        duration: typeof w.duration === 'number' ? w.duration : (this.workout.duration || 0),
+                        notes: w.notes || this.workout.notes,
+                        date: w.date || this.workout.date,
+                        completedAt: w.completedAt || this.workout.completedAt,
+                        exercises
+                    };
+                }
+            } catch (err) {
+                console.error('[WORKOUT] Failed to refresh workout from server:', err);
+            } finally {
+                // Always recalc duration from exercises to keep UI consistent
+                this.recalculateDuration();
+            }
         },
 
         // Reset exercise modal to default state
@@ -528,259 +461,126 @@ document.addEventListener('alpine:init', function() {
         },
         
         // Save exercise (add new or update existing)
-        saveExercise() {
+        async saveExercise() {
             // Validate the form
-            if (!this.validateExercise()) {
-                return;
-            }
+            if (!this.validateExercise()) return;
             if (this.savingExercise) return;
             this.savingExercise = true;
-            if (!this.workout) {
-                this.workout = { 
-                    id: window.workoutData.id || "",
-                    title: window.workoutData.title || "",
-                    duration: window.workoutData.duration || 0,
-                    exercises: [] 
-                };
-            }
-            // Find selected exercise name for payload
-            const selectedOpt = this.exerciseOptions.find(o => o.Id === this.exerciseModal.exerciseTemplateId);
-            const exerciseData = { ...this.exerciseModal };
-            
-            // Ensure proper casing for server-side model binding
-            exerciseData.workoutId = this.workout.id;
-            
-            // Debug: Log the exercise template ID to verify it's being set correctly
-            console.log('Exercise Template ID:', this.exerciseModal.exerciseTemplateId);
-            console.log('Selected Template:', selectedOpt);
-            
-            // Make sure both property casings are included to handle any model binding issues
-            exerciseData.ExerciseTemplateId = this.exerciseModal.exerciseTemplateId; // Capital E for model binding
-            exerciseData.exerciseTemplateId = this.exerciseModal.exerciseTemplateId; // Lowercase e as backup
-            
-            // When adding a new exercise, we'll let the server derive the name from the template
-            // This matches the behavior in the Edit modal where the name comes from the template
-            if (this.modalFormMode === 'add') {
-                // For new exercises, set the name from the template directly on the client side
-                // This ensures the name is always present in the payload
-                if (selectedOpt) {
-                    exerciseData.name = selectedOpt.Name;
-                    console.log('Setting name from template:', exerciseData.name);
+            try {
+                console.debug('[saveExercise] starting, mode:', this.modalFormMode);
+                if (!this.workout) {
+                    this.workout = {
+                        id: window.workoutData.id || "",
+                        title: window.workoutData.title || "",
+                        duration: window.workoutData.duration || 0,
+                        exercises: []
+                    };
+                }
+                // Prepare payload
+                const selectedOpt = this.exerciseOptions.find(o => o.Id === this.exerciseModal.exerciseTemplateId);
+                const exerciseData = { ...this.exerciseModal };
+                exerciseData.workoutId = this.workout.id;
+                // Include both casings for robust model binding
+                exerciseData.ExerciseTemplateId = this.exerciseModal.exerciseTemplateId;
+                exerciseData.exerciseTemplateId = this.exerciseModal.exerciseTemplateId;
+                if (this.modalFormMode === 'add') {
+                    exerciseData.name = selectedOpt ? selectedOpt.Name : 'Unnamed Exercise';
                 } else {
-                    exerciseData.name = 'Unnamed Exercise'; // Fallback name
-                    console.log('Using fallback name');
+                    exerciseData.name = selectedOpt ? selectedOpt.Name : this.exerciseModal.name;
                 }
-            } else {
-                // For editing, use the existing name or derive from template
-                exerciseData.name = selectedOpt ? selectedOpt.Name : this.exerciseModal.name;
-            }
-            
-            // Debug: Log the final payload
-            console.log('Exercise payload:', exerciseData);
-            let url = '';
-            if (this.modalFormMode === 'add') {
-                url = '/User/Workout/AddExercise';
-            } else if (this.modalFormMode === 'edit') {
-                url = '/User/Workout/UpdateExercise';
-                exerciseData.id = this.workout.exercises[this.editIdx].id;
-            }
-            
-            // Prevent form submission if we're already handling it via AJAX
-            const form = document.getElementById('addExerciseForm');
-            if (form) {
-                form.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                });
-            }
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]').value
-                },
-                body: JSON.stringify(exerciseData),
-                // Important: Ensure we don't follow redirects that would cause page replacement
-                redirect: 'error'
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`Network response was not ok: ${response.status}`);
+                let url = '';
+                if (this.modalFormMode === 'add') {
+                    url = '/User/Workout/AddExercise';
+                } else if (this.modalFormMode === 'edit') {
+                    url = '/User/Workout/UpdateExercise';
+                    exerciseData.id = this.workout.exercises[this.editIdx]?.id;
                 }
-                // Log the response for debugging
-                return response.text().then(text => {
-                    try {
-                        // Try to parse as JSON
-                        const data = JSON.parse(text);
-                        console.log('[WORKOUT] Exercise save response:', data);
-                        return data;
-                    } catch (e) {
-                        // If not valid JSON, throw error with the text
-                        console.error('[WORKOUT] Failed to parse response as JSON:', text);
-                        throw new Error(`Invalid JSON response: ${e.message}`);
-                    }
+                console.debug('[saveExercise] posting to:', url, 'payload:', {
+                    ...exerciseData,
+                    notes: exerciseData.notes ? '[len ' + String(exerciseData.notes).length + ']' : ''
                 });
-            })
-            .then(data => {
-                this.savingExercise = false;
-                
-                // Show toast notification
-                window.dispatchEvent(new CustomEvent('show-toast', {
-                    detail: {
-                        type: data.toastType || 'info',
-                        message: data.toastMessage || 'Operation completed'
-                    }
-                }));
-                
+                const response = await Api.postJson(url, exerciseData, { redirect: 'manual' });
+                console.debug('[saveExercise] response status:', response.status);
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    throw new Error('Invalid JSON response');
+                }
+                console.debug('[saveExercise] response json:', data);
+                // Emit toast exactly once
+                emitToast(data.toastType || 'info', data.toastMessage || 'Operation completed');
                 if (data.success) {
-                    // Use the exercise data directly from the JSON response
-                    const exerciseResult = data.exercise;
-                    
-                    if (this.modalFormMode === 'add') {
-                        // Add new exercise to the list
-                        if (!this.workout.exercises) this.workout.exercises = [];
-                        this.workout.exercises.push({
-                            id: exerciseResult?.id || exerciseData.id || crypto.randomUUID(),
-                            ...exerciseData,
-                            ...exerciseResult
-                        });
-                    } else if (this.modalFormMode === 'edit') {
-                        // Update existing exercise
-                        this.workout.exercises[this.editIdx] = {
-                            id: this.workout.exercises[this.editIdx].id,
-                            ...exerciseData,
-                            ...exerciseResult
-                        };
+                    console.debug('[saveExercise] success received, refreshing workout from server...');
+                    // Refresh full workout state from server to ensure canonical data (incl. normalized image URLs)
+                    try {
+                        await this.refreshWorkoutFromServer();
+                        console.debug('[saveExercise] workout refreshed successfully');
+                    } catch (rfErr) {
+                        console.error('[saveExercise] refreshWorkoutFromServer failed:', rfErr);
+                    } finally {
+                        // Close the modal after a successful server response regardless of refresh outcome
+                        this.showExerciseModal = false;
+                        console.debug('[saveExercise] modal closed');
                     }
-                    this.showExerciseModal = false;
                     // Clear validation errors
                     this.validationErrors = {};
-                    
-                    // Update workout duration if provided
-                    if (exerciseResult?.duration) {
-                        this.recalculateDuration();
-                    }
-                } else {
+                    // Optionally reset modal fields after close (kept minimal to not disrupt next open)
+                } else if (data.errors) {
                     // Handle validation errors from server
-                    if (data.errors) {
-                        // Reset validation errors
-                        this.validationErrors = {};
-                        
-                        // Process validation errors
-                        Object.entries(data.errors).forEach(([field, messages]) => {
-                            if (messages && messages.length > 0) {
-                                this.validationErrors[field.toLowerCase()] = messages[0];
+                    this.validationErrors = {};
+                    Object.entries(data.errors).forEach(([field, messages]) => {
+                        if (messages && messages.length > 0) {
+                            this.validationErrors[String(field).toLowerCase()] = messages[0];
+                        }
+                    });
+                    // Update validation messages in the UI
+                    this.$nextTick(() => {
+                        Object.keys(this.validationErrors).forEach(field => {
+                            const errorSpan = document.querySelector(`[data-valmsg-for="${field}"]`);
+                            if (errorSpan) {
+                                errorSpan.textContent = this.validationErrors[field];
                             }
                         });
-                        
-                        // Update validation messages in the UI
-                        this.$nextTick(() => {
-                            Object.keys(this.validationErrors).forEach(field => {
-                                const errorSpan = document.querySelector(`[data-valmsg-for="${field}"]`);
-                                if (errorSpan) {
-                                    errorSpan.textContent = this.validationErrors[field];
-                                }
-                            });
-                        });
-                    }
+                    });
+                    console.debug('[saveExercise] validation errors set:', this.validationErrors);
                 }
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Error saving exercise:', error);
+                emitToast('error', 'An error occurred while saving the exercise.');
+            } finally {
                 this.savingExercise = false;
-                
-                // Create a more descriptive error message
-                let errorMessage = 'An error occurred while saving the exercise.';
-                if (error.message) {
-                    errorMessage += ' ' + error.message;
-                }
-                
-                // Dispatch toast event with circuit breaker to prevent infinite loops
-                let toastAttempts = window._toastAttempts || 0;
-                if (toastAttempts < 3) { // Prevent infinite toast loops
-                    window._toastAttempts = toastAttempts + 1;
-                    window.dispatchEvent(new CustomEvent('show-toast', {
-                        detail: { type: 'error', message: errorMessage }
-                    }));
-                    
-                    // Reset toast attempts counter after a delay
-                    setTimeout(() => {
-                        window._toastAttempts = 0;
-                    }, 2000);
-                }
-            });
+                console.debug('[saveExercise] finished');
+            }
         },
 
         // Confirm exercise deletion
-        confirmDelete() {
+        async confirmDelete() {
             if (this.deleteIndex === null || !this.workout.exercises[this.deleteIndex]) return;
             const exerciseId = this.workout.exercises[this.deleteIndex].id;
-            const deleteIndex = this.deleteIndex; // Store for closure
-            
-            fetch('/User/Workout/DeleteExercise', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'RequestVerificationToken': document.querySelector('input[name=__RequestVerificationToken]').value
-                },
-                body: JSON.stringify({ id: exerciseId }),
-                // Important: Ensure we don't follow redirects that would cause page replacement
-                redirect: 'error'
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('Network response was not ok');
+            try {
+                const response = await Api.postJson('/User/Workout/DeleteExercise', { id: exerciseId }, { redirect: 'manual' });
+                const text = await response.text();
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    throw new Error('Invalid JSON response');
                 }
-                // Log the response for debugging
-                return response.text().then(text => {
-                    try {
-                        // Try to parse as JSON
-                        const data = JSON.parse(text);
-                        console.log('[WORKOUT] Exercise delete response:', data);
-                        return data;
-                    } catch (e) {
-                        // If not valid JSON, throw error with the text
-                        console.error('[WORKOUT] Failed to parse response as JSON:', text);
-                        throw new Error(`Invalid JSON response: ${e.message}`);
-                    }
-                });
-            })
-            .then(data => {
-                // Use the JSON response data directly
                 const success = data.success === true;
-                const toastType = data.toastType || 'info';
-                const toastMessage = data.toastMessage || 'Operation completed';
-                
-                // Show toast notification
-                window.dispatchEvent(new CustomEvent('show-toast', {
-                    detail: {
-                        type: toastType,
-                        message: toastMessage
-                    }
-                }));
-                
+                emitToast(data.toastType || 'info', data.toastMessage || 'Operation completed');
                 if (success) {
-                    // Remove the exercise from the list
-                    if (this.workout.exercises && this.deleteIndex !== null) {
-                        this.workout.exercises.splice(this.deleteIndex, 1);
-                        this.deleteIndex = null;
-                        
-                        // Recalculate workout duration
-                        this.recalculateDuration();
-                    }
+                    await this.refreshWorkoutFromServer();
                 } else {
                     console.error('Failed to delete exercise:', data);
                 }
-                this.deleteIndex = null;
-            })
-            .catch(error => {
+            } catch (error) {
                 console.error('Error deleting exercise:', error);
-                window.dispatchEvent(new CustomEvent('show-toast', {
-                    detail: { type: 'error', message: 'Error deleting exercise' }
-                }));
+                emitToast('error', 'Error deleting exercise');
+            } finally {
                 this.deleteIndex = null;
-            });
+            }
         },
 
         // Recalculate workout duration based on exercise durations
@@ -788,5 +588,5 @@ document.addEventListener('alpine:init', function() {
             // Sum all durations
             this.workout.duration = this.workout.exercises.reduce((sum, ex) => sum + (ex.duration || 0), 0);
         }
-    });
+    }));
 });

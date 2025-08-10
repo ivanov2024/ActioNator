@@ -157,14 +157,13 @@ namespace ActioNator.Services.Implementations.Community
                     IsDeleted = r.IsDeleted,
                     Comments = new List<PostCommentViewModel>(), // load on-demand or via separate query when client requests
                     Images = r
-                .Images
-                .Select(i => new PostImageViewModel
-                {
-                    Id = i.Id,
-                    PostId = r.Id,
-                    ImageUrl = i.ImageUrl,
-                    CreatedAt = DateTime.UtcNow // if you need accurate CreatedAt, add it to PostImage entity
-                }).ToList()
+                    .Images
+                    .Select(i => new PostImageViewModel
+                    {
+                        Id = i.Id,
+                        PostId = r.Id,
+                        ImageUrl = i.ImageUrl,
+                    }).ToList()
                 }).ToList();
 
             return results;

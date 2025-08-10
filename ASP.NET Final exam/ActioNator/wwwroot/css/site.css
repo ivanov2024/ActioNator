@@ -20,3 +20,11 @@ html {
 body {
   margin-bottom: 60px;
 }
+
+/* Multi-line ellipsis for notes preview (display-only contexts) */
+.notes-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3; /* number of lines to show */
+  overflow: hidden;
+}

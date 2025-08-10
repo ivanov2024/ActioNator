@@ -3,97 +3,119 @@ using ActioNator.Data.Models;
 using ActioNator.Services.Interfaces.WorkoutService;
 using ActioNator.ViewModels.Workout;
 using ActioNator.ViewModels.Workouts;
+using CloudinaryDotNet;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace ActioNator.Services.Implementations.WorkoutService
 {
     public class WorkoutService : IWorkoutService
     {
         private readonly ActioNatorDbContext _dbContext;
+        private readonly ILogger<WorkoutService> _logger;
 
-        public WorkoutService(ActioNatorDbContext dbContext)
+        public WorkoutService(ActioNatorDbContext dbContext, ILogger<WorkoutService> logger)
         {
-            _dbContext = dbContext;
+            _dbContext = dbContext
+                ?? throw new ArgumentNullException(nameof(dbContext), "Database context cannot be null");
+
+            _logger = logger
+                ?? throw new ArgumentNullException(nameof(logger), "Logger cannot be null");
         }
 
         public async Task<IEnumerable<WorkoutCardViewModel>> GetAllWorkoutsAsync(Guid? userId)
         {
-            // Fetch workouts with includes to prevent null reference exceptions
-            var workouts = await _dbContext.Workouts
+            if (userId == Guid.Empty)
+            {
+                _logger.LogError("Attempted to retrieve workouts with an empty user ID.");
+
+                throw new ArgumentException("User ID cannot be empty.", nameof(userId));
+            }
+
+            List<Workout>? workouts
+                = await
+                _dbContext
+                .Workouts
                 .AsNoTracking()
-                .Include(w => w.Exercises.Where(e => !e.IsDeleted))
-                    .ThenInclude(e => e.ExerciseTemplate)
-                .Where(w => w.UserId == userId && !w.IsDeleted)
+                .Where(w => w.UserId == userId)
+                .Include(w => w.Exercises)
+                .ThenInclude(e => e.ExerciseTemplate)
                 .OrderByDescending(w => w.Date)
                 .AsSplitQuery()
                 .ToListAsync();
 
-            // Then map to view models with client-side evaluation and null guards
             return workouts.Select(w => new WorkoutCardViewModel
             {
                 Id = w.Id,
                 Title = w.Title ?? string.Empty,
                 Notes = w.Notes ?? string.Empty,
+                Date = w.Date,
                 Duration = CalculateWorkoutDuration(w.Exercises),
                 CompletedAt = w.CompletedAt,
+                IsCompleted = w.CompletedAt != null,
                 Exercises = (w.Exercises ?? Enumerable.Empty<Exercise>())
-                    .Where(e => !e.IsDeleted)
-                    .Select(e => new ExerciseViewModel
-                    {
-                        Id = e.Id,
-                        WorkoutId = e.WorkoutId,
-                        Name = e.ExerciseTemplate?.Name ?? "Unknown Exercise",
-                        Sets = e.Sets,
-                        Reps = e.Reps,
-                        Weight = e.Weight,
-                        Notes = e.Notes ?? string.Empty,
-                        Duration = (int)(e.Duration.TotalMinutes),
-                        ExerciseTemplateId = e.ExerciseTemplateId,
-                        ImageUrl = e.ExerciseTemplate?.ImageUrl ?? string.Empty,
-                        TargetedMuscle = e.ExerciseTemplate?.TargetedMuscle ?? string.Empty
-                    }).ToList() ?? new List<ExerciseViewModel>()
-            }).ToList();
+                .Select(e => new ExerciseViewModel
+                {
+                    Id = e.Id,
+                    WorkoutId = e.WorkoutId,
+                    Name = e.ExerciseTemplate?.Name ?? string.Empty,
+                    Sets = e.Sets,
+                    Reps = e.Reps,
+                    Weight = e.Weight,
+                    Notes = e.Notes ?? string.Empty,
+                    Duration = (int)e.Duration.TotalMinutes,
+                    ExerciseTemplateId = e.ExerciseTemplateId,
+                    TargetedMuscle = e.ExerciseTemplate?.TargetedMuscle ?? string.Empty
+                }).ToList()
+            });
         }
 
-        public async Task<WorkoutCardViewModel?> GetWorkoutByIdAsync(Guid workoutId, Guid? userId)
+        public async Task<WorkoutCardViewModel?> GetWorkoutByIdAsync(Guid? workoutId, Guid? userId)
         {
-            // First fetch the workout with basic properties and include related entities
-            var workout = await _dbContext
+            if (userId == Guid.Empty)
+            {
+                _logger
+                    .LogError("Attempted to retrieve a workout with an empty user ID.");
+
+                throw new ArgumentException("User ID cannot be empty.", nameof(userId));
+            }
+
+            Workout? workout
+                = await
+                _dbContext
                 .Workouts
                 .AsNoTracking()
-                .Include(w => w.Exercises.Where(e => !e.IsDeleted))
-                    .ThenInclude(e => e.ExerciseTemplate)
-                .Where(w => w.Id == workoutId
-                    && w.UserId == userId && !w.IsDeleted)
-                .FirstOrDefaultAsync();
+                .Include(w => w.Exercises)
+                .ThenInclude(e => e.ExerciseTemplate)
+                .FirstOrDefaultAsync(w => w.Id == workoutId
+                    && w.UserId == userId);
 
-            // Return null if workout not found
             if (workout == null)
                 return null;
 
-            // Then map to view model with client-side evaluation and null guards
             return new WorkoutCardViewModel
             {
                 Id = workout.Id,
                 Title = workout.Title ?? string.Empty,
                 Notes = workout.Notes ?? string.Empty,
+                Date = workout.Date,
                 Duration = workout.Duration,
                 CompletedAt = workout.CompletedAt,
+                IsCompleted = workout.CompletedAt != null,
                 Exercises = (workout.Exercises ?? Enumerable.Empty<Exercise>())
-                    .Select(e => new ExerciseViewModel
-                    {
-                        Id = e.Id,
-                        WorkoutId = e.WorkoutId,
-                        Name = e.ExerciseTemplate?.Name ?? "Unknown Exercise",
-                        Sets = e.Sets,
-                        Reps = e.Reps,
-                        Weight = e.Weight,
-                        Notes = e.Notes ?? string.Empty,
-                        Duration = (int)(e.Duration.TotalMinutes),
-                        ExerciseTemplateId = e.ExerciseTemplateId,
-                        ImageUrl = e.ExerciseTemplate?.ImageUrl ?? string.Empty,
-                        TargetedMuscle = e.ExerciseTemplate?.TargetedMuscle ?? string.Empty
-                    }).ToList() ?? new List<ExerciseViewModel>()
+                .Select(e => new ExerciseViewModel
+                {
+                    Id = e.Id,
+                    WorkoutId = e.WorkoutId,
+                    Name = e.ExerciseTemplate?.Name!,
+                    Sets = e.Sets,
+                    Reps = e.Reps,
+                    Weight = e.Weight,
+                    Notes = e.Notes ?? string.Empty,
+                    Duration = (int)e.Duration.TotalMinutes,
+                    ExerciseTemplateId = e.ExerciseTemplateId,
+                    TargetedMuscle = e.ExerciseTemplate?.TargetedMuscle ?? string.Empty
+                }).ToList()
             };
         }
 
@@ -101,77 +123,206 @@ namespace ActioNator.Services.Implementations.WorkoutService
         {
             if (userId == null)
             {
+                _logger.LogError("Attempted to create a workout without a valid user ID.");
+
                 throw new ArgumentNullException(nameof(userId), "User ID cannot be null when creating a workout");
             }
 
-            // Create a new workout entity
-            var newWorkout = new Workout
+            if (workout == null)
+            {
+                _logger.LogError("Attempted to create a workout with a null workout model.");
+
+                throw new ArgumentNullException(nameof(workout), "Workout cannot be null");
+            }
+
+            if (string.IsNullOrWhiteSpace(workout.Title))
+            {  
+                _logger.LogError("Attempted to create a workout with an empty title.");
+
+                throw new ArgumentException("Workout title cannot be empty.", nameof(workout.Title));
+            }
+
+            Workout newWorkout = new()
             {
                 Id = Guid.NewGuid(),
-                Title = workout.Title,
-                Date = DateTime.UtcNow.Date, // Use current date since Date is not in WorkoutCardViewModel
-                Notes = workout.Notes,
-                Duration = TimeSpan.Zero, // Will be updated if exercises are added later
-                UserId = userId.Value // Use the provided userId
+                Title = workout.Title.Trim(),
+                // The date must come directly from the user's input; no server-side fallback/defaults.
+                // Controller-level model validation guarantees Date has a valid value here.
+                Date = workout.Date 
+                ?? throw new ArgumentException("Date is required and must be valid.", nameof(workout.Date)),
+                Notes = workout.Notes?.Trim(),
+                Duration = TimeSpan.Zero,
+                UserId = userId.Value
             };
 
-            // Add the workout to the database
-            await _dbContext.Workouts.AddAsync(newWorkout);
-            await _dbContext.SaveChangesAsync();
+            await
+                _dbContext
+                .Workouts
+                .AddAsync(newWorkout);
 
-            // Return the created workout with ID
-            workout.Id = newWorkout.Id;
-            return workout;
+            await
+                _dbContext
+                .SaveChangesAsync();
+
+            // Map entity to ViewModel to ensure consistent returned data
+            return new WorkoutCardViewModel
+            {
+                Id = newWorkout.Id,
+                Title = newWorkout.Title,
+                Date = newWorkout.Date,
+                Notes = newWorkout.Notes,
+                Duration = newWorkout.Duration,
+                CompletedAt = newWorkout.CompletedAt,
+                IsCompleted = newWorkout.CompletedAt != null
+            };
         }
 
         public async Task<WorkoutCardViewModel> UpdateWorkoutAsync(WorkoutCardViewModel workout, Guid? userId)
         {
+            if (userId == null || workout.Id == Guid.Empty)
+            {
+                _logger.LogError("Attempted to update a workout without a valid user ID or workout ID.");
+                throw new ArgumentException("Invalid parameters.");
+            }
+
             // Find the workout
-            var existingWorkout = await _dbContext.Workouts
-                .FirstOrDefaultAsync(w => w.Id == workout.Id && w.UserId == userId && !w.IsDeleted);
+            Workout? existingWorkout
+                = await
+                _dbContext
+                .Workouts
+                .Include(w => w.Exercises)
+                .FirstOrDefaultAsync(w => w.Id == workout.Id
+                    && w.UserId == userId);
+
 
             if (existingWorkout == null)
-                throw new InvalidOperationException("Workout not found or you don't have permission to update it.");
+            {
+                _logger
+                    .LogWarning($"Workout with ID {workout.Id} not found for user {userId}.");
 
-            // Update the workout entity
+                throw new InvalidOperationException("Workout not found or you don't have permission to update it.");
+            }
+
+            // Update properties
             existingWorkout.Title = workout.Title;
             existingWorkout.Notes = workout.Notes;
+            // Update date (validated at controller level)
+            if (workout.Date.HasValue)
+            {
+                existingWorkout.Date = workout.Date.Value;
+            }
 
-            // Duration will be recalculated from exercises, not taken from the model
+            // Toggle completion state based on IsCompleted flag
+            if (workout.IsCompleted)
+            {
+                if (!existingWorkout.CompletedAt.HasValue)
+                {
+                    existingWorkout.CompletedAt = DateTime.UtcNow;
+                }
+            }
+            else
+            {
+                // If user unchecks completion, clear the timestamp
+                if (existingWorkout.CompletedAt.HasValue)
+                {
+                    existingWorkout.CompletedAt = null;
+                }
+            }
 
-            await _dbContext.SaveChangesAsync();
-            return workout;
+            // Recalculate total duration from non-deleted exercises using ticks for precision
+            existingWorkout.Duration = CalculateWorkoutDuration(
+                existingWorkout.Exercises?.Where(e => !e.IsDeleted)
+            );
+
+            await
+                _dbContext
+                .SaveChangesAsync();
+
+            // Map updated entity back to ViewModel
+            return new WorkoutCardViewModel
+            {
+                Id = existingWorkout.Id,
+                Title = existingWorkout.Title,
+                Notes = existingWorkout.Notes,
+                Date = existingWorkout.Date,
+                Duration = existingWorkout.Duration,
+                CompletedAt = existingWorkout.CompletedAt,
+                IsCompleted = existingWorkout.CompletedAt != null
+            };
         }
 
-        public async Task<bool> DeleteWorkoutAsync(Guid workoutId, Guid? userId)
+        public async Task<bool> DeleteWorkoutAsync(Guid? workoutId, Guid? userId)
         {
+            if (workoutId == Guid.Empty)
+            {
+                _logger.LogError("Attempted to delete a workout with an empty ID.");
+
+                throw new ArgumentException("Workout ID cannot be empty.", nameof(workoutId));
+            }
+
+            if (!userId.HasValue || userId == Guid.Empty)
+            {
+                _logger.LogError("Attempted to delete a workout without a valid user ID.");
+
+                throw new ArgumentException("User ID cannot be null or empty.", nameof(userId));
+            }
+
             Workout? workout
-                = await _dbContext
+                = await
+                _dbContext
                 .Workouts
-                .FirstOrDefaultAsync(w => w.Id == workoutId
-                && w.UserId == userId && !w.IsDeleted);
+                .SingleOrDefaultAsync(w => w.Id == workoutId
+                    && w.UserId == userId);
 
             if (workout == null)
             {
+                _logger.LogCritical($"Workout with ID {workoutId} not found or does not belong to user {userId}.");
                 return false;
             }
 
-            // Soft delete
-            workout.IsDeleted = true;
-            await _dbContext.SaveChangesAsync();
+            workout
+                .IsDeleted = true;
+
+            await
+                _dbContext
+                .SaveChangesAsync();
+
             return true;
         }
 
         public async Task<ExerciseViewModel> AddExerciseAsync(ExerciseViewModel exercise, Guid? userId)
         {
-            // Verify the workout belongs to the user
+            if (!userId.HasValue || userId == Guid.Empty)
+            {
+                _logger.LogError("Attempted to add an exercise without a valid user ID.");
+
+                throw new ArgumentException("User ID cannot be null or empty.", nameof(userId));
+            }
+
+            if (exercise == null)
+            {
+                _logger
+                    .LogError("Attempted to add a null exercise.");
+                throw new ArgumentNullException(nameof(exercise));
+            }
+
+            // Verify workout ownership
             Workout? workout
-                = await _dbContext
+                = await
+                _dbContext
                 .Workouts
                 .FirstOrDefaultAsync(w => w.Id == exercise.WorkoutId
-                && w.UserId == userId && !w.IsDeleted)
-                ?? throw new InvalidOperationException($"Workout with ID {exercise.WorkoutId} not found or you don't have permission to modify it.");
+                    && w.UserId == userId);
 
+            if (workout == null)
+            {
+                _logger
+                    .LogCritical($"Workout with ID {exercise.WorkoutId} not found for user {userId}.");
+
+                throw new InvalidOperationException($"Workout with ID {exercise.WorkoutId} not found or you don't have permission to modify it.");
+            }
+
+            // Create new exercise
             Exercise newExercise = new()
             {
                 Id = Guid.NewGuid(),
@@ -184,87 +335,127 @@ namespace ActioNator.Services.Implementations.WorkoutService
                 Duration = TimeSpan.FromMinutes(exercise.Duration)
             };
 
-            await _dbContext
+            await
+                _dbContext
                 .Exercises
                 .AddAsync(newExercise);
-            await _dbContext.SaveChangesAsync();
 
-            // Recalculate workout duration from all non-deleted exercises
-            var exercises = await _dbContext.Exercises
+            await
+                _dbContext
+                .SaveChangesAsync();
+
+            // Recalculate workout duration by materializing durations then summing client-side to avoid EF translation issues
+            var durationsAdd = await _dbContext
+                .Exercises
                 .Where(e => e.WorkoutId == workout.Id && !e.IsDeleted)
+                .Select(e => e.Duration)
                 .ToListAsync();
+            workout.Duration = durationsAdd.Count > 0
+                ? TimeSpan.FromTicks(durationsAdd.Sum(d => d.Ticks))
+                : TimeSpan.Zero;
 
-            workout.Duration = CalculateWorkoutDuration(exercises);
+            await
+                _dbContext
+                .SaveChangesAsync();
 
+            // Load related template info for return
+            ExerciseTemplate? template
+                = await
+                _dbContext
+                .ExerciseTemplates
+                .AsNoTracking()
+                .FirstOrDefaultAsync(xt => xt.Id == newExercise.ExerciseTemplateId);
 
-            // Reload and return the full ExerciseViewModel
-            var result = await _dbContext.Exercises
-                .Where(e => e.Id == newExercise.Id)
-                .Select(e => new ExerciseViewModel
-                {
-                    Id = e.Id,
-                    WorkoutId = e.WorkoutId,
-                    Name = e.ExerciseTemplate.Name,
-                    Sets = e.Sets,
-                    Reps = e.Reps,
-                    Weight = e.Weight,
-                    Notes = e.Notes,
-                    Duration = (int)e.Duration.TotalMinutes,
-                    ExerciseTemplateId = e.ExerciseTemplateId,
-                    ImageUrl = e.ExerciseTemplate.ImageUrl,
-                    TargetedMuscle = e.ExerciseTemplate.TargetedMuscle
-                })
-                .FirstOrDefaultAsync();
-            return result!;
+            return new ExerciseViewModel
+            {
+                Id = newExercise.Id,
+                WorkoutId = newExercise.WorkoutId,
+                Name = template!.Name,
+                Sets = newExercise.Sets,
+                Reps = newExercise.Reps,
+                Weight = newExercise.Weight,
+                Notes = newExercise.Notes,
+                Duration = (int)newExercise.Duration.TotalMinutes,
+                ExerciseTemplateId = newExercise.ExerciseTemplateId,
+                TargetedMuscle = template?.TargetedMuscle ?? string.Empty
+            };
         }
 
         public async Task<ExerciseViewModel> UpdateExerciseAsync(ExerciseViewModel exercise, Guid? userId)
         {
-            // First verify the workout belongs to the user
+            if (!userId.HasValue || userId == Guid.Empty)
+            {
+                _logger.LogError("Attempted to update an exercise without a valid user ID.");
+
+                throw new ArgumentException("User ID cannot be null or empty.", nameof(userId));
+            }
+
+            if (exercise == null)
+            {
+                _logger.LogCritical("Attempted to update a null exercise.");
+
+                throw new ArgumentNullException(nameof(exercise));
+            }
+
+            // Verify workout ownership
             Workout? workout
-                = await _dbContext
+                = await
+                _dbContext
                 .Workouts
                 .FirstOrDefaultAsync(w => w.Id == exercise.WorkoutId
-                && w.UserId == userId && !w.IsDeleted)
-                ?? throw new InvalidOperationException($"Workout with ID {exercise.WorkoutId} not found or you don't have permission to modify it.");
+                && w.UserId == userId);
 
+            if (workout == null)
+            {
+                _logger.LogCritical($"Workout with ID {exercise.WorkoutId} not found for user {userId}.");
+
+                throw new InvalidOperationException($"Workout with ID {exercise.WorkoutId} not found or you don't have permission to modify it.");
+            }
+
+            // Find existing exercise
             Exercise? existingExercise
-                = await _dbContext
+                = await
+                _dbContext
                 .Exercises
                 .FirstOrDefaultAsync(e => e.Id == exercise.Id
-                && e.WorkoutId == exercise.WorkoutId && !e.IsDeleted)
-                ?? throw new InvalidOperationException($"Exercise with ID {exercise.Id} not found.");
+                    && e.WorkoutId == exercise.WorkoutId);
 
 
-            // Calculate duration difference for workout update
-            TimeSpan oldDuration
-                = existingExercise.Duration;
-            TimeSpan newDuration
-                = TimeSpan.FromMinutes(exercise.Duration);
-            TimeSpan durationDifference
-                = newDuration - oldDuration;
+                if (existingExercise == null)
+                {
+                    _logger
+                        .LogCritical($"Exercise with ID {exercise.Id} not found in workout {exercise.WorkoutId} for user {userId}.");
 
-            // Update exercise properties
+                    throw new InvalidOperationException($"Exercise with ID {exercise.Id} not found.");
+                }
+
+            // Update properties
             existingExercise.ExerciseTemplateId = exercise.ExerciseTemplateId;
             existingExercise.Sets = exercise.Sets;
             existingExercise.Reps = exercise.Reps;
             existingExercise.Weight = exercise.Weight;
             existingExercise.Notes = exercise.Notes;
-            existingExercise.Duration = newDuration;
+            existingExercise.Duration = TimeSpan.FromMinutes(exercise.Duration);
 
-            await _dbContext.SaveChangesAsync();
-
-            // Recalculate workout duration from all non-deleted exercises
-            var exercises = await _dbContext.Exercises
+            // Recalculate workout duration by materializing durations then summing client-side to avoid EF translation issues
+            var durationsUpdate = await _dbContext
+                .Exercises
                 .Where(e => e.WorkoutId == workout.Id && !e.IsDeleted)
+                .Select(e => e.Duration)
                 .ToListAsync();
+            workout.Duration = durationsUpdate.Count > 0
+                ? TimeSpan.FromTicks(durationsUpdate.Sum(d => d.Ticks))
+                : TimeSpan.Zero;
 
-            workout.Duration = CalculateWorkoutDuration(exercises);
+            await 
+                _dbContext
+                .SaveChangesAsync();
 
-            await _dbContext.SaveChangesAsync();
-
-            // Reload and return the full ExerciseViewModel
-            var result = await _dbContext.Exercises
+            // Return updated view model with template info
+            var result 
+                = await 
+                _dbContext
+                .Exercises
                 .Where(e => e.Id == existingExercise.Id)
                 .Select(e => new ExerciseViewModel
                 {
@@ -277,111 +468,152 @@ namespace ActioNator.Services.Implementations.WorkoutService
                     Notes = e.Notes,
                     Duration = (int)e.Duration.TotalMinutes,
                     ExerciseTemplateId = e.ExerciseTemplateId,
-                    ImageUrl = e.ExerciseTemplate.ImageUrl,
                     TargetedMuscle = e.ExerciseTemplate.TargetedMuscle
                 })
-                .FirstOrDefaultAsync();
-            return result!;
+                .FirstAsync();
+
+            return result;
         }
 
-        public async Task<bool> DeleteExerciseAsync(Guid exerciseId, Guid? userId)
+        public async Task<bool> DeleteExerciseAsync(Guid? exerciseId, Guid? userId)
         {
-            try
+            if (!userId.HasValue || userId == Guid.Empty)
             {
-                // Find the exercise that belongs to the user's workout
-                var exercise = await _dbContext.Exercises
-                    .Include(e => e.Workout)
-                    .FirstOrDefaultAsync(e => e.Id == exerciseId && e.Workout.UserId == userId && !e.IsDeleted);
+                _logger
+                    .LogError("Attempted to delete an exercise without a valid user ID.");
 
-                if (exercise == null)
-                {
-                    return false;
-                }
-
-                // Soft delete the exercise
-                exercise.IsDeleted = true;
-                await _dbContext.SaveChangesAsync();
-
-                // Recalculate workout duration after deleting the exercise
-                var workout = exercise.Workout;
-                var remainingExercises = await _dbContext.Exercises
-                    .Where(e => e.WorkoutId == workout.Id && !e.IsDeleted)
-                    .ToListAsync();
-
-                workout.Duration = CalculateWorkoutDuration(remainingExercises);
-                await _dbContext.SaveChangesAsync();
-
-                return true;
+                throw new ArgumentException("User ID cannot be null or empty.", nameof(userId));
             }
-            catch (Exception ex)
+
+            // Find exercise & ensure ownership
+            Exercise? exercise 
+                = await 
+                _dbContext
+                .Exercises
+                .Include(e => e.Workout)
+                .FirstOrDefaultAsync(e => e.Id == exerciseId 
+                && e.Workout.UserId == userId);
+
+            if (exercise == null)
             {
-                // Log the exception
-                Console.WriteLine($"Error deleting exercise: {ex.Message}");
+                _logger
+                    .LogCritical($"Exercise with ID {exerciseId} not found or does not belong to user {userId}.");
+
                 return false;
             }
+
+            // Soft delete
+            exercise.IsDeleted = true;
+
+            // Recalculate workout duration by materializing durations then summing client-side to avoid EF translation issues
+            var durationsDelete = await _dbContext
+                .Exercises
+                .Where(e => e.WorkoutId == exercise.WorkoutId 
+                    && e.Id != exerciseId
+                    && !e.IsDeleted)
+                .Select(e => e.Duration)
+                .ToListAsync();
+            exercise.Workout.Duration = durationsDelete.Count > 0
+                ? TimeSpan.FromTicks(durationsDelete.Sum(d => d.Ticks))
+                : TimeSpan.Zero;
+
+            await 
+                _dbContext
+                .SaveChangesAsync();
+
+            return true;
         }
 
         public async Task<IEnumerable<ExerciseTemplateViewModel>> GetExerciseTemplatesAsync()
         {
             try
             {
-                // Fetch the exercise templates from the database
-                var templatesFromDb = await _dbContext
+                return 
+                    await 
+                    _dbContext
                     .ExerciseTemplates
                     .AsNoTracking()
-                    .ToListAsync();
-
-                // Map to ExerciseTemplateViewModel
-                var templates = new List<ExerciseTemplateViewModel>();
-
-                foreach (var template in templatesFromDb)
-                {
-                    templates.Add(new ExerciseTemplateViewModel
+                    .Select(t => new ExerciseTemplateViewModel
                     {
-                        Id = template.Id,
-                        Name = template.Name ?? "",
-                        ImageUrl = template.ImageUrl ?? "",
-                        TargetedMuscle = template.TargetedMuscle ?? ""
-                    });
-                }
-
-                return templates;
+                        Id = t.Id,
+                        Name = t.Name ?? string.Empty,
+                        ImageUrl = t.ImageUrl ?? string.Empty,
+                        TargetedMuscle = t.TargetedMuscle ?? string.Empty
+                    })
+                    .ToListAsync();
             }
             catch (Exception ex)
             {
-                // Log the exception or handle it appropriately
                 throw new InvalidOperationException("Error retrieving exercise templates", ex);
             }
         }
 
-        public async Task<bool> VerifyWorkoutOwnershipAsync(Guid workoutId, Guid? userId)
+        public async Task<bool> VerifyWorkoutOwnershipAsync
+        (
+            Guid? workoutId,
+            Guid? userId,
+            CancellationToken cancellationToken = default
+        )
         {
-            if (userId == null)
-                return false;
-            
-            // Check if the workout exists and belongs to the user
-            return await 
+            if (userId is null || workoutId == Guid.Empty)
+            {
+                _logger.LogCritical("Attempted to verify workout ownership with invalid parameters.");
+
+                throw new ArgumentException("Invalid parameters for workout ownership verification.");
+            }
+
+            return 
+                await 
                 _dbContext
                 .Workouts
-                .AnyAsync(w => w.Id == workoutId 
-                    && w.UserId == userId);
+                .AnyAsync(
+                    w => w.Id == workoutId && w.UserId == userId.Value,
+                    cancellationToken
+                );
+        }
+
+        public async Task<bool> VerifyExerciseOwnershipAsync
+        (
+            Guid? exerciseId,
+            Guid? userId,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (userId is null || exerciseId == Guid.Empty)
+            {
+                _logger.LogCritical("Attempted to verify exercise ownership with invalid parameters.");
+
+                throw new ArgumentException("Invalid parameters for exercise ownership verification.");
+            }
+
+            return
+                await
+                _dbContext
+                .Exercises
+                .Include(e => e.Workout)
+                .AnyAsync(
+                    e => e.Id == exerciseId 
+                    && e.Workout.UserId == userId.Value,
+                    cancellationToken
+                );
         }
 
         /// <summary>
-        /// Calculates the total duration of a workout based on its exercises
+        /// Calculates the total duration of a workout based on its non-deleted exercises.
         /// </summary>
         /// <param name="exercises">Collection of exercises</param>
         /// <returns>Total duration as TimeSpan</returns>
-        private TimeSpan CalculateWorkoutDuration(IEnumerable<Exercise>? exercises)
+        private static TimeSpan CalculateWorkoutDuration(IEnumerable<Exercise>? exercises)
         {
-            if (exercises == null || !exercises.Any())
+            if (exercises is null)
             {
                 return TimeSpan.Zero;
             }
 
-            return exercises
-                .Where(e => !e.IsDeleted)
-                .Aggregate(TimeSpan.Zero, (sum, exercise) => sum.Add(exercise.Duration));
+            long totalTicks = exercises
+                .Sum(e => e.Duration.Ticks);
+
+            return TimeSpan.FromTicks(totalTicks);
         }
     }
 }

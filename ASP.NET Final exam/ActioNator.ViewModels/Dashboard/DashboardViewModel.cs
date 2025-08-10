@@ -18,5 +18,7 @@ namespace ActioNator.ViewModels.Dashboard
             = new HashSet<WorkoutCardViewModel>();
         public IEnumerable<PostCardViewModel> RecentPosts { get; set; }
             = new HashSet<PostCardViewModel>();
+
+        public IEnumerable<Community.PostCardViewModel>? ConvertedRecentPosts { get; set; }
     }
 }

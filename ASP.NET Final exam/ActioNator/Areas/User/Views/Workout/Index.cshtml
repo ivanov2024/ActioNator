@@ -9,7 +9,7 @@
 
 @section Scripts {
     <!-- Using fixed version of the workout exercises JS file to prevent frontend freeze -->
-    <script src="~/js/workoutExercisesFixed.js" asp-append-version="true"></script>
+    <script src="~/js/workout.js" asp-append-version="true"></script>
     <script>
         // Pass server-side model data to the Alpine component
         document.addEventListener('DOMContentLoaded', function() {
@@ -133,10 +133,9 @@
         </div>
     </div>
     
-    <!-- Delete modal is now handled by the shared modal partial -->
-    
     @* Include Modal Partial *@
     <partial name="_ModalPartial" />
 
-    <!-- Success messages are now handled by the toast system -->
+    @* Include Toast Partial to listen for show-toast events *@
+    <partial name="_ToastPartial" />
 </div>
