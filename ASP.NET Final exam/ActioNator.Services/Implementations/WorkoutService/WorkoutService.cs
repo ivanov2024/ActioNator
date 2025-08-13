@@ -23,6 +23,61 @@ namespace ActioNator.Services.Implementations.WorkoutService
                 ?? throw new ArgumentNullException(nameof(logger), "Logger cannot be null");
         }
 
+        public async Task<(IEnumerable<WorkoutCardViewModel> Workouts, int TotalCount)> GetWorkoutsPageAsync(Guid? userId, int page, int pageSize)
+        {
+            if (userId == Guid.Empty)
+            {
+                _logger.LogError("Attempted to retrieve workouts with an empty user ID.");
+                throw new ArgumentException("User ID cannot be empty.", nameof(userId));
+            }
+
+            if (page <= 0) page = 1;
+            if (pageSize <= 0) pageSize = 3;
+
+            var baseQuery = _dbContext
+                .Workouts
+                .AsNoTracking()
+                .Where(w => w.UserId == userId);
+
+            int totalCount = await baseQuery.CountAsync();
+
+            List<Workout>? workouts = await baseQuery
+                .Include(w => w.Exercises)
+                .ThenInclude(e => e.ExerciseTemplate)
+                .OrderByDescending(w => w.Date)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .AsSplitQuery()
+                .ToListAsync();
+
+            var mapped = workouts.Select(w => new WorkoutCardViewModel
+            {
+                Id = w.Id,
+                Title = w.Title ?? string.Empty,
+                Notes = w.Notes ?? string.Empty,
+                Date = w.Date,
+                Duration = CalculateWorkoutDuration(w.Exercises),
+                CompletedAt = w.CompletedAt,
+                IsCompleted = w.CompletedAt != null,
+                Exercises = (w.Exercises ?? Enumerable.Empty<Exercise>())
+                    .Select(e => new ExerciseViewModel
+                    {
+                        Id = e.Id,
+                        WorkoutId = e.WorkoutId,
+                        Name = e.ExerciseTemplate?.Name ?? string.Empty,
+                        Sets = e.Sets,
+                        Reps = e.Reps,
+                        Weight = e.Weight,
+                        Notes = e.Notes ?? string.Empty,
+                        Duration = (int)e.Duration.TotalMinutes,
+                        ExerciseTemplateId = e.ExerciseTemplateId,
+                        TargetedMuscle = e.ExerciseTemplate?.TargetedMuscle ?? string.Empty
+                    }).ToList()
+            });
+
+            return (mapped, totalCount);
+        }
+
         public async Task<IEnumerable<WorkoutCardViewModel>> GetAllWorkoutsAsync(Guid? userId)
         {
             if (userId == Guid.Empty)

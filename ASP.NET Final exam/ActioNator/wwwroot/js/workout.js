@@ -126,11 +126,17 @@ window.workoutsPage = function() {
         modal: { title: '', date: '', notes: '' },
         validationErrors: { title: '', date: '' },
         _isAfterDeletion: false, // Flag to track post-deletion state
+        // Pagination state
+        currentPage: 1,
+        pageSize: 3,
+        totalPages: 1,
         
         // Initialize the component
         init() {
             console.log('[WORKOUT] Initializing workouts page Alpine component');
             this.setupEventListeners();
+            // Initialize pagination state from DOM/model
+            this.syncPageStateFromDom();
             // Ensure the shared modal's delete-confirm callback exists on this page.
             // The shared _ModalPartial calls window.handlePostDeletion() when type === 'delete'.
             // Define a local shim only if not already present (to avoid overriding community pages).
@@ -140,14 +146,66 @@ window.workoutsPage = function() {
                         // Route to workout deletion flow
                         this.confirmDelete();
                     } else {
-                        // Fallback to the event-driven path used elsewhere
-                        window.dispatchEvent(new CustomEvent('modal-confirmed'));
+                        // Avoid double-dispatching 'modal-confirmed' which may have null detail
+                        // This can trigger errors in listeners expecting a detail object.
+                        console.debug('[WORKOUT] handlePostDeletion without deleteWorkoutId; ignoring.');
                     }
                 };
                 console.log('[WORKOUT] Installed handlePostDeletion shim for workout deletion');
             }
         },
         
+        // Pagination helpers
+        syncPageStateFromDom() {
+            try {
+                const el = document.getElementById('paginationContainer');
+                if (el) {
+                    const p = Number(el.getAttribute('data-current-page')) || 1;
+                    const tp = Number(el.getAttribute('data-total-pages')) || 1;
+                    this.currentPage = Math.max(1, p);
+                    this.totalPages = Math.max(1, tp);
+                    // Page size is constant from server contract (3) unless overridden
+                    this.pageSize = 3;
+                } else if (window.workoutModelData) {
+                    const data = window.workoutModelData;
+                    this.currentPage = Math.max(1, Number(data.Page) || 1);
+                    this.totalPages = Math.max(1, Number(data.TotalPages) || 1);
+                    this.pageSize = Math.max(1, Number(data.PageSize) || 3);
+                }
+                console.log('[WORKOUT] Pagination state', { page: this.currentPage, totalPages: this.totalPages, pageSize: this.pageSize });
+            } catch (e) {
+                console.warn('[WORKOUT] Unable to read pagination state from DOM', e);
+            }
+        },
+        // Navigate to a specific page
+        goToPage(p) {
+            const page = Math.max(1, Math.min(Number(p) || 1, this.totalPages || 1));
+            if (page === this.currentPage) return;
+            this.currentPage = page;
+            this.refreshWorkoutsList();
+        },
+        // Next page
+        nextPage() {
+            if (this.currentPage < this.totalPages) {
+                this.currentPage += 1;
+                this.refreshWorkoutsList();
+            }
+        },
+        // Previous page
+        prevPage() {
+            if (this.currentPage > 1) {
+                this.currentPage -= 1;
+                this.refreshWorkoutsList();
+            }
+        },
+        // Build URL with page query params
+        _buildPageUrl(base) {
+            const url = new URL(base, window.location.origin);
+            url.searchParams.set('page', String(this.currentPage || 1));
+            url.searchParams.set('pageSize', String(this.pageSize || 3));
+            return url.toString().replace(window.location.origin, '');
+        },
+
         // Set up event listeners
         setupEventListeners() {
             // Observe toast events for debugging (do not re-dispatch to avoid loops)
@@ -290,6 +348,10 @@ window.workoutsPage = function() {
                         try {
                             if (data.workoutsHtml) {
                                 workoutsContainer.innerHTML = data.workoutsHtml;
+                                // Sync pagination state with newly rendered partial
+                                if (typeof this.syncPageStateFromDom === 'function') {
+                                    this.syncPageStateFromDom();
+                                }
                             } else if (data.workouts) {
                                 const workoutCards = data.workouts.map(workout => `
                                     <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 workout-card" data-workout-id="${workout.id}">
@@ -329,7 +391,9 @@ window.workoutsPage = function() {
                                 workoutsContainer.innerHTML = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">${workoutCards}</div>`;
                             }
                             if (window.Alpine?.initTree) {
-                                setTimeout(() => { try { window.Alpine.initTree(workoutsContainer); } catch (e) { console.error('[WORKOUT] Alpine init error:', e); } }, 0);
+                                setTimeout(() => {
+                                    try { window.Alpine.initTree(workoutsContainer); } catch (e) { console.error('[WORKOUT] Alpine init error:', e); }
+                                }, 0);
                             }
                         } catch (updateError) {
                             console.error('[WORKOUT] Error updating workout list container:', updateError);
@@ -358,7 +422,11 @@ window.workoutsPage = function() {
         async refreshWorkoutsList() {
             console.log('[WORKOUT] Refreshing workouts list via AJAX');
             try {
-                const res = await Api.get('/User/Workout/GetWorkouts', { timeoutMs: 10000 });
+                // Ensure page within bounds before request
+                if (this.currentPage <= 0) this.currentPage = 1;
+                if (this.pageSize <= 0) this.pageSize = 3;
+                const url = this._buildPageUrl('/User/Workout/GetWorkouts');
+                const res = await Api.get(url, { timeoutMs: 10000 });
                 const html = await res.text();
                 if (!html || html.trim() === '') {
                     console.warn('[WORKOUT] Empty response received from GetWorkouts, reloading page');
@@ -377,6 +445,17 @@ window.workoutsPage = function() {
                             return;
                         }
                         workoutsContainer.innerHTML = html;
+                        // After update, sync pagination from the new DOM
+                        this.syncPageStateFromDom();
+                        // If current page is now out of bounds (e.g., after deletion), fetch the last page
+                        if (this.currentPage > this.totalPages) {
+                            this.currentPage = this.totalPages;
+                            const url2 = this._buildPageUrl('/User/Workout/GetWorkouts');
+                            const res2 = await Api.get(url2, { timeoutMs: 10000 });
+                            const html2 = await res2.text();
+                            workoutsContainer.innerHTML = html2;
+                            this.syncPageStateFromDom();
+                        }
                         console.log('[WORKOUT] Workouts list refreshed successfully');
                         if (window.Alpine?.initTree) {
                             setTimeout(() => {

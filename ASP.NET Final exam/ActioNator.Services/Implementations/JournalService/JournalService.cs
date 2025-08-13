@@ -26,7 +26,6 @@ namespace ActioNator.Services.Implementations.JournalService
         public async Task<IEnumerable<JournalEntryViewModel>> GetAllEntriesAsync()
         => await _dbContext
             .JournalEntries
-            .Where(je => !je.IsDeleted)
             .AsNoTracking()
             .Select(je => new JournalEntryViewModel
             {
@@ -47,7 +46,6 @@ namespace ActioNator.Services.Implementations.JournalService
             => await
             _dbContext
             .JournalEntries
-            .Where(je => !je.IsDeleted)
             .AsNoTracking()
             .Select(je => new JournalEntryViewModel
             {
@@ -185,7 +183,7 @@ namespace ActioNator.Services.Implementations.JournalService
 
             var results = await _dbContext
                 .JournalEntries
-                .Where(e => !e.IsDeleted && (
+                .Where(e => (
                     EF.Functions.Like(e.Title, pattern) ||
                     EF.Functions.Like(e.Content, pattern) ||
                     (e.MoodTag != null && EF.Functions.Like(e.MoodTag, pattern))

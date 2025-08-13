@@ -118,7 +118,7 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int page = 1, int pageSize = 3)
         {
             Guid? userId = GetUserId();
 
@@ -129,12 +129,18 @@ namespace ActioNator.Areas.User.Controllers
 
             try
             {
-                IEnumerable<WorkoutCardViewModel>? workouts
-                    = await
-                    _workoutService
-                    .GetAllWorkoutsAsync(userId.Value);
+                var (workouts, totalCount) = await _workoutService.GetWorkoutsPageAsync(userId.Value, page, pageSize);
+                int totalPages = (int)Math.Ceiling((double)totalCount / Math.Max(pageSize, 1));
+                var vm = new WorkoutsListViewModel
+                {
+                    Workouts = workouts.ToList(),
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                    TotalPages = totalPages
+                };
 
-                return View(workouts);
+                return View(vm);
             }
             catch (Exception ex)
             {
@@ -151,7 +157,7 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetWorkouts()
+        public async Task<IActionResult> GetWorkouts(int page = 1, int pageSize = 3)
         {
             Guid? userId = GetUserId();
 
@@ -177,20 +183,26 @@ namespace ActioNator.Areas.User.Controllers
 
             try
             {
-                IEnumerable<WorkoutCardViewModel>? workouts
-                    = await
-                    _workoutService
-                    .GetAllWorkoutsAsync(userId);
+                var (workouts, totalCount) = await _workoutService.GetWorkoutsPageAsync(userId, page, pageSize);
+                int totalPages = (int)Math.Ceiling((double)totalCount / Math.Max(pageSize, 1));
+                var vm = new WorkoutsListViewModel
+                {
+                    Workouts = workouts.ToList(),
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                    TotalPages = totalPages
+                };
 
                 _logger
-                    .LogInformation("Retrieved {Count} workouts for user {UserId}", workouts?.Count() ?? 0, userId);
+                    .LogInformation("Retrieved page {Page}/{TotalPages} ({Count} of {Total}) workouts for user {UserId}", page, totalPages, vm.Workouts.Count, totalCount, userId);
 
                 if (isAjax)
                 {
-                    return PartialView("_WorkoutsPartial", workouts);
+                    return PartialView("_WorkoutsPartial", vm);
                 }
 
-                return View("Index", workouts);
+                return View("Index", vm);
             }
             catch (Exception ex)
             {
@@ -864,14 +876,22 @@ namespace ActioNator.Areas.User.Controllers
 
                 if (isAjaxRequest)
                 {
-                    IEnumerable<WorkoutCardViewModel>? workouts
-                        = await
-                        _workoutService
-                        .GetAllWorkoutsAsync(userId);
+                    // After creation, return the first page (page=1) with fixed pageSize=3
+                    // to match the UI pagination contract and the _WorkoutsPartial model type.
+                    int page = 1;
+                    int pageSize = 3;
+                    var (workouts, totalCount) = await _workoutService.GetWorkoutsPageAsync(userId.Value, page, pageSize);
+                    int totalPages = (int)Math.Ceiling((double)totalCount / Math.Max(pageSize, 1));
+                    var vm = new WorkoutsListViewModel
+                    {
+                        Workouts = workouts.ToList(),
+                        Page = page,
+                        PageSize = pageSize,
+                        TotalCount = totalCount,
+                        TotalPages = totalPages
+                    };
 
-                    string? workoutsHtml
-                        = await
-                        this.RenderPartialViewToStringAsync("_WorkoutsPartial", workouts);
+                    string? workoutsHtml = await this.RenderPartialViewToStringAsync("_WorkoutsPartial", vm);
 
                     return Json(new
                     {

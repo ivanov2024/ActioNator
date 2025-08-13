@@ -16,6 +16,15 @@ namespace ActioNator.Services.Interfaces.WorkoutService
         Task<IEnumerable<WorkoutCardViewModel>> GetAllWorkoutsAsync(Guid? userId);
 
         /// <summary>
+        /// Gets a paged list of workouts and the total count for the specified user.
+        /// </summary>
+        /// <param name="userId">The user's ID</param>
+        /// <param name="page">1-based page number</param>
+        /// <param name="pageSize">Items per page</param>
+        /// <returns>Tuple of workouts and total count</returns>
+        Task<(IEnumerable<WorkoutCardViewModel> Workouts, int TotalCount)> GetWorkoutsPageAsync(Guid? userId, int page, int pageSize);
+
+        /// <summary>
         /// Gets a specific workout by ID
         /// </summary>
         /// <param name="workoutId">The workout ID</param>

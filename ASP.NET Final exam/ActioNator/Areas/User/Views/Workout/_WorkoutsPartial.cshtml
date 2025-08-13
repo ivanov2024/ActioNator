@@ -1,14 +1,47 @@
 @using ActioNator.ViewModels.Workouts
-@model IEnumerable<WorkoutCardViewModel>
+@model WorkoutsListViewModel
+
+<!-- Pagination Controls -->
+@if (Model.TotalPages > 1)
+{
+    <nav class="mt-6 flex items-center justify-center space-x-2 select-none" aria-label="Pagination">
+        <button type="button"
+                class="px-3 py-1 rounded border text-sm disabled:opacity-50"
+                @@click="prevPage()" @(Model.Page <= 1 ? "disabled" : null)>
+            Prev
+        </button>
+
+        @for (int p = 1; p <= Model.TotalPages; p++)
+        {
+            <button type="button"
+                    class="px-3 py-1 rounded border text-sm @(p == Model.Page ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-700")"
+                    @@click="goToPage(@p)">
+                @p
+            </button>
+        }
+
+        <button type="button"
+                class="px-3 py-1 rounded border text-sm disabled:opacity-50"
+                @@click="nextPage()" @(Model.Page >= Model.TotalPages ? "disabled" : null)>
+            Next
+        </button>
+    </nav>
+}
+
+<div id="paginationContainer"
+     data-current-page="@Model.Page"
+     data-total-pages="@Model.TotalPages"
+     class="hidden">
+</div>
 
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-    @foreach (var workout in Model)
+    @foreach (var workout in Model.Workouts)
     {
         <div class="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 workout-card" data-workout-id="@workout.Id">
             <div class="p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="text-xl font-semibold text-gray-800">@workout.Title</h3>
-                    <div class="flex space-x-2">
+                <div class="flex justify-between items-start mb-4 min-w-0">
+                    <h3 class="text-xl font-semibold text-gray-800 flex-1 min-w-0 truncate">@workout.Title</h3>
+                    <div class="flex space-x-2 flex-shrink-0">
                         <a asp-action="Edit" asp-route-id="@workout.Id" class="text-blue-500 hover:text-blue-700">
                             <i class="fas fa-edit"></i>
                         </a>
@@ -39,21 +72,23 @@
                         <span>Not completed</span>
                     </div>
                 }
-
+                
                 <div class="flex items-center text-gray-600 mb-2">
-                    <i class="far fa-clock mr-2"></i>
-                    <span>@workout.Duration</span>
+                    <p class="text-sm">Duration: @workout.DurationDisplay</p>
                 </div>
                 
-                @if (!string.IsNullOrWhiteSpace(workout.Notes) && !string.Equals(workout.Notes.Trim(), "None", StringComparison.OrdinalIgnoreCase))
+                @if (!string.IsNullOrWhiteSpace(workout.Notes))
                 {
-                    <div class="mt-4 text-gray-600">
-                        <p class="text-sm overflow-hidden break-words" style="display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3;">
-                            <span class="font-medium">Notes: </span>@workout.Notes
-                        </p>
+                    <div class="mt-4 text-gray-600 min-w-0">
+                        <p class="text-sm truncate">Notes: @workout.Notes</p>
                     </div>
                 }
-                
+                else {
+                    <div class="mt-4 text-gray-600 min-w-0">
+                        <p class="text-sm">Notes:None</p>
+                    </div>
+                }
+
                 <div class="mt-6">
                     <a asp-action="Edit" asp-route-id="@workout.Id" 
                        class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
@@ -67,7 +102,7 @@
 
 </div>
 
-@if (!Model.Any())
+@if (Model.Workouts is null || !Model.Workouts.Any())
 {
     <div class="text-center py-12">
         <div class="text-gray-500 mb-4">

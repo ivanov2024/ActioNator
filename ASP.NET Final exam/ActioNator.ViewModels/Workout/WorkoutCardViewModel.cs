@@ -1,6 +1,7 @@
 using ActioNator.ViewModels.Workout;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.ComponentModel.DataAnnotations;
 
 namespace ActioNator.ViewModels.Workouts
@@ -46,11 +47,11 @@ namespace ActioNator.ViewModels.Workouts
             set => _duration = value; 
         }
         
-        /// <summary>
-        /// Formatted display of the workout duration
-        /// </summary>
-        //[Display(Name = "Duration")]
-        //public string DurationDisplay => $"{(int)Duration.TotalMinutes} mins";
+        // <summary>
+        // Formatted display of the workout duration
+        // </summary>
+        [Display(Name = "Duration")]
+        public string DurationDisplay => $"{(int)Duration.TotalMinutes} mins";
 
         /// <summary>
         /// Date and time when the workout was completed
@@ -64,7 +65,7 @@ namespace ActioNator.ViewModels.Workouts
         /// </summary>
         [Display(Name = "Completed On")]
         [DataType(DataType.Date)]
-        public string? CompletedDateDisplay => CompletedAt?.ToString("d");
+        public string? CompletedDateDisplay => CompletedAt?.ToString("MMM d, yyyy, h:mm tt", CultureInfo.InvariantCulture);
 
         [Display(Name = "Completed")]
         public bool IsCompleted { get; set; }
@@ -78,7 +79,7 @@ namespace ActioNator.ViewModels.Workouts
         [Display(Name = "Created On")]
         [DataType(DataType.Date)]
         public string? DateDisplay 
-            => Date?.ToString("d");
+            => Date?.ToString("MMM d, yyyy, h:mm tt", CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Additional notes about the workout
