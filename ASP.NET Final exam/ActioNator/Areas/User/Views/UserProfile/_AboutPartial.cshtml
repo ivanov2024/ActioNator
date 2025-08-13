@@ -1,0 +1,12 @@
+@model string
+
+<div id="aboutContent" class="bg-white rounded-lg shadow p-6 text-gray-800 whitespace-pre-wrap">
+    @if (string.IsNullOrWhiteSpace(Model))
+    {
+        <h3 class="text-xl font-semibold text-gray-700 text-center">No information provided yet.</h3>
+    }
+    else
+    {
+        @Model
+    }
+</div>

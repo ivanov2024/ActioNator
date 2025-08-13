@@ -148,5 +148,11 @@ namespace ActioNator.GCommon
 
             public static readonly (int Min, int Max) ContentLength = (ContentMinLength, ContentMaxLength);
         }
+
+        public static class UserProfile
+        {
+            public const int AboutTextMinLength = 0;
+            public const int AboutTextMaxLength = 1000;
+        }
     }
 }

@@ -45,10 +45,13 @@ namespace ActioNator.Services.Implementations.UserProfileService
             {
                 UserId = user.Id,
                 FullName = $"{user.FirstName} {user.LastName}",
+                FirstName = user.FirstName,
+                LastName = user.LastName,
                 ProfilePictureUrl = user.ProfilePictureUrl,
                 CoverPhotoUrl = profileData?.CoverPhotoUrl ?? string.Empty,
                 Headline = profileData?.Headline ?? string.Empty,
                 Location = profileData?.Location ?? string.Empty,
+                AboutText = profileData?.AboutText ?? string.Empty,
                 FriendsCount = 0, // We removed friends functionality
                 IsCurrentUser = false, // Set this based on context if needed
                 ActiveTab = "Overview"

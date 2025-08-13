@@ -78,6 +78,12 @@ namespace ActioNator.Data.Models
         public virtual ICollection<UserLoginHistory> LoginHistory { get; set; } 
             = new HashSet<UserLoginHistory>();
 
+        /// <summary>
+        /// Encrypted Dropbox refresh token for the user (if connected).
+        /// NULL if the user has not connected Dropbox.
+        /// </summary>
+        public string? DropboxRefreshTokenEncrypted { get; set; }
+
 
     }
 }

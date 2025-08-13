@@ -7,10 +7,13 @@ namespace FinalExamUI.ViewModels.UserProfile
     {
         public Guid UserId { get; set; }
         public string FullName { get; set; }
+        public string FirstName { get; set; }
+        public string LastName { get; set; }
         public string ProfilePictureUrl { get; set; }
         public string CoverPhotoUrl { get; set; }
         public string Headline { get; set; }
         public string Location { get; set; }
+        public string AboutText { get; set; }
         public int FriendsCount { get; set; }
         public bool IsCurrentUser { get; set; }
         public string ActiveTab { get; set; } = "Overview";

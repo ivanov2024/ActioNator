@@ -13,6 +13,8 @@ namespace ActioNator.Data.Models
         
         // About Section
         public string? Bio { get; set; }
+        // Single-block About text used by the profile About tab
+        public string? AboutText { get; set; }
         public string? Interests { get; set; }
         
         // Contact Info
@@ -29,6 +31,7 @@ namespace ActioNator.Data.Models
             string.IsNullOrWhiteSpace(Location) &&
             string.IsNullOrWhiteSpace(CoverPhotoUrl) &&
             string.IsNullOrWhiteSpace(Bio) &&
+            string.IsNullOrWhiteSpace(AboutText) &&
             string.IsNullOrWhiteSpace(Interests) &&
             string.IsNullOrWhiteSpace(Website) &&
             string.IsNullOrWhiteSpace(SocialMediaLinks);

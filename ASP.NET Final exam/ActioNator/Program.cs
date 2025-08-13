@@ -22,6 +22,7 @@ using ActioNator.Services.Interfaces.Cloud;
 using ActioNator.Services.Interfaces.Communication;
 using ActioNator.Services.Interfaces.Community;
 using ActioNator.Services.Interfaces.FileServices;
+using ActioNator.Services.Interfaces;
 using ActioNator.Services.Interfaces.GoalService;
 using ActioNator.Services.Interfaces.InputSanitizationService;
 using ActioNator.Services.Interfaces.JournalService;
@@ -32,6 +33,9 @@ using ActioNator.Services.Interfaces.WorkoutService;
 using ActioNator.Services.Seeding;
 using ActioNator.Services.Validators;
 using CloudinaryDotNet;
+using ActioNator.Services.Interfaces.Security;
+using ActioNator.Services.Security;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -93,6 +97,9 @@ namespace ActioNator
                     options.Conventions.AllowAnonymousToAreaPage("Identity", "/Account/AccessDenied");
                 })
                 .AddRazorRuntimeCompilation();
+            
+            // Data Protection for encrypting sensitive tokens
+            builder.Services.AddDataProtection();
                 
             // Add SignalR services
             builder.Services.AddSignalR();
@@ -101,6 +108,11 @@ namespace ActioNator
             builder.Services
                 .Configure<FileUploadOptions>
                 (builder.Configuration.GetSection("FileUpload"));
+            
+            // Bind Dropbox options
+            builder.Services
+                .Configure<DropboxOptions>
+                (builder.Configuration.GetSection(DropboxOptions.SectionName));
                 
             // Register Cloudinary configuration
             builder.Services
@@ -178,13 +190,21 @@ namespace ActioNator
             builder.Services
                 .AddScoped<IFileStorageService, FileStorageService>();
             builder.Services
+                .AddScoped<IDropboxPictureService, DropboxPictureService>();
+            builder.Services
+                .AddScoped<IDropboxOAuthService, DropboxOAuthService>();
+            builder.Services
+                .AddScoped<IDropboxTokenProvider, DropboxTokenProvider>();
+            builder.Services
                 .AddScoped<ICoachDocumentUploadService, CoachDocumentUploadService>();
+            
+            // Token protector for encrypting Dropbox refresh tokens
+            builder.Services.AddScoped<ITokenProtector, DataProtectionTokenProtector>();
             
             // Register authentication service
             builder.Services
                 .AddScoped<IAuthenticationService, AuthenticationService>();
 
-            // Register user dashboard service
             builder.Services
                 .AddScoped<IUserDashboardService, UserDashboardService>();
 
@@ -249,6 +269,16 @@ namespace ActioNator
                 options.HeaderName = "X-CSRF-TOKEN";
                 options.Cookie.Name = "CSRF-TOKEN";
                 options.FormFieldName = "__RequestVerificationToken";
+            });
+
+            // Session for OAuth (store PKCE verifier/state; optionally tokens in dev)
+            builder.Services.AddDistributedMemoryCache();
+            builder.Services.AddSession(options =>
+            {
+                options.Cookie.Name = ".ActioNator.Session";
+                options.Cookie.HttpOnly = true;
+                options.Cookie.IsEssential = true;
+                options.IdleTimeout = TimeSpan.FromHours(2);
             });
 
             // Configure authorization options
@@ -345,6 +375,9 @@ namespace ActioNator
             app.UseFileUploadExceptionHandler();
 
             app.UseRouting();
+            
+            // Enable session before auth so actions can read/write session
+            app.UseSession();
 
             app.UseAuthentication();
             app.UseAuthorization();

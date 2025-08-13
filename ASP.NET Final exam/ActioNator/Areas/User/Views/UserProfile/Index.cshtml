@@ -6,24 +6,24 @@
 <div class="profile-container">
     <!-- Cover Photo and Profile Header -->
     <div class="relative">
-        <div class="h-80 bg-cover bg-center" style="background-image: url('@Model.CoverPhotoUrl')">
+        <div id="coverPhotoHeader" class="h-80 bg-cover bg-center" style="background-image: url('@Model.CoverPhotoUrl')">
             <!-- Cover Photo -->
         </div>
         
         <div class="absolute bottom-0 left-8 transform translate-y-1/2">
     <!-- Profile Picture -->
         <button type="button" onclick="openEditModal()" class="p-0 border-0 bg-transparent" title="Change profile picture">
-            <img src="@Model.ProfilePictureUrl" alt="@Model.FullName" class="w-40 h-40 rounded-full border-4 border-white shadow-lg cursor-pointer">
+            <img id="profileHeaderImage" src="@Model.ProfilePictureUrl" alt="@Model.FullName" class="w-40 h-40 rounded-full border-4 border-white shadow-lg cursor-pointer">
         </button>
-</div>
     </div>
+</div>
     
     <!-- Profile Info -->
     <div class="pt-24 pb-4 px-8 bg-white">
         <div class="flex flex-col md:flex-row md:items-end md:justify-between">
             <div class="text-center md:text-left md:ml-48">
-                <h1 class="text-3xl font-bold">@Model.FullName</h1>
-                <p class="text-gray-600 mt-1">@Model.Headline</p>
+                <h1 id="profileFullName" class="text-3xl font-bold">@Model.FullName</h1>
+                <p id="profileHeadline" class="text-gray-600 mt-1">@Model.Headline</p>
 
             </div>
             
@@ -42,8 +42,13 @@
     <div class="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div class="px-8">
             <nav class="flex justify-center space-x-8 overflow-x-auto">
+                <a href="#about" 
+                   class="tab-link py-4 px-1 border-b-2 border-blue-500 text-blue-600 border-t-0 border-l-0 border-r-0 focus:outline-none focus:ring-0"
+                   data-tab="About">
+                    About
+                </a>
                 <a href="#posts" 
-                   class="tab-link py-4 px-1 border-b-2 @(Model.ActiveTab == "Posts" ? "border-blue-500 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700")"
+                   class="tab-link py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 border-t-0 border-l-0 border-r-0 focus:outline-none focus:ring-0"
                    data-tab="Posts">
                     Posts
                 </a>
@@ -54,11 +59,17 @@
     <!-- Tab Content -->
     <div class="max-w-7xl mx-auto p-4">
         <!-- Posts Tab -->
-        <div id="posts-tab" class="tab-content @(Model.ActiveTab == "Posts" ? "block" : "hidden")">
+        <div id="posts-tab" class="tab-content hidden">
     <div class="bg-white rounded-lg shadow p-8 text-center">
         <h3 class="text-xl font-semibold text-gray-700">No posts sended yet!</h3>
     </div>
 </div>
+        <!-- About Tab -->
+        <div id="about-tab" class="tab-content block">
+            <div id="aboutContainer">
+                @await Html.PartialAsync("_AboutPartial", Model.AboutText ?? string.Empty)
+            </div>
+        </div>
     </div>
 </div>
 
@@ -83,19 +94,32 @@
     <script>
         // Tab switching functionality
         document.addEventListener('DOMContentLoaded', function() {
-            function loadTabContent(tabName, userId) {
-                // This function would make AJAX calls to load tab content dynamically
-                // For this example, we're using server-side rendering with partials
-                console.log(`Loading ${tabName} tab content for user ${userId}`);
-                // Example AJAX call (commented out since we're using server-side rendering)
-                /*
-                fetch(`/User/UserProfile/Get${tabName}Partial?userId=${userId}`)
-                    .then(response => response.text())
-                    .then(html => {
-                        document.getElementById(`${tabName.toLowerCase()}-tab`).innerHTML = html;
-                    });
-                */
+            const links = document.querySelectorAll('.tab-link');
+            const tabs = {
+                Posts: document.getElementById('posts-tab'),
+                About: document.getElementById('about-tab')
+            };
+            function activate(tab) {
+                Object.keys(tabs).forEach(k => {
+                    if (tabs[k]) tabs[k].classList.toggle('hidden', k !== tab);
+                });
+                links.forEach(a => {
+                    const isActive = a.getAttribute('data-tab') === tab;
+                    a.classList.toggle('border-blue-500', isActive);
+                    a.classList.toggle('text-blue-600', isActive);
+                    a.classList.toggle('border-transparent', !isActive);
+                    a.classList.toggle('text-gray-500', !isActive);
+                });
             }
+            links.forEach(a => {
+                a.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const tab = this.getAttribute('data-tab');
+                    activate(tab);
+                });
+            });
+            // Default to About tab on load
+            activate('About');
         });
     </script>
 }

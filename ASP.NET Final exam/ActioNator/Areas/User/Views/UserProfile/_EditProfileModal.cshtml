@@ -1,4 +1,6 @@
-@model FinalExamUI.ViewModels.UserProfile.ProfileViewModel
+@using FinalExamUI.ViewModels.UserProfile;
+@using ActioNator.GCommon
+@model ProfileViewModel
 
 <!-- Edit Profile Modal -->
 <div id="editProfileModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
@@ -11,7 +13,18 @@
         </div>
         
         <div class="mt-4">
-            <form id="editProfileForm" method="post" enctype="multipart/form-data">
+            <form id="editProfileForm" method="post" enctype="multipart/form-data" onsubmit="return false;">
+                @Html.AntiForgeryToken()
+
+                <!-- Modal Tabs -->
+                <div class="border-b border-gray-200 mb-4">
+                    <nav class="flex space-x-6">
+                        <a href="#" id="modalTabMain" class="py-2 border-b-2 border-blue-500 text-blue-600 border-t-0 border-l-0 border-r-0 focus:outline-none focus:ring-0">Main</a>
+                        <a href="#" id="modalTabAbout" class="py-2 border-b-2 border-transparent text-gray-500 hover:text-gray-700 border-t-0 border-l-0 border-r-0 focus:outline-none focus:ring-0">About</a>
+                    </nav>
+                </div>
+
+                <div id="mainTabContent">
                 <!-- Profile Picture Upload -->
                 <div class="mb-6">
                     <label class="block text-gray-700 text-sm font-bold mb-2 text-center">Profile Picture</label>
@@ -32,11 +45,33 @@
                     </div>
                 </div>
 
-                <!-- Username/Full Name -->
-                <div class="mb-6">
-                    <label class="block text-gray-700 text-sm font-bold mb-2" for="fullName">Username</label>
-                    <input type="text" id="fullName" name="fullName" value="@Model.FullName" 
+                <!-- First Name -->
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="firstName">First name</label>
+                    <input type="text" id="firstName" name="firstName" value="@Model.FirstName"
                            class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <div id="firstNameError" class="text-red-500 text-xs mt-1 hidden"></div>
+                </div>
+
+                <!-- Last Name -->
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2" for="lastName">Last name</label>
+                    <input type="text" id="lastName" name="lastName" value="@Model.LastName"
+                           class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">
+                    <div id="lastNameError" class="text-red-500 text-xs mt-1 hidden"></div>
+                </div>
+                </div>
+
+                <!-- About Tab Content -->
+                <div id="aboutTabContent" class="hidden">
+                    <div class="mb-4">
+                        <label class="block text-gray-700 text-sm font-bold mb-2" for="aboutText">About</label>
+                        <textarea id="aboutText" name="aboutText" rows="6" class="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline">@Model.AboutText</textarea>
+                        <div class="flex items-center justify-between mt-1 text-xs">
+                            <div id="aboutTextError" class="text-red-500 hidden"></div>
+                            <div class="text-gray-500"><span id="aboutCharCount">0</span> / @ValidationConstants.UserProfile.AboutTextMaxLength</div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Form Actions -->
@@ -45,7 +80,7 @@
                             class="bg-white hover:bg-gray-100 text-gray-700 font-medium py-2 px-4 border border-gray-300 rounded shadow-sm mr-2">
                         Cancel
                     </button>
-                    <button type="submit" id="saveButton" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded shadow-sm flex items-center">
+                    <button type="button" id="saveButton" onclick="performEditProfileSubmit()" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded shadow-sm flex items-center">
                         <span>Save Changes</span>
                         <div id="loadingSpinner" class="hidden ml-2">
                             <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -56,20 +91,31 @@
                     </button>
                 </div>
             </form>
-        </div>
-        
-        <!-- Toast Notifications -->
-        <div id="successToast" class="hidden fixed bottom-4 right-4 bg-green-500 text-white px-4 py-2 rounded shadow-lg">
-            Profile updated successfully!
-        </div>
-        <div id="errorToast" class="hidden fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded shadow-lg">
-            Error updating profile.
+            
         </div>
     </div>
 </div>
 
 <!-- JavaScript for the modal -->
 <script>
+    // Toast helper that works even if global function is not present yet
+    function triggerToast(type, message) {
+        if (window.showToast) {
+            try { window.showToast(type, message); return; } catch {}
+        }
+        try {
+            console.debug('Dispatching show-toast', { type, message });
+            window.dispatchEvent(new CustomEvent('show-toast', { detail: { type: type, message: message }, bubbles: true, composed: true }));
+        } catch {}
+    }
+
+    // Debug: log when the window receives show-toast events
+    if (!window.__toastDebugInstalled) {
+        window.__toastDebugInstalled = true;
+        window.addEventListener('show-toast', (e) => {
+            try { console.debug('show-toast received on window', e.detail); } catch {}
+        });
+    }
     // Open the modal
     function openEditModal() {
         document.getElementById('editProfileModal').classList.remove('hidden');
@@ -79,8 +125,7 @@
     // Close the modal
     function closeEditModal() {
         document.getElementById('editProfileModal').classList.add('hidden');
-        document.body.classList.remove('hidden');
-        hideToasts();
+        document.body.classList.remove('overflow-hidden');
     }
     
     // Show/hide loading spinner
@@ -97,23 +142,6 @@
             saveButton.disabled = false;
             saveButton.classList.remove('opacity-75');
         }
-    }
-    
-    // Show toast notification
-    function showToast(type, duration = 3000) {
-        hideToasts();
-        const toast = document.getElementById(type + 'Toast');
-        toast.classList.remove('hidden');
-        
-        setTimeout(() => {
-            toast.classList.add('hidden');
-        }, duration);
-    }
-    
-    // Hide all toasts
-    function hideToasts() {
-        document.getElementById('successToast').classList.add('hidden');
-        document.getElementById('errorToast').classList.add('hidden');
     }
 
     // Preview image before upload and validate
@@ -134,7 +162,7 @@
             return;
         }
         
-        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        if (file.size > 10 * 1024 * 1024) { // 5MB limit
             errorDiv.innerText = 'Image must be less than 5MB.';
             errorDiv.classList.remove('hidden');
             input.value = '';
@@ -148,51 +176,286 @@
         reader.readAsDataURL(file);
     }
 
-    // Handle form submission
-    document.getElementById('editProfileForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
+    // Helper to open Dropbox OAuth popup and wait for result
+    async function openDropboxOAuthPopup(authorizeUrl) {
+        return new Promise((resolve) => {
+            const url = authorizeUrl || '/User/UserProfile/ConnectDropbox?mode=popup';
+            const w = 600, h = 700;
+            const left = window.screenX + (window.outerWidth - w) / 2;
+            const top = window.screenY + (window.outerHeight - h) / 2;
+            const popupRef = window.open(url, 'dropbox_oauth_inline', `width=${w},height=${h},left=${left},top=${top}`);
+
+            const handler = (ev) => {
+                try {
+                    if (!ev.data || ev.data.source !== 'dropbox-oauth') return;
+                    if (ev.origin !== window.location.origin) return;
+                    window.removeEventListener('message', handler);
+                    try { if (popupRef && !popupRef.closed) popupRef.close(); } catch {}
+                    resolve(ev.data.status === 'success');
+                } catch {
+                    window.removeEventListener('message', handler);
+                    try { if (popupRef && !popupRef.closed) popupRef.close(); } catch {}
+                    resolve(false);
+                }
+            };
+            window.addEventListener('message', handler);
+        });
+    }
+
+    // Retrieve a fresh anti-forgery request token and set hidden input
+    async function refreshAntiforgeryToken() {
+        try {
+            const resp = await fetch('/User/UserProfile/AntiforgeryRefresh', { method: 'GET', credentials: 'same-origin', headers: { 'Accept': 'application/json' } });
+            if (!resp.ok) return null;
+            const data = await resp.json().catch(() => null);
+            const token = data && data.token ? data.token : null;
+            if (token) {
+                const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+                if (tokenEl) tokenEl.value = token;
+            }
+            return token;
+        } catch {
+            return null;
+        }
+    }
+
+    // Modal tabs + About counter
+    document.addEventListener('DOMContentLoaded', function() {
+        const aboutMax = @ValidationConstants.UserProfile.AboutTextMaxLength;
+        const tabMain = document.getElementById('modalTabMain');
+        const tabAbout = document.getElementById('modalTabAbout');
+        const mainContent = document.getElementById('mainTabContent');
+        const aboutContent = document.getElementById('aboutTabContent');
+        const aboutText = document.getElementById('aboutText');
+        const aboutCount = document.getElementById('aboutCharCount');
+        const aboutErr = document.getElementById('aboutTextError');
+        const saveBtn = document.getElementById('saveButton');
+
+        function activateModalTab(which) {
+            const isMain = which === 'main';
+            if (mainContent) mainContent.classList.toggle('hidden', !isMain);
+            if (aboutContent) aboutContent.classList.toggle('hidden', isMain);
+            if (tabMain) {
+                tabMain.classList.toggle('border-blue-500', isMain);
+                tabMain.classList.toggle('text-blue-600', isMain);
+                tabMain.classList.toggle('border-transparent', !isMain);
+                tabMain.classList.toggle('text-gray-500', !isMain);
+            }
+            if (tabAbout) {
+                tabAbout.classList.toggle('border-blue-500', !isMain);
+                tabAbout.classList.toggle('text-blue-600', !isMain);
+                tabAbout.classList.toggle('border-transparent', isMain);
+                tabAbout.classList.toggle('text-gray-500', isMain);
+            }
+        }
+
+        function updateAboutCounter() {
+            if (!aboutText || !aboutCount || !aboutErr) return;
+            const len = (aboutText.value || '').length;
+            aboutCount.textContent = len;
+            const over = len > aboutMax;
+            aboutErr.textContent = over ? `About must be at most ${aboutMax} characters.` : '';
+            aboutErr.classList.toggle('hidden', !over);
+            if (saveBtn) saveBtn.disabled = over;
+        }
+
+        if (tabMain) tabMain.addEventListener('click', function(e){ e.preventDefault(); activateModalTab('main'); });
+        if (tabAbout) tabAbout.addEventListener('click', function(e){ e.preventDefault(); activateModalTab('about'); });
+        if (aboutText) {
+            aboutText.addEventListener('input', updateAboutCounter);
+            updateAboutCounter();
+        }
+        // Default to Main tab
+        activateModalTab('main');
+    });
+
+    // Shared submit logic used by button click and Enter key submit
+    async function performEditProfileSubmit() {
         const errorDiv = document.getElementById('profileImageError');
+        const firstNameErr = document.getElementById('firstNameError');
+        const lastNameErr = document.getElementById('lastNameError');
+        const aboutErr = document.getElementById('aboutTextError');
         errorDiv.classList.add('hidden');
         errorDiv.innerText = '';
+        if (firstNameErr) { firstNameErr.classList.add('hidden'); firstNameErr.innerText = ''; }
+        if (lastNameErr) { lastNameErr.classList.add('hidden'); lastNameErr.innerText = ''; }
+        if (aboutErr) { aboutErr.classList.add('hidden'); aboutErr.innerText = ''; }
         
         // Show loading spinner
         toggleLoading(true);
         
-        const formData = new FormData(this);
-        
+        const formEl = document.getElementById('editProfileForm');
+        const formDataBase = new FormData(formEl);
+        const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');    
+
+        async function submitOnce(formData) {
+            const headers = new Headers();
+            headers.set('Accept', 'application/json');
+            headers.set('X-Requested-With', 'XMLHttpRequest');
+            if (tokenEl) headers.set('RequestVerificationToken', tokenEl.value);
+            return fetch('/User/UserProfile/UpdateProfile', {
+                method: 'POST',
+                body: formData,
+                headers,
+                credentials: 'same-origin'
+            });
+        }
+
         try {
-            // Add antiforgery token to the form data instead of headers
-            const token = document.querySelector('input[name="__RequestVerificationToken"]');
-            if (token) {
-                formData.append('__RequestVerificationToken', token.value);
+            let csrfRetried = false;
+            let response = await submitOnce(formDataBase);
+
+            // Try to parse JSON payload if available
+            async function parseJsonSafe(resp) {
+                const ct = resp.headers.get('content-type') || '';
+                if (ct.includes('application/json')) {
+                    try { return await resp.json(); } catch { return null; }
+                }
+                return null;
+            }
+
+            let payload = await parseJsonSafe(response);
+
+            // If the server redirected (e.g., to login), inform the user and navigate
+            if (response.redirected) {
+                // Do not navigate; just inform the user to re-authenticate
+                triggerToast('error', 'Your session has expired. Please sign in again and retry.');
+                toggleLoading(false);
+                return;
+            }
+
+            // Handle OAuth requirement via JSON
+            if (payload && payload.requiresOAuth && payload.authorizeUrl) {
+                const connected = await openDropboxOAuthPopup(payload.authorizeUrl);
+                if (connected) {
+                    // Refresh antiforgery token after popup flow to sync with cookie
+                    await refreshAntiforgeryToken();
+                    const retryData = new FormData(formEl);
+                    response = await submitOnce(retryData);
+                    payload = await parseJsonSafe(response);
+                }
+            } else if (response.status === 428) {
+                // Fallback: legacy 428 path
+                const connected = await openDropboxOAuthPopup();
+                if (connected) {
+                    await refreshAntiforgeryToken();
+                    const retryData = new FormData(formEl);
+                    response = await submitOnce(retryData);
+                    payload = await parseJsonSafe(response);
+                }
+            } else if (response.status === 403 && !csrfRetried) {
+                // CSRF mismatch fallback: refresh token and retry once
+                csrfRetried = true;
+                await refreshAntiforgeryToken();
+                const retryData = new FormData(formEl);
+                response = await submitOnce(retryData);
+                payload = await parseJsonSafe(response);
             }
             
-            const response = await fetch('/User/UserProfile/UpdateProfile', {
-                method: 'POST',
-                body: formData
-                // No headers - let the browser set the Content-Type automatically for FormData
-            });
-            
             toggleLoading(false);
-            
-            if (response.ok) {
-                showToast('success');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
+
+            const isJson = payload !== null && typeof payload === 'object';
+            if (response.ok && isJson && payload.success === true) {
+                if (payload.toastType && payload.toastMessage) {
+                    triggerToast(payload.toastType, payload.toastMessage);
+                } else {
+                    triggerToast('success', 'Profile updated successfully!');
+                }
+                // Update DOM in place to avoid full page reload
+                try {
+                    const cacheBust = `&_=${Date.now()}`;
+                    if (payload.profilePictureUrl) {
+                        const img = document.getElementById('profileHeaderImage');
+                        if (img) img.src = payload.profilePictureUrl + cacheBust;
+                    }
+                    if (payload.coverPhotoUrl) {
+                        const cover = document.getElementById('coverPhotoHeader');
+                        if (cover) cover.style.backgroundImage = `url('${payload.coverPhotoUrl + cacheBust}')`;
+                    }
+                    if (payload.fullName) {
+                        const nameEl = document.getElementById('profileFullName');
+                        if (nameEl) nameEl.textContent = payload.fullName;
+                    }
+                    if (typeof payload.headline === 'string') {
+                        const headlineEl = document.getElementById('profileHeadline');
+                        if (headlineEl) headlineEl.textContent = payload.headline || '';
+                    }
+                    if (payload.aboutUpdated) {
+                        try {
+                            const resp = await fetch(`/User/UserProfile/GetAboutPartial?userId=${encodeURIComponent('@Model.UserId')}`, { credentials: 'same-origin' });
+                            if (resp.ok) {
+                                const html = await resp.text();
+                                const container = document.getElementById('aboutContainer');
+                                if (container) container.innerHTML = html;
+                            }
+                        } catch {}
+                    }
+                } catch {}
+                // Close modal after updating UI
+                closeEditModal();
             } else {
-                const errText = await response.text();
-                errorDiv.innerText = errText || 'Error updating profile. Please try again.';
-                errorDiv.classList.remove('hidden');
-                showToast('error');
+                // Attempt to show validation messages
+                if (payload && payload.validationErrors) {
+                    const ve = payload.validationErrors;
+                    let anySpecific = false;
+                    if (ve.firstName && ve.firstName.length && firstNameErr) {
+                        firstNameErr.innerText = ve.firstName.join('\n');
+                        firstNameErr.classList.remove('hidden');
+                        anySpecific = true;
+                    }
+                    if (ve.lastName && ve.lastName.length && lastNameErr) {
+                        lastNameErr.innerText = ve.lastName.join('\n');
+                        lastNameErr.classList.remove('hidden');
+                        anySpecific = true;
+                    }
+                    if (ve.aboutText && ve.aboutText.length && aboutErr) {
+                        aboutErr.innerText = ve.aboutText.join('\n');
+                        aboutErr.classList.remove('hidden');
+                        anySpecific = true;
+                    }
+                    if (ve.profilePicture && ve.profilePicture.length) {
+                        errorDiv.innerText = ve.profilePicture.join('\n');
+                        errorDiv.classList.remove('hidden');
+                    } else if (!anySpecific && ve.general && ve.general.length) {
+                        errorDiv.innerText = ve.general.join('\n');
+                        errorDiv.classList.remove('hidden');
+                    } else if (!anySpecific) {
+                        errorDiv.innerText = 'Error updating profile. Please try again.';
+                        errorDiv.classList.remove('hidden');
+                    }
+                } else if (payload && payload.message) {
+                    errorDiv.innerText = payload.message;
+                    errorDiv.classList.remove('hidden');
+                } else {
+                    const errText = await response.text();
+                    errorDiv.innerText = errText || 'Error updating profile. Please try again.';
+                    errorDiv.classList.remove('hidden');
+                }
+                if (payload && payload.toastType && payload.toastMessage) {
+                    triggerToast(payload.toastType, payload.toastMessage);
+                } else if (payload && payload.message) {
+                    triggerToast('error', payload.message);
+                } else {
+                    triggerToast('error', 'Error updating profile. Please try again.');
+                }
+                // Log technical details to console for troubleshooting
+                console.error('UpdateProfile error:', { status: response.status, payload });
             }
         } catch (error) {
             console.error('Error:', error);
             errorDiv.innerText = 'An error occurred while updating your profile.';
             errorDiv.classList.remove('hidden');
             toggleLoading(false);
-            showToast('error');
+            triggerToast('error', 'An error occurred while updating your profile.');
         }
+    }
+
+    // Also intercept Enter key that triggers native form submit
+    const __editForm = document.getElementById('editProfileForm');
+    if (__editForm) __editForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        performEditProfileSubmit();
     });
 
     // Close modal when clicking outside of it

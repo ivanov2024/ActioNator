@@ -2,7 +2,7 @@
 
 <div x-data="toastSystem"
 	 @@show-toast.window ="addToast($event.detail)"
-	 class="fixed top-4 right-4 z-50 w-72 space-y-2">
+	 class="fixed top-4 right-4 z-[9999] w-72 space-y-2">
 
 	<template x-for="(toast, index) in toasts" :key="index">
 		<div :class="{
