@@ -40,8 +40,13 @@
 
   // =============== API Layer ===============
   const GoalsAPI = {
-    async getPartial(filter = 'all') {
-      const res = await fetch(`/User/Goal/GetGoalPartial?filter=${encodeURIComponent(filter)}`, {
+    async getPartial(filter = 'all', page = 1, pageSize = 3) {
+      const params = new URLSearchParams({
+        filter: String(filter || 'all'),
+        page: String(page || 1),
+        pageSize: String(pageSize || 3)
+      });
+      const res = await fetch(`/User/Goal/GetGoalPartial?${params.toString()}`, {
         credentials: 'same-origin'
       });
       if (!res.ok) throw new Error('Failed to load goals');
@@ -502,6 +507,10 @@
     window.Alpine.data('goalsPage', () => ({
       filter: 'all',
       loading: false,
+      // pagination state
+      currentPage: 1,
+      pageSize: 3,
+      totalPages: 1,
 
       init() {
         // Filter buttons
@@ -626,6 +635,8 @@
 
       async setFilter(filter) {
         this.filter = filter || 'all';
+        // reset to first page on filter change
+        this.currentPage = 1;
         await this.reload();
       },
 
@@ -634,17 +645,47 @@
           this.loading = true;
           const container = document.getElementById('goals-container');
           const emptyState = document.getElementById('empty-state');
-          const html = await GoalsAPI.getPartial(this.filter);
+          const html = await GoalsAPI.getPartial(this.filter, this.currentPage, this.pageSize);
           container.innerHTML = html;
           const hasGoals = !!qs('.goal-card', container);
           emptyState?.classList.toggle('hidden', hasGoals);
           container.classList.toggle('hidden', !hasGoals);
+          // sync pagination from hidden container in the partial
+          const pg = qs('#paginationContainer', container);
+          if (pg) {
+            const cp = parseInt(pg.getAttribute('data-current-page') || '1', 10);
+            const tp = parseInt(pg.getAttribute('data-total-pages') || '1', 10);
+            const ps = parseInt(pg.getAttribute('data-page-size') || '3', 10);
+            if (!Number.isNaN(cp)) this.currentPage = cp;
+            if (!Number.isNaN(tp)) this.totalPages = tp;
+            if (!Number.isNaN(ps)) this.pageSize = ps;
+          }
           UI.hydrate();
         } catch (err) {
           console.error('Load goals error:', err);
           showToast('Failed to load goals. Please try again.', 'error');
         } finally {
           this.loading = false;
+        }
+      },
+
+      // pagination methods
+      async goToPage(p) {
+        const target = Math.min(Math.max(1, Number(p) || 1), this.totalPages || 1);
+        if (target === this.currentPage) return;
+        this.currentPage = target;
+        await this.reload();
+      },
+      async nextPage() {
+        if (this.currentPage < (this.totalPages || 1)) {
+          this.currentPage += 1;
+          await this.reload();
+        }
+      },
+      async prevPage() {
+        if (this.currentPage > 1) {
+          this.currentPage -= 1;
+          await this.reload();
         }
       }
     }));

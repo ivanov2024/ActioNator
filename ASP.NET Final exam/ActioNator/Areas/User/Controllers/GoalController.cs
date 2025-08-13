@@ -7,6 +7,9 @@ using ActioNator.ViewModels.Goal;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace ActioNator.Areas.User.Controllers
@@ -34,21 +37,40 @@ namespace ActioNator.Areas.User.Controllers
                 ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public async Task<IActionResult> Index(CancellationToken cancellationToken)
+        public async Task<IActionResult> Index(string filter = "all", int page = 1, int pageSize = 3, CancellationToken cancellationToken = default)
         {
             try
             {
                 Guid? userId = GetUserId();
                 IEnumerable<GoalViewModel> goals 
                     = await _goalService
-                    .GetUserGoalsAsync(userId, "all", cancellationToken);
+                    .GetUserGoalsAsync(userId, filter, cancellationToken);
 
-                return View(goals);
+                page = Math.Max(1, page);
+                pageSize = Math.Max(1, pageSize);
+
+                int totalCount = goals?.Count() ?? 0;
+                int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+                var pagedGoals = (goals ?? Enumerable.Empty<GoalViewModel>())
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+
+                var vm = new GoalsListViewModel
+                {
+                    Goals = pagedGoals,
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                    TotalPages = totalPages
+                };
+
+                return View(vm);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving goals");
-                return View(new List<GoalViewModel>());
+                return View(new GoalsListViewModel());
             }
         }
 
@@ -72,7 +94,7 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetGoalPartial(string filter = "all", CancellationToken cancellationToken = default)
+        public async Task<IActionResult> GetGoalPartial(string filter = "all", int page = 1, int pageSize = 3, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -81,12 +103,31 @@ namespace ActioNator.Areas.User.Controllers
                     = await _goalService
                     .GetUserGoalsAsync(userId, filter, cancellationToken);
 
-                return PartialView("_GoalsPartial", goals);
+                page = Math.Max(1, page);
+                pageSize = Math.Max(1, pageSize);
+
+                int totalCount = goals?.Count() ?? 0;
+                int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+                var pagedGoals = (goals ?? Enumerable.Empty<GoalViewModel>())
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
+                    .ToList();
+
+                var vm = new GoalsListViewModel
+                {
+                    Goals = pagedGoals,
+                    Page = page,
+                    PageSize = pageSize,
+                    TotalCount = totalCount,
+                    TotalPages = totalPages
+                };
+
+                return PartialView("_GoalsPartial", vm);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving goals partial with filter: {Filter}", filter);
-                return PartialView("_GoalsPartial", new List<GoalViewModel>());
+                return PartialView("_GoalsPartial", new GoalsListViewModel());
             }
         }
 

@@ -164,13 +164,15 @@ window.workoutsPage = function() {
                     const tp = Number(el.getAttribute('data-total-pages')) || 1;
                     this.currentPage = Math.max(1, p);
                     this.totalPages = Math.max(1, tp);
-                    // Page size is constant from server contract (3) unless overridden
-                    this.pageSize = 3;
+                    // Prefer DOM-provided page size if present, otherwise keep existing or default to 3
+                    const ps = Number(el.getAttribute('data-page-size'));
+                    this.pageSize = ps > 0 ? ps : (this.pageSize > 0 ? this.pageSize : 3);
                 } else if (window.workoutModelData) {
                     const data = window.workoutModelData;
                     this.currentPage = Math.max(1, Number(data.Page) || 1);
                     this.totalPages = Math.max(1, Number(data.TotalPages) || 1);
-                    this.pageSize = Math.max(1, Number(data.PageSize) || 3);
+                    const ps = Number(data.PageSize);
+                    this.pageSize = ps > 0 ? ps : (this.pageSize > 0 ? this.pageSize : 3);
                 }
                 console.log('[WORKOUT] Pagination state', { page: this.currentPage, totalPages: this.totalPages, pageSize: this.pageSize });
             } catch (e) {

@@ -1,15 +1,56 @@
-@model List<ActioNator.ViewModels.Goal.GoalViewModel>
+@using ActioNator.ViewModels.Goal
+@model GoalsListViewModel
 
-@if (Model != null && Model.Any())
-{
-    foreach (var goal in Model)
+<!-- Pagination Controls -->
+<div class="w-full basis-full">
+    @if (Model.TotalPages > 1)
     {
-        <div class="goal-card p-5 rounded-xl shadow-sm hover:shadow-lg transition-all duration-200 w-full md:w-[calc(50%-12px)] lg:w-[calc(33.333%-16px)] xl:w-[calc(25%-18px)] flex-grow-0 flex-shrink-0" data-id="@goal.Id" data-status="@(goal.Completed ? "completed" : "active")">
-            <div class="goal-card-inner">
+        <nav class="w-full mt-2 mb-2 flex items-center justify-center space-x-2 select-none mx-auto" aria-label="Pagination">
+            <button type="button"
+                    class="px-3 py-1 rounded border text-sm disabled:opacity-50"
+                    data-action="prev"
+                    @@click="prevPage()" @(Model.Page <= 1 ? "disabled" : null)>
+                Prev
+            </button>
+
+            @for (int p = 1; p <= Model.TotalPages; p++)
+            {
+                <button type="button"
+                        class="px-3 py-1 rounded border text-sm @(p == Model.Page ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-700")"
+                        data-page="@p"
+                        @@click="goToPage(@p)">
+                    @p
+                </button>
+            }
+
+            <button type="button"
+                    class="px-3 py-1 rounded border text-sm disabled:opacity-50"
+                    data-action="next"
+                    @@click="nextPage()" @(Model.Page >= Model.TotalPages ? "disabled" : null)>
+                Next
+            </button>
+        </nav>
+    }
+
+    <div id="paginationContainer"
+         data-current-page="@Model.Page"
+         data-total-pages="@Model.TotalPages"
+         data-page-size="@Model.PageSize"
+         class="w-full hidden">
+    </div>
+</div>
+
+@if (Model?.Goals != null && Model.Goals.Any())
+{
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8 w-full">
+    @foreach (var goal in Model.Goals)
+    {
+        <div class="goal-card bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300" data-id="@goal.Id" data-status="@(goal.Completed ? "completed" : "active")">
+            <div class="goal-card-inner p-6">
                 <!-- Card Header -->
-                <div class="goal-card-header flex items-center justify-between mb-3">
-                    <h3 class="goal-title text-lg font-semibold text-gray-800" title="@goal.Title">@goal.Title</h3>
-                    <div class="goal-actions dropdown-container relative">
+                <div class="goal-card-header relative mb-3">
+                    <h3 class="goal-title text-lg font-semibold text-gray-800 pr-10 whitespace-pre-line break-words" title="@goal.Title">@goal.Title</h3>
+                    <div class="goal-actions dropdown-container absolute top-0 right-0">
                         <button type="button" class="goal-menu-btn dropdown-trigger p-2 rounded-full hover:bg-gray-100 cursor-pointer relative z-30" aria-label="Goal options">
                             <i class="fas fa-ellipsis-v"></i>
                         </button>
@@ -75,6 +116,7 @@
             </div>
         </div>
     }
+    </div>
 }
 else
 {
