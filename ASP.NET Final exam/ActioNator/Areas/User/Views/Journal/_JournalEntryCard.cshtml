@@ -1,9 +1,9 @@
 @* Journal Entry Card Partial View *@
 
-<div class="bg-white rounded-lg shadow-md p-6 journal-card relative">
+<div class="bg-white rounded-lg shadow-md p-6 journal-card goal-card relative">
     <!-- Entry Header -->
     <div class="flex justify-between items-start mb-3">
-        <h3 class="text-lg font-semibold text-gray-900 leading-tight" x-text="entry.title"></h3>
+        <h3 class="text-lg font-semibold text-gray-900 leading-tight whitespace-pre-line break-words flex-1 min-w-0 mr-3" x-text="entry.title"></h3>
         
         <!-- Entry Menu -->
         <div class="relative">
@@ -48,12 +48,16 @@
         </div>
     </div>
     
-    <!-- Entry Content -->
-    <div
-        x-ref="content"
-        class="text-gray-600 leading-relaxed prose prose-sm max-w-none line-clamp-4 mb-3"
-        x-html="entry.content ? entry.content.replace(/\n/g, '<br>') : ''"
-    ></div>
+    <!-- Entry Content (Read More / Show Less) -->
+    <div class="goal-card-body mb-4">
+        <div class="goal-description-container flex flex-col space-y-2">
+            <p class="goal-description text-gray-600 text-sm whitespace-pre-wrap overflow-hidden transition-all duration-300 pb-6" x-text="entry.content || ''"></p>
+            <button class="read-more-btn text-xs text-indigo-600 hover:text-indigo-800 self-start font-medium transition-all duration-200">
+                <span class="read-more">Read More</span>
+                <span class="read-less hidden">Show Less</span>
+            </button>
+        </div>
+    </div>
     
     <!-- Entry Footer -->
     <div class="flex flex-wrap justify-between items-center text-sm text-gray-500 mt-4">
@@ -64,9 +68,9 @@
             <span x-text="formatDate(entry.createdAt)"></span>
         </div>
         
-        <div class="flex items-center mt-2 sm:mt-0">
-            <span class="mood-tag-prefix">#</span>
-            <span x-text="entry.moodTag || ''"></span>
+        <div class="flex items-start mt-2 sm:mt-0 max-w-full gap-1">
+            <span class="mood-tag-prefix mr-0.5 select-none">#</span>
+            <span class="block whitespace-pre-wrap break-words max-w-full overflow-hidden" x-text="entry.moodTag || ''"></span>
         </div>
     </div>
 </div>

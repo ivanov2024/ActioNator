@@ -1,5 +1,6 @@
 using System;
 using System.ComponentModel.DataAnnotations;
+using static ActioNator.GCommon.ValidationConstants.JournalEntry;
 
 namespace ActioNator.ViewModels.Journal
 {
@@ -7,15 +8,16 @@ namespace ActioNator.ViewModels.Journal
     {
         public Guid Id { get; set; }
 
-        [Required(ErrorMessage = "Title is required")]
-        [StringLength(20, MinimumLength = 3, ErrorMessage = "The Title must be with length from 3 to 20. You currently have {0} characters.")]
+        [Required(ErrorMessage = TitleRequiredMessage)]
+        [StringLength(TitleMaxLength, MinimumLength = TitleMinLength, ErrorMessage = TitleLengthMessage)]
         public string Title { get; set; } = null!;
 
-        [Required(ErrorMessage = "Content is required")]
-        [StringLength(150, ErrorMessage = "The Content must be with length from 0 to 150. You currently have {0} characters.")]
+        [Required(ErrorMessage = ContentRequiredMessage)]
+        [StringLength(ContentMaxLength, MinimumLength = ContentMinLength, ErrorMessage = ContentLengthMessage)]
         public string Content { get; set; } = null!;
 
-        [StringLength(50, ErrorMessage = "The Mood Tag must be with length from 0 to 50. You currently have {0} characters.")]
+        [Required(ErrorMessage = MoodTagRequiredMessage)]
+        [StringLength(MoodTagMaxLength, MinimumLength = MoodTagMinLength, ErrorMessage = MoodTagLengthMessage)]
         public string? MoodTag { get; set; }
 
         public DateTime CreatedAt { get; set; }

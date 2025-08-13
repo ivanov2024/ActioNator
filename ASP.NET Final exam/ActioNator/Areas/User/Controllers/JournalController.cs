@@ -40,21 +40,26 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         /// <summary>
+        /// Return entries as JSON for AJAX consumers
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> List(string? searchTerm = null)
+        {
+            IEnumerable<JournalEntryViewModel> entries =
+                string.IsNullOrWhiteSpace(searchTerm)
+                    ? await _journalService.GetAllEntriesAsync()
+                    : await _journalService.SearchEntriesAsync(searchTerm);
+
+            return Json(entries);
+        }
+
+        /// <summary>
         /// Return the partial view for creating a new journal entry
         /// </summary>
         [HttpGet]
         public IActionResult Create()
         {
-            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-            {
-                // If AJAX request, return partial view
-                return PartialView("_JournalEntryModal", new JournalEntryViewModel
-                {
-                    CreatedAt = DateTime.Now
-                });
-            }
-
-            // Otherwise redirect to index
+            // Deprecated: modal is embedded on Index; keep endpoint for backward-compatibility
             return RedirectToAction(nameof(Index));
         }
 
@@ -64,22 +69,14 @@ namespace ActioNator.Areas.User.Controllers
         [HttpGet]
         public async Task<IActionResult> Edit(Guid id)
         {
-            JournalEntryViewModel? entry 
-                = await _journalService
-                .GetEntryByIdAsync(id);
+            JournalEntryViewModel? entry = await _journalService.GetEntryByIdAsync(id);
 
             if (entry == null)
             {
                 return NotFound();
             }
 
-            if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
-            {
-                // If AJAX request, return partial view
-                return PartialView("_JournalEntryModal", entry);
-            }
-
-            // Otherwise redirect to index
+            // Deprecated: modal is embedded on Index; keep endpoint for backward-compatibility
             return RedirectToAction(nameof(Index));
         }
 
@@ -159,10 +156,10 @@ namespace ActioNator.Areas.User.Controllers
         /// </summary>
         [HttpPost]
         [ValidateAntiForgeryTokenFromJson]
-        public async Task<IActionResult> Delete([FromBody] Guid id)
+        public async Task<IActionResult> Delete([FromBody] DeleteJournalRequest request)
         {      
             if (!await _journalService
-                .DeleteEntryAsync(id))
+                .DeleteEntryAsync(request.Id))
             {
                 if (Request.Headers["X-Requested-With"] == "XMLHttpRequest")
                 {

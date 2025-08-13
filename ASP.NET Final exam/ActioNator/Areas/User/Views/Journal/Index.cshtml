@@ -11,6 +11,8 @@
 
 @section Styles {
     <link rel="stylesheet" href="~/css/journal.css" />
+    <!-- Reuse Goals read-more styles for consistent UX -->
+    <link rel="stylesheet" href="~/css/goal-animations.css" />
 }
 
 <div class="container mx-auto px-4 py-8" x-data="journalApp">
@@ -73,15 +75,14 @@
     </div>
 
     <!-- Add/Edit Entry Modal - Using custom journal-specific modal -->
-    <partial name="_AddJournalEntryModal" />
-
-    <!-- Delete Confirmation Modal is handled by the shared _ModalPartial -->
-
-    <!-- Toast Notifications is now handled by the shared _ToastPartial -->
+    <partial name="_AddJournalEntryModal" model="new JournalEntryViewModel()" />
 </div>
 
 @section Scripts {
-    <script src="~/js/journal.js"></script>
+    <partial name="_ValidationScriptsPartial" />
+    <script src="~/js/journal.js" asp-append-version="true"></script>
+    <!-- Enable shared Read More / Show Less behavior -->
+    <script src="~/js/read-more.js" asp-append-version="true"></script>
     <script>
         // Initialize Alpine.js component when the page loads
         document.addEventListener('DOMContentLoaded', function() {

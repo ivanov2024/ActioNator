@@ -7,6 +7,7 @@ using ActioNator.ViewModels.Goal;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using System.Threading;
 
 namespace ActioNator.Areas.User.Controllers
 {
@@ -33,14 +34,14 @@ namespace ActioNator.Areas.User.Controllers
                 ?? throw new ArgumentNullException(nameof(logger));
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(CancellationToken cancellationToken)
         {
             try
             {
                 Guid? userId = GetUserId();
                 IEnumerable<GoalViewModel> goals 
                     = await _goalService
-                    .GetUserGoalsAsync(userId);
+                    .GetUserGoalsAsync(userId, "all", cancellationToken);
 
                 return View(goals);
             }
@@ -52,14 +53,14 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetGoals(string filter = "all")
+        public async Task<IActionResult> GetGoals(string filter = "all", CancellationToken cancellationToken = default)
         {
             try
             {
                 Guid? userId = GetUserId();
                 IEnumerable<GoalViewModel>? goals 
                     = await _goalService
-                    .GetUserGoalsAsync(userId, filter);
+                    .GetUserGoalsAsync(userId, filter, cancellationToken);
 
                 return Json(goals);
             }
@@ -71,14 +72,14 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetGoalPartial(string filter = "all")
+        public async Task<IActionResult> GetGoalPartial(string filter = "all", CancellationToken cancellationToken = default)
         {
             try
             {
                 Guid? userId = GetUserId();
                 IEnumerable<GoalViewModel>? goals 
                     = await _goalService
-                    .GetUserGoalsAsync(userId, filter);
+                    .GetUserGoalsAsync(userId, filter, cancellationToken);
 
                 return PartialView("_GoalsPartial", goals);
             }
@@ -91,7 +92,7 @@ namespace ActioNator.Areas.User.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryTokenFromJson]
-        public async Task<IActionResult> Create([FromBody] GoalViewModel model)
+        public async Task<IActionResult> Create([FromBody] GoalViewModel model, CancellationToken cancellationToken)
         {
             try
             {
@@ -112,7 +113,7 @@ namespace ActioNator.Areas.User.Controllers
                 Guid? userId = GetUserId();
                 model 
                     = await _goalService
-                    .CreateGoalAsync(model, userId);
+                    .CreateGoalAsync(model, userId, cancellationToken);
 
                 return Json(new { success = true, goal = model });
             }
@@ -125,7 +126,7 @@ namespace ActioNator.Areas.User.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryTokenFromJson]
-        public async Task<IActionResult> Update([FromBody] GoalViewModel model)
+        public async Task<IActionResult> Update([FromBody] GoalViewModel model, CancellationToken cancellationToken)
         {
             try
             {
@@ -155,10 +156,27 @@ namespace ActioNator.Areas.User.Controllers
                     return Unauthorized(new { success = false, message = "User not authenticated" });
                 }
 
-                // Update the goal
-                var result = await _goalService.UpdateGoalAsync(model);
+                // Verify ownership (controller-level guard)
+                if (!await _goalService.VerifyGoalOwnershipAsync(model.Id, userId, cancellationToken))
+                {
+                    _logger.LogWarning("Unauthorized attempt to update goal: User {UserId} attempted to update goal {GoalId} they don't own", userId, model.Id);
+                    return StatusCode(403, new { success = false, message = "You do not have permission to update this goal" });
+                }
+
+                // Update the goal (service will also validate ownership)
+                var result = await _goalService.UpdateGoalAsync(model, userId, cancellationToken);
                 
                 return Json(new { success = true, goal = result });
+            }
+            catch (UnauthorizedAccessException uex)
+            {
+                _logger.LogWarning(uex, "Forbidden updating goal {GoalId}", model?.Id);
+                return StatusCode(403, new { success = false, message = uex.Message });
+            }
+            catch (InvalidOperationException iex)
+            {
+                _logger.LogWarning(iex, "Goal not found for update {GoalId}", model?.Id);
+                return NotFound(new { success = false, message = iex.Message });
             }
             catch (Exception ex)
             {
@@ -169,7 +187,7 @@ namespace ActioNator.Areas.User.Controllers
         
         [HttpPost]
         [ValidateAntiForgeryTokenFromJson]
-        public async Task<IActionResult> Delete([FromBody] DeleteGoalRequest request)
+        public async Task<IActionResult> Delete([FromBody] DeleteGoalRequest request, CancellationToken cancellationToken)
         {
             try
             {
@@ -186,7 +204,7 @@ namespace ActioNator.Areas.User.Controllers
                 }
 
                 // Verify ownership
-                if (!await _goalService.VerifyGoalOwnershipAsync(request.Id, userId))
+                if (!await _goalService.VerifyGoalOwnershipAsync(request.Id, userId, cancellationToken))
                 {
                     _logger.LogWarning("Unauthorized attempt to delete goal: User {UserId} attempted to delete goal {GoalId} they don't own", userId, request.Id);
                     // Return a JSON response instead of Forbid() to avoid the redirect
@@ -194,7 +212,7 @@ namespace ActioNator.Areas.User.Controllers
                 }
 
                 await _goalService
-                    .DeleteGoalAsync(request.Id);
+                    .DeleteGoalAsync(request.Id, cancellationToken);
 
                 return Json(new { success = true });
             }
@@ -207,7 +225,7 @@ namespace ActioNator.Areas.User.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryTokenFromJson]
-        public async Task<IActionResult> ToggleComplete(Guid goalId)
+        public async Task<IActionResult> ToggleComplete(Guid goalId, CancellationToken cancellationToken)
         {
             try
             {
@@ -219,21 +237,21 @@ namespace ActioNator.Areas.User.Controllers
                 Guid? userId = GetUserId();
 
                 // Verify ownership
-                if (!await _goalService.VerifyGoalOwnershipAsync(goalId, userId))
+                if (!await _goalService.VerifyGoalOwnershipAsync(goalId, userId, cancellationToken))
                 {
-                    return Forbid();
+                    return StatusCode(403, new { success = false, message = "You do not have permission to update this goal" });
                 }
 
                 GoalViewModel goal 
                     = await _goalService
-                    .ToggleGoalCompletionAsync(goalId);
+                    .ToggleGoalCompletionAsync(goalId, cancellationToken);
 
                 return Json(new { success = true, goal });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error toggling completion for goal with ID: {GoalId}", goalId);
-                return Json(new { success = false, message = "Failed to update goal status. Please try again." });
+                return StatusCode(500, new { success = false, message = "Failed to update goal status. Please try again." });
             }
         }
     }

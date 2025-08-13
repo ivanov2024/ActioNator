@@ -1,9 +1,11 @@
 @* Add Journal Entry Modal - Custom implementation for Journal feature *@
+@model ActioNator.ViewModels.Journal.JournalEntryViewModel
 
 <div 
     x-data="journalModal()"
     @@open-journal-modal.window="openModal()"
     @@close-journal-modal.window="closeModal()"
+    @@journal-edit-mode.window="applyMode($event)"
     x-cloak
 >
     <!-- Backdrop with improved blur effect -->
@@ -77,98 +79,80 @@
                 
             <!-- Form Content -->
             <form id="journalEntryForm" class="px-4 sm:px-8 md:px-12 pt-3 sm:pt-4 pb-6 sm:pb-8" x-on:submit.prevent="validateForm() && saveEntry()">
-                <input type="hidden" name="id" x-model="currentEntry.id">
-                <input type="hidden" name="createdAt" x-model="currentEntry.createdAt">
+                <input asp-for="Id" type="hidden" x-model="currentEntry.id" />
+                <input asp-for="CreatedAt" type="hidden" x-model="currentEntry.createdAt" />
+                @Html.AntiForgeryToken()
+                <div asp-validation-summary="ModelOnly" class="text-red-600 text-sm mb-3"></div>
                 
                 <!-- Title Field -->
                 <div class="mb-6" x-data="{
                     get titleLength() { return currentEntry.title ? currentEntry.title.length : 0; },
-                    get isTitleValid() { return this.titleLength >= 3 && this.titleLength <= 100; }
+                    get isTitleValid() { return this.titleLength >= 3 && this.titleLength <= 20; }
                 }">
-                    <label for="title" class="block text-sm font-medium text-gray-700 mb-2">Title <span class="text-red-500">*</span></label>
+                    <label asp-for="Title" class="block text-sm font-medium text-gray-700 mb-2">Title <span class="text-red-500">*</span></label>
                     <div class="relative rounded-md shadow-sm">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                             </svg>
                         </div>
-                        <input 
-                            type="text" 
-                            id="title" 
+                        <input asp-for="Title"
                             x-model="currentEntry.title"
                             class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-base"
                             :class="{'border-red-300 focus:ring-red-500 focus:border-red-500': !isTitleValid && validationAttempted}"
                             placeholder="What's on your mind?"
-                            style="white-space: normal; overflow-wrap: break-word;"
-                        >
+                            style="white-space: normal; overflow-wrap: break-word;" />
                     </div>
-                    <div 
-                        x-show="!isTitleValid && validationAttempted"
-                        class="mt-1 text-sm text-red-600"
-                    >
-                        Title must be between 3 and 100 characters.
-                    </div>
+                    <span asp-validation-for="Title" class="mt-1 text-sm text-red-600"></span>
+                    <div x-show="!isTitleValid && validationAttempted" class="mt-1 text-sm text-red-600">Title must be between 3 and 20 characters.</div>
                 </div>
 
                 <!-- Mood Tag Field -->
                 <div class="mb-6" x-data="{
                     get moodLength() { return currentEntry.mood ? currentEntry.mood.length : 0; },
-                    get isMoodValid() { return this.moodLength <= 50; }
+                    get isMoodValid() { return this.moodLength >= 1 && this.moodLength <= 50; }
                 }">
-                    <label for="mood" class="block text-sm font-medium text-gray-700 mb-2">Mood Tag</label>
+                    <label asp-for="MoodTag" class="block text-sm font-medium text-gray-700 mb-2">Mood Tag <span class="text-red-500">*</span></label>
                     <div class="relative rounded-md shadow-sm">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                             <span class="text-gray-500">#</span>
                         </div>
-                        <input 
-                            type="text" 
-                            id="mood" 
+                        <input asp-for="MoodTag"
                             x-model="currentEntry.mood"
                             class="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-base"
                             :class="{'border-red-300 focus:ring-red-500 focus:border-red-500': !isMoodValid && validationAttempted}"
                             placeholder="How are you feeling? (e.g., Happy, Stressed, Calm)"
-                            style="white-space: normal; overflow-wrap: break-word;"
-                        >
+                            style="white-space: normal; overflow-wrap: break-word;" />
                     </div>
-                    <div 
-                        x-show="!isMoodValid && validationAttempted"
-                        class="mt-1 text-sm text-red-600"
-                    >
-                        Mood tag must be 50 characters or less.
-                    </div>
+                    <span asp-validation-for="MoodTag" class="mt-1 text-sm text-red-600"></span>
+                    <div x-show="!isMoodValid && validationAttempted" class="mt-1 text-sm text-red-600">Mood tag must be 50 characters or less.</div>
                 </div>
                 
                 <!-- Content Field -->
                 <div class="mb-4" x-data="{
                     get contentLength() { return currentEntry.content ? currentEntry.content.length : 0; },
-                    get isContentValid() { return this.contentLength <= 150; }
+                    get isContentValid() { return this.contentLength >= 1 && this.contentLength <= 150; }
                 }">
-                    <label for="entry-content" class="block text-sm font-medium text-gray-700 mb-2">Your Thoughts</label>
+                    <label asp-for="Content" class="block text-sm font-medium text-gray-700 mb-2">Your Thoughts <span class="text-red-500">*</span></label>
                     <div class="relative">
                         <div class="absolute top-3 left-3 flex items-start pointer-events-none text-gray-400">
                             <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h7" />
                             </svg>
                         </div>
-                        <textarea 
-                            id="entry-content" 
+                        <textarea asp-for="Content"
                             x-model="currentEntry.content"
                             placeholder="Write your journal entry here..."
                             style="white-space: normal; overflow-wrap: break-word;"
                             rows="5"
                             class="block w-full pl-10 pr-4 py-3 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring focus:ring-indigo-200 focus:ring-opacity-50 transition duration-150 ease-in-out text-base"
-                            :class="{'border-red-500 focus:border-red-500 focus:ring-red-200': !isContentValid && validationAttempted}"
-                        ></textarea>
+                            :class="{'border-red-500 focus:border-red-500 focus:ring-red-200': !isContentValid && validationAttempted}"></textarea>
                         <div class="absolute bottom-2 right-2 text-xs font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-600">
                             <span x-text="contentLength"></span> characters
                         </div>
                     </div>
-                    <div 
-                        x-show="!isContentValid && validationAttempted"
-                        class="mt-1 text-sm text-red-600"
-                    >
-                        Content must not exceed 150 characters.
-                    </div>
+                    <span asp-validation-for="Content" class="mt-1 text-sm text-red-600"></span>
+                    <div x-show="!isContentValid && validationAttempted" class="mt-1 text-sm text-red-600">Content must not exceed 150 characters.</div>
                 </div>
             </form>
             
@@ -222,23 +206,53 @@
             init() {
                 console.log('Journal modal component initialized');
                 
-                // Listen for open and close events - both custom event and Alpine event
-                window.addEventListener('open-journal-modal', (event) => {
-                    console.log('Journal modal received open event from window');
-                    this.openModal();
-                });
-                
                 // Add extra logging to debug event flow
                 console.log('Journal modal component registered and listening for events');
-                
-                window.addEventListener('close-journal-modal', () => {
-                    console.log('Journal modal received close event');
-                    this.closeModal();
-                });
+            },
+            
+            // Apply incoming mode and entry state from event detail
+            applyMode(e) {
+                try {
+                    console.log('Journal modal received journal-edit-mode event', e?.detail);
+                    const detail = e && e.detail ? e.detail : {};
+                    this.isEditMode = !!detail.isEditMode;
+                    const src = detail.entry || {};
+                    this.currentEntry = {
+                        id: src.id || '',
+                        title: src.title || '',
+                        content: src.content || '',
+                        mood: src.mood || src.moodTag || '',
+                        createdAt: src.createdAt || this.currentEntry.createdAt || new Date().toISOString()
+                    };
+                    this.validationAttempted = false;
+                    this.validationErrors = {};
+                } catch (err) {
+                    console.warn('Failed to apply journal-edit-mode detail:', err);
+                }
             },
             
             openModal() {
                 console.log('Journal modal opening');
+                // Apply any persisted state from the caller before opening
+                try {
+                    const st = window.__journalModalState;
+                    if (st) {
+                        console.log('Applying persisted modal state before open:', st);
+                        this.isEditMode = !!st.isEditMode;
+                        const src = st.entry || {};
+                        this.currentEntry = {
+                            id: src.id || '',
+                            title: src.title || '',
+                            content: src.content || '',
+                            mood: src.mood || src.moodTag || '',
+                            createdAt: src.createdAt || this.currentEntry.createdAt || new Date().toISOString()
+                        };
+                        this.validationAttempted = false;
+                        this.validationErrors = {};
+                    }
+                } catch (e) {
+                    console.warn('Failed to apply persisted modal state:', e);
+                }
                 
                 // Reset any previous state to avoid animation conflicts
                 if (this.$refs.modalContent) {

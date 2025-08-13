@@ -113,39 +113,38 @@
                 },
 
                 confirm() {
-                    // For delete operations, call the global deletion handler
+                    // Always notify listeners first (works for all modal consumers)
+                    window.dispatchEvent(new CustomEvent('modal-confirmed', {
+                        detail: {
+                            type: this.type,
+                            title: this.title
+                        }
+                    }));
+                    
                     if (this.type === 'delete') {
                         try {
-                            // Call the global post deletion function
                             if (typeof window.handlePostDeletion === 'function') {
                                 window.handlePostDeletion();
                                 console.log('Called handlePostDeletion from modal');
                             } else {
-                                console.error('handlePostDeletion function not found');
+                                // No-op if not present
+                                console.debug('handlePostDeletion not present; relying on modal-confirmed listeners');
                             }
                         } catch (error) {
                             console.error('Error in post deletion:', error);
                         }
-                    } else {
-                        // For non-delete operations, use the event system
-                        window.dispatchEvent(new CustomEvent('modal-confirmed', {
+                    }
+
+                    // Show toast for report type
+                    if (this.type === 'report') {
+                        window.dispatchEvent(new CustomEvent('show-toast', {
                             detail: {
-                                type: this.type,
-                                title: this.title
+                                type: 'success',
+                                message: 'Content has been reported successfully.'
                             }
                         }));
-                        
-                        // Show toast for report type
-                        if (this.type === 'report') {
-                            window.dispatchEvent(new CustomEvent('show-toast', {
-                                detail: {
-                                    type: 'success',
-                                    message: 'Content has been reported successfully.'
-                                }
-                            }));
-                        }
                     }
-                    
+
                     this.close();
                 }
             };

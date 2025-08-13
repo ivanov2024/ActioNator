@@ -3,6 +3,7 @@ using ActioNator.Data.Models;
 using ActioNator.Services.Interfaces.GoalService;
 using ActioNator.ViewModels.Goal;
 using Microsoft.EntityFrameworkCore;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace ActioNator.Services.Implementations.GoalService
@@ -14,18 +15,19 @@ namespace ActioNator.Services.Implementations.GoalService
     {
         private readonly ActioNatorDbContext _dbContext;
         private readonly ILogger<GoalService> _logger;
+        private readonly IClock _clock;
 
         /// <summary>
         /// Constructor for GoalService
         /// </summary>
-        /// <param name="goalRepository">Repository for goal data access</param>
+        /// <param name="dbContext">DbContext for goal data access</param>
         /// <param name="logger">Logger for service operations</param>
-        public GoalService(ActioNatorDbContext dbContext, ILogger<GoalService> logger)
+        /// <param name="clock">Clock for time operations (default: SystemClock)</param>
+        public GoalService(ActioNatorDbContext dbContext, ILogger<GoalService> logger, IClock? clock = null)
         {
-            _dbContext = dbContext 
-                ?? throw new ArgumentNullException(nameof(dbContext));
-            _logger = logger 
-                ?? throw new ArgumentNullException(nameof(logger));
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _clock = clock ?? SystemClock.Instance;
         }
 
         /// <summary>
@@ -34,7 +36,7 @@ namespace ActioNator.Services.Implementations.GoalService
         /// <param name="userId">The ID of the user</param>
         /// <param name="filter">Optional filter: "all", "active", "completed", or "overdue"</param>
         /// <returns>A list of goal view models</returns>
-        public async Task<List<GoalViewModel>> GetUserGoalsAsync(Guid? userId, string filter = "all")
+        public async Task<List<GoalViewModel>> GetUserGoalsAsync(Guid? userId, string filter = "all", CancellationToken cancellationToken = default)
         {
             try
             {
@@ -63,7 +65,7 @@ namespace ActioNator.Services.Implementations.GoalService
                     case "overdue":
                         query 
                             = query.Where(g => !g.IsCompleted 
-                            && g.DueDate < DateTime.Now);
+                            && g.DueDate < _clock.UtcNow);
                         break;
                     // "all" or any other value returns all goals
                 }
@@ -80,7 +82,7 @@ namespace ActioNator.Services.Implementations.GoalService
                         DueDate = g.DueDate,
                         Completed = g.IsCompleted
                     })
-                    .ToListAsync();
+                    .ToListAsync(cancellationToken);
 
                 return goals;
             }
@@ -97,7 +99,7 @@ namespace ActioNator.Services.Implementations.GoalService
         /// <param name="model">The goal view model containing goal details</param>
         /// <param name="userId">The ID of the user creating the goal</param>
         /// <returns>The created goal view model with assigned ID</returns>
-        public async Task<GoalViewModel> CreateGoalAsync(GoalViewModel model, Guid? userId)
+        public async Task<GoalViewModel> CreateGoalAsync(GoalViewModel model, Guid? userId, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -112,17 +114,17 @@ namespace ActioNator.Services.Implementations.GoalService
                 {
                     Title = model.Title,
                     Description = model.Description,
-                    DueDate = model.DueDate,
+                    DueDate = DateTime.SpecifyKind(model.DueDate, DateTimeKind.Utc),
                     IsCompleted = model.Completed,
                     ApplicationUserId = userId!.Value,
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = _clock.UtcNow
                 };
 
                 await _dbContext
-                    .AddAsync(goal);
+                    .AddAsync(goal, cancellationToken);
 
                 await _dbContext
-                    .SaveChangesAsync();
+                    .SaveChangesAsync(cancellationToken);
 
                 // Update the model with the generated ID
                 model.Id = goal.Id;
@@ -140,8 +142,9 @@ namespace ActioNator.Services.Implementations.GoalService
         /// Updates an existing goal
         /// </summary>
         /// <param name="model">The goal view model with updated information</param>
+        /// <param name="userId">The ID of the user performing the update</param>
         /// <returns>The updated goal view model</returns>
-        public async Task<GoalViewModel> UpdateGoalAsync(GoalViewModel model)
+        public async Task<GoalViewModel> UpdateGoalAsync(GoalViewModel model, Guid? userId, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -154,28 +157,45 @@ namespace ActioNator.Services.Implementations.GoalService
                 {
                     throw new ArgumentException("Goal ID cannot be null or empty", nameof(model.Id));
                 }
+                
+                if (userId == null || userId == Guid.Empty)
+                {
+                    throw new UnauthorizedAccessException("User not authenticated");
+                }
 
-                Goal goal 
-                    = await _dbContext
+                var goal = await _dbContext
                     .Goals
-                    .FirstAsync(g => g.Id == model.Id)
-                    ?? throw new InvalidOperationException($"Goal with ID {model.Id} not found");
+                    .SingleOrDefaultAsync(g => g.Id == model.Id, cancellationToken);
+
+                if (goal == null)
+                {
+                    throw new InvalidOperationException($"Goal with ID {model.Id} not found");
+                }
+
+                if (goal.ApplicationUserId != userId)
+                {
+                    throw new UnauthorizedAccessException("You do not have permission to update this goal");
+                }
 
                 // Update properties
                 goal.Title = model.Title;
                 goal.Description = model.Description;
-                goal.DueDate = model.DueDate;
+                goal.DueDate = DateTime.SpecifyKind(model.DueDate, DateTimeKind.Utc);
                 goal.IsCompleted = model.Completed;
 
                 if (model.Completed)
                 {
-                    goal.CompletedAt = DateTime.UtcNow;
+                    goal.CompletedAt = _clock.UtcNow;
+                }
+                else
+                {
+                    goal.CompletedAt = null;
                 }
 
                 _dbContext.Update(goal);
 
                 await _dbContext
-                    .SaveChangesAsync();
+                    .SaveChangesAsync(cancellationToken);
 
                 return model;
             }
@@ -191,7 +211,7 @@ namespace ActioNator.Services.Implementations.GoalService
         /// </summary>
         /// <param name="goalId">The ID of the goal to delete</param>
         /// <returns>A task representing the asynchronous operation</returns>
-        public async Task DeleteGoalAsync(Guid goalId)
+        public async Task DeleteGoalAsync(Guid goalId, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -200,17 +220,20 @@ namespace ActioNator.Services.Implementations.GoalService
                     throw new ArgumentException("Goal ID cannot be empty", nameof(goalId));
                 }
 
-                Goal goal
-                    = (await _dbContext
+                var goal = await _dbContext
                     .Goals
-                    .FirstAsync(g => g.Id == goalId)
-                    ?? throw new InvalidOperationException($"Goal with ID {goalId} not found"));
+                    .SingleOrDefaultAsync(g => g.Id == goalId, cancellationToken);
+
+                if (goal == null)
+                {
+                    throw new InvalidOperationException($"Goal with ID {goalId} not found");
+                }
 
                  _dbContext
                     .Remove(goal);
 
                 await _dbContext
-                    .SaveChangesAsync();
+                    .SaveChangesAsync(cancellationToken);
             }
             catch (Exception ex)
             {
@@ -224,7 +247,7 @@ namespace ActioNator.Services.Implementations.GoalService
         /// </summary>
         /// <param name="goalId">The ID of the goal to toggle</param>
         /// <returns>The updated goal view model</returns>
-        public async Task<GoalViewModel> ToggleGoalCompletionAsync(Guid goalId)
+        public async Task<GoalViewModel> ToggleGoalCompletionAsync(Guid goalId, CancellationToken cancellationToken = default)
         {
             try
             {
@@ -233,20 +256,23 @@ namespace ActioNator.Services.Implementations.GoalService
                     throw new ArgumentException("Goal ID cannot be empty", nameof(goalId));
                 }
 
-                Goal goal
-                    = (await _dbContext
+                var goal = await _dbContext
                     .Goals
-                    .FirstAsync(g => g.Id == goalId)
-                    ?? throw new InvalidOperationException($"Goal with ID {goalId} not found"));
+                    .SingleOrDefaultAsync(g => g.Id == goalId, cancellationToken);
+                if (goal == null)
+                {
+                    throw new InvalidOperationException($"Goal with ID {goalId} not found");
+                }
 
                 // Toggle completion status
                 goal.IsCompleted = !goal.IsCompleted;
+                goal.CompletedAt = goal.IsCompleted ? _clock.UtcNow : null;
 
                 // Don't use AddAsync for existing entities - it's for new entities only
                 _dbContext.Update(goal);
 
                 await _dbContext
-                    .SaveChangesAsync();
+                    .SaveChangesAsync(cancellationToken);
 
                 return new GoalViewModel
                 {
@@ -270,17 +296,27 @@ namespace ActioNator.Services.Implementations.GoalService
         /// <param name="goalId">The ID of the goal to check</param>
         /// <param name="userId">The ID of the user</param>
         /// <returns>True if the user is the owner, otherwise false</returns>
-        public async Task<bool> VerifyGoalOwnershipAsync(Guid goalId, Guid? userId)
+        public async Task<bool> VerifyGoalOwnershipAsync(Guid goalId, Guid? userId, CancellationToken cancellationToken = default)
         {
             if (userId == null)
                 return false;
 
             // Check if the workout exists and belongs to the user
-            return await
-                _dbContext
+            return await _dbContext
                 .Goals
-                .AnyAsync(g => g.Id == goalId
-                    && g.ApplicationUserId == userId);
+                .AnyAsync(g => g.Id == goalId && g.ApplicationUserId == userId, cancellationToken);
         }
     }
+}
+
+// Minimal clock abstraction for UTC normalization
+public interface IClock
+{
+    DateTime UtcNow { get; }
+}
+
+public sealed class SystemClock : IClock
+{
+    public static readonly SystemClock Instance = new SystemClock();
+    public DateTime UtcNow => DateTime.UtcNow;
 }

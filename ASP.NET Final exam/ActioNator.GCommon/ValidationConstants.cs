@@ -115,6 +115,15 @@ namespace ActioNator.GCommon
                     { nameof(ContentMinLength), (ContentMinLength, ContentMaxLength) },
                     { nameof(MoodTagMinLength), (MoodTagMinLength, MoodTagMaxLength) }
                 };
+
+            public const string TitleRequiredMessage = "Title is required.";
+            public const string TitleLengthMessage = "Title must be between {2} and {1} characters.";
+
+            public const string ContentRequiredMessage = "Content is required.";
+            public const string ContentLengthMessage = "Content must be between {2} and {1} characters.";
+
+            public const string MoodTagRequiredMessage = "Mood tag is required.";
+            public const string MoodTagLengthMessage = "Mood tag must be between {2} and {1} characters.";
         }
 
         public static class AchievementTemplate

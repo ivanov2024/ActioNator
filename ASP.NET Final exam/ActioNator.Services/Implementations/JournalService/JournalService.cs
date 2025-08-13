@@ -26,6 +26,7 @@ namespace ActioNator.Services.Implementations.JournalService
         public async Task<IEnumerable<JournalEntryViewModel>> GetAllEntriesAsync()
         => await _dbContext
             .JournalEntries
+            .Where(je => !je.IsDeleted)
             .AsNoTracking()
             .Select(je => new JournalEntryViewModel
             {
@@ -46,6 +47,7 @@ namespace ActioNator.Services.Implementations.JournalService
             => await
             _dbContext
             .JournalEntries
+            .Where(je => !je.IsDeleted)
             .AsNoTracking()
             .Select(je => new JournalEntryViewModel
             {
@@ -179,18 +181,16 @@ namespace ActioNator.Services.Implementations.JournalService
                 return await GetAllEntriesAsync();
             }
 
-            string normalizedSearchTerm
-                = searchTerm.ToLower();
+            string pattern = $"%{searchTerm.Trim()}%";
 
-            var results = 
-                await 
-                _dbContext
+            var results = await _dbContext
                 .JournalEntries
-                .Where(e =>
-                    e.Title.Contains(normalizedSearchTerm, StringComparison.CurrentCultureIgnoreCase) ||
-                    e.Content.Contains(normalizedSearchTerm, StringComparison.CurrentCultureIgnoreCase) ||
-                    (e.MoodTag != null 
-                    && e.MoodTag.Contains(normalizedSearchTerm, StringComparison.CurrentCultureIgnoreCase)))
+                .Where(e => !e.IsDeleted && (
+                    EF.Functions.Like(e.Title, pattern) ||
+                    EF.Functions.Like(e.Content, pattern) ||
+                    (e.MoodTag != null && EF.Functions.Like(e.MoodTag, pattern))
+                ))
+                .AsNoTracking()
                 .OrderByDescending(e => e.CreatedAt)
                 .Select(e => new JournalEntryViewModel
                 {

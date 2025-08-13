@@ -91,47 +91,145 @@ window.showDeletePostModal = function(postId) {
     console.error('Could not open modal - no modal system found');
 };
 
-// Function to handle post deletion when modal is confirmed
-window.handlePostDeletion = function() {
-    const postId = window.currentPostIdForDeletion;
-    if (!postId) {
-        console.error('No post ID found for deletion');
+// Function to show delete goal modal (reuses shared modal)
+window.showDeleteGoalModal = function(goalId) {
+    console.log('Global showDeleteGoalModal called for goal:', goalId);
+
+    const openModalConfig = {
+        type: 'delete',
+        title: 'Delete Goal',
+        message: 'Are you sure you want to delete this goal? This action cannot be undone.',
+        confirmText: 'Delete',
+        cancelText: 'Cancel'
+    };
+
+    // Store goalId globally for the modal confirm action
+    window.currentGoalIdForDeletion = goalId;
+
+    // Try the direct modal access first
+    if (window.openModalDirect && window.openModalDirect(openModalConfig)) {
+        console.log('Modal opened using direct access');
         return;
     }
-    
-    console.log('Deleting post:', postId);
-    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
-    
-    fetch(`/User/Community/DeletePost`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': token
-        },
-        body: JSON.stringify({ PostId: postId })
-    })
-    .then(response => {
-        if (!response.ok) throw new Error('Network response was not ok');
-        return response.json();
-    })
-    .then(data => {
-        console.log('Post deleted successfully:', data);
-        // Remove the post from the UI or refresh the page
-        const postElement = document.querySelector(`[data-post-id="${postId}"]`);
-        if (postElement) {
-            postElement.remove();
-        } else {
-            window.location.reload();
-        }
-    })
-    .catch(error => {
-        console.error('Error deleting post:', error);
-        alert('Failed to delete post. Please try again.');
-    })
-    .finally(() => {
-        // Clear the stored post ID
-        window.currentPostIdForDeletion = null;
-    });
+
+    // Try the standard openModal function
+    if (window.openModal) {
+        window.openModal(openModalConfig);
+        console.log('Modal opened using standard openModal');
+        return;
+    }
+
+    // Fallback: try to find and open modal directly
+    const modalElement = document.querySelector('[x-data="modal"]');
+    if (modalElement && modalElement.__x && modalElement.__x.$data) {
+        const modalData = modalElement.__x.$data;
+        modalData.type = 'delete';
+        modalData.title = 'Delete Goal';
+        modalData.message = 'Are you sure you want to delete this goal? This action cannot be undone.';
+        modalData.confirmText = 'Delete';
+        modalData.cancelText = 'Cancel';
+        modalData.isOpen = true;
+        document.body.style.overflow = 'hidden';
+        console.log('Modal opened using direct element access');
+        return;
+    }
+
+    console.error('Could not open modal - no modal system found');
+};
+
+// Function to handle post deletion when modal is confirmed
+window.handlePostDeletion = function() {
+    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+    const goalId = window.currentGoalIdForDeletion;
+    const postId = window.currentPostIdForDeletion;
+
+    // If a Goal deletion was requested via the shared modal
+    if (goalId) {
+        console.log('Deleting goal:', goalId);
+        fetch(`/User/Goal/Delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token
+            },
+            body: JSON.stringify({ Id: goalId, __RequestVerificationToken: token })
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json().catch(() => ({ success: true }));
+        })
+        .then(data => {
+            console.log('Goal deleted response:', data);
+            if (!data || data.success === false) throw new Error(data?.message || 'Failed to delete goal');
+            // Remove the goal from the UI or refresh
+            const goalElement = document.querySelector(`.goal-card[data-id="${goalId}"]`);
+            if (goalElement) {
+                goalElement.remove();
+            }
+            // Success toast
+            try {
+                if (window.GoalsPage && typeof window.GoalsPage.showToast === 'function') {
+                    window.GoalsPage.showToast('Goal deleted successfully', 'success');
+                } else {
+                    window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: 'Goal deleted successfully', type: 'success' } }));
+                }
+            } catch (e) {
+                console.warn('Toast dispatch failed:', e);
+            }
+            if (window.__goalsReload) {
+                window.__goalsReload();
+            } else if (!goalElement) {
+                window.location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting goal:', error);
+            alert('Failed to delete goal. Please try again.');
+            try {
+                window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: (error && error.message) ? error.message : 'Failed to delete goal', type: 'error' } }));
+            } catch (_) {}
+        })
+        .finally(() => {
+            window.currentGoalIdForDeletion = null;
+        });
+        return;
+    }
+
+    // Otherwise, proceed with Post deletion (existing behavior)
+    if (postId) {
+        console.log('Deleting post:', postId);
+        fetch(`/User/Community/DeletePost`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token
+            },
+            body: JSON.stringify({ PostId: postId })
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Network response was not ok');
+            return response.json();
+        })
+        .then(data => {
+            console.log('Post deleted successfully:', data);
+            const postElement = document.querySelector(`[data-post-id="${postId}"]`);
+            if (postElement) {
+                postElement.remove();
+            } else {
+                window.location.reload();
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting post:', error);
+            alert('Failed to delete post. Please try again.');
+        })
+        .finally(() => {
+            window.currentPostIdForDeletion = null;
+        });
+        return;
+    }
+
+    console.error('No ID found for deletion');
 };
 
 // Function to restore a deleted post

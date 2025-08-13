@@ -5,7 +5,7 @@
     Layout = "_Layout";
 }
 
-<div class="container mx-auto px-4 py-8">
+<div x-data="goalsPage()" class="container mx-auto px-4 py-8">
     <!-- Page Header -->
     <div class="mb-8">
         <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
@@ -240,7 +240,5 @@
 }
 
 @section Scripts {
-    <script src="~/js/goal.js" asp-append-version="true"></script>
-    <script src="~/js/read-more.js" asp-append-version="true"></script>
-    <script src="~/js/modal-handler.js" asp-append-version="true"></script>
+    <script src="~/js/goals.page.js" asp-append-version="true"></script>
 }
