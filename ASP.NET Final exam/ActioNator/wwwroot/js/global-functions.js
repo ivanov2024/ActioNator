@@ -44,6 +44,52 @@ window.likePost = function(postId) {
     });
 };
 
+// Function to show delete comment modal (reuses shared modal)
+window.showDeleteCommentModal = function(commentId) {
+    console.log('Global showDeleteCommentModal called for comment:', commentId);
+
+    const openModalConfig = {
+        type: 'delete',
+        title: 'Delete Comment',
+        message: 'Are you sure you want to delete this comment? This action cannot be undone.',
+        confirmText: 'Delete',
+        cancelText: 'Cancel'
+    };
+
+    // Store commentId globally for the modal confirm action
+    window.currentCommentIdForDeletion = commentId;
+
+    // Try the direct modal access first
+    if (window.openModalDirect && window.openModalDirect(openModalConfig)) {
+        console.log('Modal opened using direct access');
+        return;
+    }
+
+    // Try the standard openModal function
+    if (window.openModal) {
+        window.openModal(openModalConfig);
+        console.log('Modal opened using standard openModal');
+        return;
+    }
+
+    // Fallback: try to find and open modal directly
+    const modalElement = document.querySelector('[x-data="modal"]');
+    if (modalElement && modalElement.__x && modalElement.__x.$data) {
+        const modalData = modalElement.__x.$data;
+        modalData.type = 'delete';
+        modalData.title = 'Delete Comment';
+        modalData.message = 'Are you sure you want to delete this comment? This action cannot be undone.';
+        modalData.confirmText = 'Delete';
+        modalData.cancelText = 'Cancel';
+        modalData.isOpen = true;
+        document.body.style.overflow = 'hidden';
+        console.log('Modal opened using direct element access');
+        return;
+    }
+
+    console.error('Could not open modal - no modal system found');
+};
+
 // Function to show delete post modal
 window.showDeletePostModal = function(postId) {
     console.log('Global showDeletePostModal called for post:', postId);
@@ -141,7 +187,55 @@ window.showDeleteGoalModal = function(goalId) {
 window.handlePostDeletion = function() {
     const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
     const goalId = window.currentGoalIdForDeletion;
+    const commentId = window.currentCommentIdForDeletion;
     const postId = window.currentPostIdForDeletion;
+
+    // If a Comment deletion was requested via the shared modal
+    if (commentId) {
+        try {
+            console.log('Deleting comment:', commentId);
+            // Try to find the related postId from the DOM for the request body
+            let postIdForComment = null;
+            const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
+            const postElement = commentElement ? commentElement.closest('[data-post-id]') : null;
+            if (postElement) {
+                postIdForComment = postElement.dataset.postId || null;
+            }
+
+            fetch(`/User/Community/DeleteComment/${commentId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': token
+                },
+                body: JSON.stringify({ PostId: postIdForComment })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                console.log('Comment deleted response:', data);
+                if (!data || data.success === false) throw new Error(data?.message || 'Failed to delete comment');
+                // Simplest consistent behavior: refresh to reflect updated comments
+                window.location.reload();
+            })
+            .catch(error => {
+                console.error('Error deleting comment:', error);
+                alert('Failed to delete comment. Please try again.');
+                try {
+                    window.dispatchEvent(new CustomEvent('show-toast', { detail: { message: (error && error.message) ? error.message : 'Failed to delete comment', type: 'error' } }));
+                } catch (_) {}
+            })
+            .finally(() => {
+                window.currentCommentIdForDeletion = null;
+            });
+        } catch (err) {
+            console.error('Unexpected error deleting comment:', err);
+            window.currentCommentIdForDeletion = null;
+        }
+        return;
+    }
 
     // If a Goal deletion was requested via the shared modal
     if (goalId) {

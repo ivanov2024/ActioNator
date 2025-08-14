@@ -66,19 +66,6 @@
                     foreach (var post in Model)
                     {
                         <partial name="_PostCardPartial" model="post" />
-                        <script>
-                            window.postCommentsData = window.postCommentsData || {};
-                            window.postCommentsData['@post.Id'] = @Html.Raw(Json.Serialize(
-                                post.Comments.Select(c => new {
-                                    author = c.AuthorName,
-                                    content = c.Content,
-                                    time = c.TimeAgo,
-                                    likes = c.LikesCount,
-                                    liked = c.IsLiked,
-                                    isDeleted = c.IsDeleted
-                                })
-                            ));
-                        </script>
                     }
                 }
                 else
@@ -101,8 +88,8 @@
 <partial name="_ModalPartial" />
 
 @section Scripts {
-    <!-- SignalR client library -->
-    <script src="~/lib/microsoft/signalr/signalr.min.js"></script>
+    <!-- SignalR client library (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@7.0.5/dist/browser/signalr.min.js" crossorigin="anonymous"></script>
     
     <!-- Community hub client -->
     <script src="~/js/communityHub.js"></script>

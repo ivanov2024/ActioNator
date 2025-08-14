@@ -64,6 +64,28 @@ namespace ActioNator.Services.Implementations.ReportVerificationService
             return reportedComments;
         }
 
+        public async Task<int> GetPendingPostReportsCountAsync()
+        {
+            // Count distinct posts with pending reports, excluding deleted posts
+            return await _dbContext.PostReports
+                .Where(r => r.Status == "Sent")
+                .Where(r => r.Post != null && !r.Post.IsDeleted)
+                .Select(r => r.PostId)
+                .Distinct()
+                .CountAsync();
+        }
+
+        public async Task<int> GetPendingCommentReportsCountAsync()
+        {
+            // Count distinct comments with pending reports, excluding deleted comments
+            return await _dbContext.CommentReports
+                .Where(r => r.Status == "Sent")
+                .Where(r => r.Comment != null && !r.Comment.IsDeleted)
+                .Select(r => r.CommentId)
+                .Distinct()
+                .CountAsync();
+        }
+
         public async Task<bool> DeletePostAsync(Guid postId)
         {
             // Find the post

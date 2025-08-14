@@ -23,6 +23,20 @@ namespace ActioNator.Services.Interfaces.ReportVerificationService
         Task<List<ReportedCommentViewModel>> GetReportedCommentsAsync();
         
         /// <summary>
+        /// Gets the number of distinct posts that currently have pending reports.
+        /// Excludes deleted posts.
+        /// </summary>
+        /// <returns>Count of posts with pending reports</returns>
+        Task<int> GetPendingPostReportsCountAsync();
+        
+        /// <summary>
+        /// Gets the number of distinct comments that currently have pending reports.
+        /// Excludes deleted comments.
+        /// </summary>
+        /// <returns>Count of comments with pending reports</returns>
+        Task<int> GetPendingCommentReportsCountAsync();
+        
+        /// <summary>
         /// Deletes a post and its associated reports
         /// </summary>
         /// <param name="postId">ID of the post to delete</param>

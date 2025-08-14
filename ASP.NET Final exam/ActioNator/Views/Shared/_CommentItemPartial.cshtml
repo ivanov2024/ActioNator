@@ -70,11 +70,11 @@
                     class="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-10 border border-gray-100 z-10"
                     style="display: none;">
                     <div class="py-1" role="menu" aria-orientation="vertical">
-                        <!-- Delete Comment - Only visible to comment owner or admin -->
-                        @if (Model.IsAuthor || User.IsInRole("Administrator"))
+                        <!-- Delete Comment - Only visible to comment owner or admin/coach -->
+                        @if (Model.IsAuthor || User.IsInRole("Administrator") || User.IsInRole("Coach"))
                         {
                             <button 
-                                @@click="showActions = false; window.deleteComment('@Model.Id.ToString()', $root.closest('[data-post-id]')?.dataset.postId)" 
+                                @@click="showActions = false; window.showDeleteCommentModal('@Model.Id.ToString()')" 
                                 class="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" 
                                 role="menuitem"
                                 data-action="delete-comment">
@@ -82,8 +82,8 @@
                             </button>
                         }
                         
-                        <!-- Restore Comment - Only visible to admins for deleted comments -->
-                        @if (Model.IsDeleted && User.IsInRole("Administrator"))
+                        <!-- Restore Comment - Only visible to admins/coaches for deleted comments -->
+                        @if (Model.IsDeleted && (User.IsInRole("Administrator") || User.IsInRole("Coach")))
                         {
                             <button 
                                 @@click="showActions = false; window.restoreComment('@Model.Id.ToString()', $root.closest('[data-post-id]')?.dataset.postId)" 
@@ -94,8 +94,8 @@
                             </button>
                         }
                         
-                        <!-- Report Comment - Not visible to comment owner or if comment is deleted -->
-                        @if (!Model.IsAuthor && !Model.IsDeleted)
+                        <!-- Report Comment - Not visible to comment owner or if comment is deleted or if user is admin/coach -->
+                        @if (!Model.IsAuthor && !Model.IsDeleted && !User.IsInRole("Administrator") && !User.IsInRole("Coach"))
                         {
                             <button 
                                 @@click="showActions = false; window.reportComment('@Model.Id.ToString()', $root.closest('[data-post-id]')?.dataset.postId)" 

@@ -183,10 +183,15 @@ function likePost(postId) {
     });
 }
 
-// Function to like a comment via AJAX
-function likeComment(commentId) {
+// Function to like a comment via AJAX (legacy, kept local)
+const likeCommentAjaxLegacy = (commentId) => {
     // Get the anti-forgery token
-    const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+    const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+    if (!tokenEl) {
+        console.error('Anti-forgery token not found');
+        return;
+    }
+    const token = tokenEl.value;
     
     // Make the AJAX call to the controller
     fetch('/User/Community/ToggleLikeComment', {
@@ -195,7 +200,7 @@ function likeComment(commentId) {
             'Content-Type': 'application/json',
             'X-CSRF-TOKEN': token
         },
-        body: JSON.stringify({ commentId: commentId })
+        body: JSON.stringify({ commentId })
     })
     .then(response => {
         if (!response.ok) {
@@ -205,8 +210,7 @@ function likeComment(commentId) {
     })
     .then(data => {
         console.log('Comment like toggled successfully:', data);
-        // The UI is already updated optimistically by Alpine.js
-        // SignalR will broadcast the update to other clients
+        // The UI may be updated via SignalR handlers
     })
     .catch(error => {
         console.error('Error toggling comment like:', error);
@@ -229,7 +233,7 @@ document.addEventListener("alpine:init", () => {
     console.log("Alpine.js initialized");
     
     // Register the postCard component
-    Alpine.data('postCard', function(initialLiked = false) {
+    Alpine.data('postCardLegacy', function(initialLiked = false) {
         return {
             liked: initialLiked,
             likesCount: 0,
@@ -679,10 +683,15 @@ document.addEventListener("alpine:init", () => {
         likePost(postId);
     };
     
-    // Comment liking functionality
-    function likeComment(commentId) {
+    // Comment liking functionality (AJAX fallback)
+    function likeCommentAjax(commentId, postId) {
         // Get the anti-forgery token
-        const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+        const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (!tokenEl) {
+            console.error('Anti-forgery token not found');
+            return;
+        }
+        const token = tokenEl.value;
         
         // Call the API to like/unlike the comment
         fetch(`/User/Community/ToggleLikeComment`, {
@@ -705,7 +714,7 @@ document.addEventListener("alpine:init", () => {
                 const commentElement = document.querySelector(`[data-comment-id="${commentId}"]`);
                 if (commentElement) {
                     const likeButton = commentElement.querySelector('[data-action="like-comment"]');
-                    const likeCountElement = commentElement.querySelector('span[data-like-count]');
+                    const likeCountElement = commentElement.querySelector('.comment-likes-count');
                     
                     if (likeButton) {
                         // Toggle the liked state
@@ -722,13 +731,37 @@ document.addEventListener("alpine:init", () => {
                         // Update the like count if available
                         if (likeCountElement && data.likesCount !== undefined) {
                             // If there are no likes, remove the count element
-                            if (data.likesCount === 0) {
-                                likeCountElement.textContent = '';
-                            } else {
-                                likeCountElement.textContent = `(${data.likesCount})`;
+                            likeCountElement.textContent = data.likesCount === 0 ? '' : `${data.likesCount}`;
+                        }
+                    }
+                }
+
+                // Update Alpine data store so x-for markup re-renders even if count was 0 previously
+                try {
+                    const postIdStr = (postId || (document.querySelector(`[data-comment-id="${commentId}"]`)?.closest('[data-post-id]')?.dataset.postId) || '').toString();
+                    if (postIdStr) {
+                        window.postCommentsData = window.postCommentsData || {};
+                        const arr = window.postCommentsData[postIdStr];
+                        if (Array.isArray(arr)) {
+                            const idx = arr.findIndex(c => (c && (c.id || c.Id)) === commentId);
+                            if (idx >= 0) {
+                                const c = arr[idx];
+                                const prevLiked = !!(c && (c.isLikedByCurrentUser || c.isLiked));
+                                const nextLikes = (typeof data.likesCount === 'number' && isFinite(data.likesCount)) ? data.likesCount : (c.likesCount || c.likes || 0) + (prevLiked ? -1 : 1);
+                                arr[idx] = {
+                                    ...c,
+                                    likesCount: nextLikes,
+                                    likes: nextLikes,
+                                    isLikedByCurrentUser: !prevLiked,
+                                    isLiked: !prevLiked
+                                };
+                                // Notify Alpine components
+                                document.dispatchEvent(new CustomEvent('comment-updated', { detail: { postId: postIdStr, commentId } }));
                             }
                         }
                     }
+                } catch (e) {
+                    console.warn('Failed to update Alpine store for comment like', e);
                 }
             } else {
                 throw new Error(data.message || 'Failed to like comment');
@@ -745,10 +778,12 @@ document.addEventListener("alpine:init", () => {
         });
     }
     
-    // Make likeComment function globally accessible
-    window.likeComment = function(commentId) {
-        likeComment(commentId);
-    };
+    // Make likeComment function globally accessible (do not override if provided elsewhere)
+    if (typeof window.likeComment !== 'function') {
+        window.likeComment = function(commentId, postId) {
+            likeCommentAjax(commentId, postId);
+        };
+    }
     
     // Comment creation functionality
     function addComment(postId, content, parentCommentId = null) {
@@ -1211,19 +1246,6 @@ document.addEventListener("alpine:init", () => {
         });
     };
 
-    window.showDeleteCommentModal = function(commentId) {
-        window.openModal({
-            type: 'delete',
-            title: 'Delete Comment',
-            message: 'Are you sure you want to delete this comment? This action cannot be undone.',
-            confirmText: 'Delete',
-            cancelText: 'Cancel',
-            onConfirm: function() {
-                deleteComment(commentId);
-            }
-        });
-    };
-
     window.showReportCommentModal = function(commentId) {
         window.openModal({
             type: 'report',
@@ -1267,11 +1289,6 @@ document.addEventListener("alpine:init", () => {
             if (postId) {
                 reportPost(postId);
             }
-        } else if (detail.title === 'Delete Comment' && detail.type === 'delete') {
-            const commentId = document.querySelector('[data-comment-id]')?.dataset.commentId;
-            if (commentId) {
-                deleteComment(commentId);
-            }
         } else if (detail.title === 'Report Comment' && detail.type === 'report') {
             const commentId = document.querySelector('[data-comment-id]')?.dataset.commentId;
             if (commentId) {
@@ -1285,7 +1302,7 @@ document.addEventListener("alpine:init", () => {
         }
     });
 
-    Alpine.data("postCard", () => ({
+    Alpine.data("postCardDemo", () => ({
         liked: false,
         showComments: false,
         commentText: "",

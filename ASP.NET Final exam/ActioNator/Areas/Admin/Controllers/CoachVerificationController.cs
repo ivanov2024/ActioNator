@@ -3,6 +3,9 @@ using ActioNator.ViewModels.CoachVerification;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Threading.Tasks;
+using ActioNator.Services.Interfaces.FileServices;
+using System;
+using System.IO;
 
 namespace ActioNator.Areas.Admin.Controllers
 {
@@ -11,10 +14,12 @@ namespace ActioNator.Areas.Admin.Controllers
     public class CoachVerificationController : Controller
     {
         private readonly ICoachVerificationService _coachVerificationService;
+        private readonly IFileStorageService _fileStorageService;
 
-        public CoachVerificationController(ICoachVerificationService coachVerificationService)
+        public CoachVerificationController(ICoachVerificationService coachVerificationService, IFileStorageService fileStorageService)
         {
             _coachVerificationService = coachVerificationService;
+            _fileStorageService = fileStorageService;
         }
 
         public async Task<IActionResult> Index()
@@ -31,6 +36,13 @@ namespace ActioNator.Areas.Admin.Controllers
                 return BadRequest("User ID is required");
             }
 
+            // Prevent direct navigation to the partial which would render without layout (can cause Quirks Mode)
+            if (!Request.Headers.ContainsKey("X-Requested-With") ||
+                !string.Equals(Request.Headers["X-Requested-With"], "XMLHttpRequest", StringComparison.OrdinalIgnoreCase))
+            {
+                return RedirectToAction(nameof(Index));
+            }
+
             var documents = await _coachVerificationService.GetDocumentsForUserAsync(userId);
             
             var model = new CoachVerificationUserViewModel
@@ -43,30 +55,58 @@ namespace ActioNator.Areas.Admin.Controllers
         }
 
         [HttpGet]
-        public IActionResult ViewDocument(string path)
+        public async Task<IActionResult> ViewDocument(string userId, string path, bool download = false)
         {
-            // This is a placeholder for document viewing functionality
-            // In a real implementation, you would validate the path and return the document
-            if (string.IsNullOrEmpty(path) || path.Contains(".."))
+            if (string.IsNullOrWhiteSpace(userId) || string.IsNullOrWhiteSpace(path) || path.Contains(".."))
             {
-                return BadRequest("Invalid path");
+                return BadRequest("Invalid request.");
             }
 
-            return File(path, "application/octet-stream");
+            try
+            {
+                var (fileStream, contentType) = await _fileStorageService.GetFileAsync(path, userId);
+                string fileName = Path.GetFileName(path);
+
+                if (download)
+                {
+                    return File(fileStream, contentType, fileName);
+                }
+
+                return File(fileStream, contentType);
+            }
+            catch (Exception)
+            {
+                return NotFound();
+            }
         }
 
-        // Placeholder for future approval/rejection functionality
         [HttpPost]
-        public IActionResult ApproveVerification(string userId)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> ApproveVerification(string userId)
         {
-            // Placeholder for approval logic
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                TempData["Error"] = "User ID is required.";
+                return RedirectToAction("Index");
+            }
+
+            bool success = await _coachVerificationService.ApproveVerificationAsync(userId);
+            TempData[success ? "Success" : "Error"] = success ? "Verification approved." : "Failed to approve verification.";
             return RedirectToAction("Index");
         }
 
         [HttpPost]
-        public IActionResult RejectVerification(string userId)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> RejectVerification(string userId, string reason = "Rejected by admin")
         {
-            // Placeholder for rejection logic
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                TempData["Error"] = "User ID is required.";
+                return RedirectToAction("Index");
+            }
+
+            bool success = await _coachVerificationService.RejectVerificationAsync(userId, reason);
+            TempData[success ? "Success" : "Error"] = success ? "Verification rejected." : "Failed to reject verification.";
             return RedirectToAction("Index");
         }
     }

@@ -5,6 +5,7 @@ using ActioNator.Infrastructure.Settings;
 using ActioNator.Middleware;
 using ActioNator.Services.Configuration;
 using ActioNator.Services.ContentInspectors;
+using ActioNator.Extensions;
 using ActioNator.Services.Implementations.AuthenticationService;
 using ActioNator.Services.Implementations.Cloud;
 using ActioNator.Services.Implementations.Communication;
@@ -228,6 +229,11 @@ namespace ActioNator
             builder
                 .Services
                 .AddScoped<IUserProfileService, UserProfileService>();
+
+            // Register Admin services for coach verification and report review
+            builder.Services
+                .AddCoachVerificationServices()
+                .AddReportReviewServices();
 
             // Check if we're running in migration mode
             bool isMigrationMode = args.Contains("--design-time") || 

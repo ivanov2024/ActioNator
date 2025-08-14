@@ -3,4 +3,49 @@
     Layout = "_Layout";
 }
 
-<h1>Admin title</h1>
+@model ActioNator.ViewModels.Reports.AdminDashboardCountsViewModel
+
+<div class="container py-3">
+    <h2 class="mb-4">Admin Dashboard</h2>
+
+    <div class="row g-3">
+        <!-- Pending Coach Verifications -->
+        <div class="col-12 col-md-6">
+            <div class="card border-warning h-100">
+                <div class="card-body d-flex align-items-center justify-content-between">
+                    <div>
+                        <h5 class="card-title text-warning">Pending Coach Verifications</h5>
+                        <p class="card-text display-6 fw-bold mb-0">@Model.PendingCoachVerifications</p>
+                    </div>
+                    <a asp-area="Admin" asp-controller="CoachVerification" asp-action="Index" class="btn btn-outline-warning">Review</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reported Content -->
+        <div class="col-12 col-md-6">
+            <div class="card border-danger h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h5 class="card-title text-danger mb-0">Reported Content (Pending)</h5>
+                        <a asp-area="Admin" asp-controller="ReportReview" asp-action="Index" class="btn btn-outline-danger">Open</a>
+                    </div>
+                    <div class="row text-center">
+                        <div class="col-4">
+                            <div class="small text-muted">Posts</div>
+                            <div class="h3 mb-0">@Model.PendingPostReports</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="small text-muted">Comments</div>
+                            <div class="h3 mb-0">@Model.PendingCommentReports</div>
+                        </div>
+                        <div class="col-4">
+                            <div class="small text-muted">Users</div>
+                            <div class="h3 mb-0">@Model.PendingUserReports</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

@@ -197,22 +197,50 @@ namespace ActioNator.Areas.User.Controllers
         [ValidateAntiForgeryTokenFromJson]
         public async Task<IActionResult> AddComment([FromBody] CommentRequest request)
         {
-            if (request?.PostId == null || request.PostId == Guid.Empty || string.IsNullOrEmpty(request.Content))
+            try
             {
-                return BadRequest("Valid Post ID and content are required");
-            }
+                if (request?.PostId == null || request.PostId == Guid.Empty || string.IsNullOrWhiteSpace(request.Content))
+                {
+                    return BadRequest(new { success = false, message = "Valid Post ID and non-empty content are required" });
+                }
 
-            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
-            var userId = Guid.Parse(userIdString);
-            var comment = await _communityService.AddCommentAsync(request.PostId, request.Content, userId);
-            
-            // Broadcast the new comment to all connected clients
-            if (comment != null)
+                var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+                if (string.IsNullOrEmpty(userIdString))
+                {
+                    return Unauthorized(new { success = false, message = "User not authenticated" });
+                }
+
+                var userId = Guid.Parse(userIdString);
+                var comment = await _communityService.AddCommentAsync(request.PostId, request.Content, userId);
+
+                // No explicit SignalR broadcast here; service handles broadcasting
+                return Json(new { success = true, comment });
+            }
+            catch (ArgumentNullException ex)
             {
-                await _hubContext.Clients.All.SendAsync("ReceiveNewComment", comment);
+                _logger.LogWarning(ex, "Invalid add comment payload for post {PostId}", request?.PostId);
+                return BadRequest(new { success = false, message = ex.Message });
             }
-
-            return Json(new { success = true, comment });
+            catch (ArgumentOutOfRangeException ex)
+            {
+                _logger.LogWarning(ex, "Comment length out of range for post {PostId}", request?.PostId);
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning(ex, "Invalid add comment request for post {PostId}", request?.PostId);
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                _logger.LogWarning(ex, "Operation failed while adding comment for post {PostId}", request?.PostId);
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error adding comment for post {PostId}", request?.PostId);
+                return StatusCode(500, new { success = false, message = "An error occurred while processing your request" });
+            }
         }
 
         [HttpPost("/User/Community/DeletePost/{id}")]

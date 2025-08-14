@@ -5,11 +5,12 @@
 "use strict";
 
 // Create connection
-const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+const token = tokenEl ? tokenEl.value : null;
 const connection = new signalR.HubConnectionBuilder()
     .withUrl("/communityHub", {
         headers: {
-            'X-CSRF-TOKEN': token
+            'X-CSRF-TOKEN': token || ''
         }
     })
     .withAutomaticReconnect([0, 2000, 5000, 10000, 30000]) // Retry policy
@@ -100,6 +101,22 @@ connection.on("ReceivePostUpdate", (postId, likesCount) => {
 });
 
 connection.on("ReceiveCommentUpdate", (commentId, likesCount) => {
+    // Some backends/serializers may send a single payload or array. Normalize here.
+    try {
+        if (Array.isArray(commentId) && likesCount === undefined) {
+            // Format: [commentId, likesCount]
+            const arr = commentId;
+            commentId = arr[0];
+            likesCount = arr[1];
+        } else if (typeof commentId === 'string' && likesCount === undefined && commentId.includes(',')) {
+            // Format: "<commentId>,<likesCount>"
+            const parts = commentId.split(',');
+            commentId = parts[0];
+            likesCount = parseInt(parts[1], 10);
+        }
+    } catch (e) {
+        console.warn('Failed to normalize ReceiveCommentUpdate payload', e);
+    }
     console.log(`Comment ${commentId} updated with ${likesCount} likes`);
     updateCommentLikes(commentId, likesCount);
 });
@@ -226,7 +243,7 @@ function addNewCommentToPost(comment) {
     }
     
     // Try to find the Alpine.js component for this post's comments
-    const commentsContainer = postElement.querySelector('[x-data="postCommentsHandler"]');
+    const commentsContainer = postElement.querySelector('[x-data^="postCommentsHandler"]');
     if (commentsContainer && window.Alpine) {
         try {
             // Get the Alpine.js component instance
@@ -254,8 +271,12 @@ function addNewCommentToPost(comment) {
         return;
     }
     
-    // Find the comments container
-    const fallbackCommentsContainer = postElement.querySelector('.comments-container');
+    // Find the comments list container (preferred) or fall back to the outer container
+    // Prefer appending into '.comments-list' so comments appear in the correct list area
+    let fallbackCommentsContainer = postElement.querySelector('.comments-list');
+    if (!fallbackCommentsContainer) {
+        fallbackCommentsContainer = postElement.querySelector('.comments-container');
+    }
     if (!fallbackCommentsContainer) {
         console.error("Comments container not found");
         return;
@@ -318,57 +339,18 @@ function addNewCommentToPost(comment) {
         </div>
         <div class="d-flex justify-content-between align-items-center mt-2">
             <div>
-                <button class="btn btn-sm btn-link p-0 me-3" onclick="likeComment('${commentIdStr}', '${postIdStr}'); return false;">
+                <button class="btn btn-sm btn-link p-0 me-3" data-action="like-comment" onclick="likeComment('${commentIdStr}', '${postIdStr}'); return false;">
                     <i class="bi bi-hand-thumbs-up${comment.isLikedByCurrentUser ? '-fill' : ''}"></i>
                     <span class="comment-likes-count">${comment.likesCount || 0}</span>
                 </button>
                 <button class="btn btn-sm btn-link p-0" onclick="replyToComment('${comment.authorName}', '${commentIdStr}'); return false;">
                     <i class="bi bi-reply"></i> Reply
                 </button>
-                        x-transition:leave-end="opacity-0 scale-95"
-                        class="absolute right-0 z-10 w-48 py-1 mt-1 bg-white rounded-lg shadow-xl ring-1 ring-black ring-opacity-5 border border-gray-200">
-                        ${!commentData.isDeleted && (commentData.isOwner || commentData.isAdmin) ? `
-                        <button @click="showMenu = false; window.deleteComment('${commentData.id}', '${postIdStr}');"
-                                class="block w-full px-4 py-2.5 text-sm text-left text-red-600 hover:bg-gray-100 transition-colors">
-                            <div class="flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                                </svg>
-                                Delete Comment
-                            </div>
-                        </button>
-                        ` : ''}
-                        ${commentData.isDeleted && commentData.isAdmin ? `
-                        <button @click="showMenu = false; window.restoreComment('${commentData.id}', '${postIdStr}');"
-                                class="block w-full px-4 py-2.5 text-sm text-left text-green-600 hover:bg-gray-100 transition-colors">
-                            <div class="flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
-                                </svg>
-                                Restore Comment
-                            </div>
-                        </button>
-                        ` : ''}
-                        <div class="border-t border-gray-100 my-1"></div>
-                        ${!commentData.isOwner && !commentData.isDeleted ? `
-                        <button @click="showMenu = false; window.reportComment('${commentData.id}', '${postIdStr}');"
-                                class="block w-full px-4 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-100 transition-colors">
-                            <div class="flex items-center">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clip-rule="evenodd" />
-                                </svg>
-                                Report Comment
-                            </div>
-                        </button>
-                        ` : ''}
-                    </div>
-                </div>
-            </div>
-        </div>
+            
     `;
     
     // Add the comment to the DOM
-    commentsContainer.appendChild(commentElement);
+    fallbackCommentsContainer.appendChild(commentElement);
     
     // Initialize Alpine.js components in the new comment element
     if (window.Alpine) {
@@ -527,37 +509,117 @@ function updateCommentCount(postElement, increment) {
     }
 }
 
+// Fallback helper to reply to a comment when Alpine component is not available
+window.replyToComment = function(authorName, commentId) {
+    try {
+        const commentEl = document.querySelector(`[data-comment-id="${commentId}"]`);
+        const postEl = commentEl ? commentEl.closest('[data-post-id]') : null;
+        if (!postEl) return;
+
+        // Try Alpine component first
+        const compEl = postEl.querySelector('[x-data^="postCommentsHandler"]');
+        if (compEl && window.Alpine) {
+            try {
+                const comp = window.Alpine.$data(compEl);
+                if (comp) {
+                    comp.replyingTo = authorName;
+                    // Focus the textarea
+                    if (comp.$refs && comp.$refs.commentTextarea) {
+                        comp.$refs.commentTextarea.focus();
+                    } else {
+                        const ta = compEl.querySelector('textarea');
+                        if (ta) ta.focus();
+                    }
+                    return;
+                }
+            } catch {}
+        }
+
+        // Fallback: manipulate DOM directly
+        const container = postEl.querySelector('.comments-container');
+        const textarea = container ? container.querySelector('textarea') : null;
+        if (textarea) {
+            const mention = `@${authorName} `;
+            if (!textarea.value.startsWith(mention)) {
+                textarea.value = mention + (textarea.value || '');
+            }
+            textarea.focus();
+            // Move caret to end
+            const len = textarea.value.length;
+            textarea.setSelectionRange(len, len);
+        }
+    } catch (e) {
+        console.error('replyToComment fallback failed', e);
+    }
+};
+
 function updateCommentLikes(commentId, likesCount) {
     // Ensure commentId is treated as a string (in case it's a GUID)
     const commentIdStr = commentId.toString();
-    
+    const nextLikes = Number.isFinite(Number(likesCount)) ? Number(likesCount) : 0;
+
     // Find the comment element
     const commentElement = document.querySelector(`[data-comment-id="${commentIdStr}"]`);
-    if (!commentElement) return;
     
-    // Find the like count element (span with data-like-count attribute)
-    const likesElement = commentElement.querySelector(`span[data-like-count]`);
-    if (likesElement) {
-        // Update the text content
-        likesElement.textContent = `(${likesCount})`;
-        
-        // Add a brief highlight effect
-        likesElement.classList.add("text-blue-600");
-        setTimeout(() => {
-            likesElement.classList.remove("text-blue-600");
-        }, 1000);
+    // Update global Alpine data store so UI re-renders
+    try {
+        // Try to determine postId from DOM first
+        const postIdStr = commentElement?.closest('[data-post-id]')?.dataset?.postId
+            || Object.keys(window.postCommentsData || {}).find(pid =>
+                Array.isArray(window.postCommentsData[pid]) && window.postCommentsData[pid].some(c => (c && (c.id || c.Id)) === commentIdStr)
+            );
+        if (postIdStr) {
+            window.postCommentsData = window.postCommentsData || {};
+            const arr = window.postCommentsData[postIdStr];
+            if (Array.isArray(arr)) {
+                const idx = arr.findIndex(c => (c && (c.id || c.Id)) === commentIdStr);
+                if (idx >= 0) {
+                    const c = arr[idx] || {};
+                    arr[idx] = {
+                        ...c,
+                        likesCount: nextLikes,
+                        likes: nextLikes
+                        // Do not change isLikedByCurrentUser here; server may not send it
+                    };
+                    // Notify Alpine components to refresh from store
+                    document.dispatchEvent(new CustomEvent('comment-updated', { detail: { postId: postIdStr, commentId: commentIdStr } }));
+                    // Also directly dispatch set-comments to the handler element if present
+                    try {
+                        const commentsElement = document.querySelector(`[data-post-id="${postIdStr}"] .comments-container`);
+                        if (commentsElement) {
+                            commentsElement.dispatchEvent(new CustomEvent('set-comments', {
+                                detail: { comments: arr.slice() },
+                                bubbles: true
+                            }));
+                        }
+                    } catch (e2) {
+                        console.warn('Failed to dispatch set-comments to element', e2);
+                    }
+                }
+            }
+        }
+    } catch (e) {
+        console.warn('Failed to sync Alpine store in updateCommentLikes', e);
     }
-    
-    // Update the like button appearance based on the current user's like status
-    const likeButton = commentElement.querySelector(`[data-action="like-comment"]`);
+
+    if (!commentElement) return;
+
+    // Fallback: update the like count text in DOM
+    const likesElement = commentElement.querySelector('.comment-likes-count');
+    if (likesElement) {
+        likesElement.textContent = nextLikes > 0 ? String(nextLikes) : '';
+        likesElement.classList.add('text-blue-600');
+        setTimeout(() => likesElement.classList.remove('text-blue-600'), 1000);
+    }
+
+    // Briefly highlight the like button to indicate an update
+    const likeButton = commentElement.querySelector('[data-action="like-comment"]');
     if (likeButton) {
-        // We can't determine if the current user liked it from this function,
-        // but we can highlight the button briefly to indicate the update
-        likeButton.classList.add("text-blue-600");
+        likeButton.classList.add('text-blue-600');
         setTimeout(() => {
-            // Only remove the highlight if it's not already liked by the user
-            if (!likeButton.classList.contains("text-blue-600")) {
-                likeButton.classList.remove("text-blue-600");
+            // If Alpine toggled it based on isLikedByCurrentUser, leave it; otherwise remove flash
+            if (!likeButton.classList.contains('text-blue-600')) {
+                likeButton.classList.remove('text-blue-600');
             }
         }, 1000);
     }
@@ -630,7 +692,12 @@ function removeCommentFromPost(commentId, postId) {
 }
 
 // Start the connection when the document is ready
-document.addEventListener("DOMContentLoaded", startConnection);
+if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", startConnection);
+} else {
+    // In case this script is loaded after DOMContentLoaded (e.g., dynamic navigation), start immediately
+    startConnection();
+}
 
 // Export connection for external use
 window.communityHub = connection;
@@ -647,33 +714,97 @@ window.likeComment = function(commentId, postId) {
         console.error('Missing required parameters for likeComment:', { commentId, postId });
         return;
     }
+
+    // Optimistic UI update: toggle like locally for instant feedback
+    try {
+        const pid = postId.toString();
+        window.postCommentsData = window.postCommentsData || {};
+        const arr = window.postCommentsData[pid];
+        if (Array.isArray(arr)) {
+            const idx = arr.findIndex(c => (c && (c.id || c.Id)) === commentId);
+            if (idx >= 0) {
+                const c = arr[idx] || {};
+                const prevLiked = !!(c.isLikedByCurrentUser || c.isLiked);
+                const prevLikes = (c.likesCount ?? c.likes ?? 0) | 0;
+                const nextLikes = prevLiked ? Math.max(0, prevLikes - 1) : prevLikes + 1;
+                arr[idx] = {
+                    ...c,
+                    likesCount: nextLikes,
+                    likes: nextLikes,
+                    isLikedByCurrentUser: !prevLiked,
+                    isLiked: !prevLiked
+                };
+                document.dispatchEvent(new CustomEvent('comment-updated', { detail: { postId: pid, commentId } }));
+            }
+        }
+    } catch (e) {
+        console.warn('Optimistic like update failed', e);
+    }
+
+    // DOM fallback for instant visual feedback if Alpine store path was unavailable
+    try {
+        const commentEl = document.querySelector(`[data-post-id="${postId}"] [data-comment-id="${commentId}"]`);
+        if (commentEl) {
+            const icon = commentEl.querySelector('i');
+            const countEl = commentEl.querySelector('.comment-likes-count');
+            if (icon) {
+                // Toggle filled/outlined icon classes and color
+                const filled = icon.classList.contains('bi-hand-thumbs-up-fill');
+                icon.classList.toggle('bi-hand-thumbs-up-fill', !filled);
+                icon.classList.toggle('bi-hand-thumbs-up', filled);
+                icon.classList.toggle('text-blue-600', !filled);
+            }
+            if (countEl) {
+                const current = parseInt(countEl.textContent || '0', 10) || 0;
+                const next = (icon && icon.classList.contains('bi-hand-thumbs-up-fill')) ? current + 1 : Math.max(0, current - 1);
+                countEl.textContent = next > 0 ? String(next) : '';
+            }
+        }
+    } catch (e) {
+        console.warn('Optimistic DOM like toggle failed', e);
+    }
     
     // Send the like request via SignalR
     connection.invoke('LikeComment', commentId)
         .then(() => {
             console.log(`Like request sent for comment ${commentId}`);
-            // UI will be updated by SignalR event handler
+            // Server will broadcast ReceiveCommentUpdate; updateCommentLikes will sync count
         })
         .catch(err => {
             console.error('Error liking comment:', err);
-            // Fallback to AJAX if SignalR fails
-            fetch(`/api/comments/${commentId}/like`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': token
+            // Fallback to AJAX (MVC endpoint) if SignalR fails
+            try {
+                const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+                const csrf = tokenEl ? tokenEl.value : null;
+                if (!csrf) {
+                    console.error('Anti-forgery token not found for likeComment fallback');
+                    return;
                 }
-            })
-            .then(response => {
-                if (!response.ok) throw new Error('Network response was not ok');
-                return response.json();
-            })
-            .then(data => {
-                console.log('Comment liked via AJAX fallback:', data);
-                // Update UI manually since SignalR failed
-                updateCommentLikes(commentId, data.likesCount);
-            })
-            .catch(error => console.error('Error in AJAX fallback for liking comment:', error));
+                fetch('/User/Community/ToggleLikeComment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': csrf
+                    },
+                    body: JSON.stringify({ commentId })
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data && data.success) {
+                        console.log('Comment like toggled via AJAX fallback:', data);
+                        // Sync with server-provided likes count
+                        updateCommentLikes(commentId, data.likesCount);
+                    } else {
+                        console.error('AJAX fallback likeComment failed:', data);
+                    }
+                })
+                .catch(error => console.error('Error in AJAX fallback for liking comment:', error));
+            } catch (fallbackErr) {
+                console.error('likeComment AJAX fallback encountered an error:', fallbackErr);
+            }
         });
 };
 

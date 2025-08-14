@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 
 using static ActioNator.GCommon.FileConstants.ContentTypes;
+using static ActioNator.GCommon.ValidationConstants.Comment;
 
 namespace ActioNator.Services.Implementations.Community
 {
@@ -138,7 +139,53 @@ namespace ActioNator.Services.Implementations.Community
                 projected
                 .ToListAsync(cancellationToken);
 
-            // Materialize into view models and do any non-translatable work (e.g., TimeAgo)
+            // Fetch comments for the selected posts (non-deleted), including author and likes info
+            List<Guid> postIds = rows.Select(r => r.Id).ToList();
+
+            var commentRows = await _dbContext
+                .Comments
+                .AsNoTracking()
+                .Where(c => c.PostId != null
+                            && postIds.Contains(c.PostId.Value)
+                            && !c.IsDeleted)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Content,
+                    c.CreatedAt,
+                    c.AuthorId,
+                    AuthorName = c.Author!.UserName,
+                    AuthorProfilePicture = c.Author!.ProfilePictureUrl,
+                    LikeCount = c.LikesCount,
+                    IsDeleted = c.IsDeleted,
+                    PostId = c.PostId,
+                    IsLiked = c.Likes.Any(l => l.UserId == userId && l.IsActive)
+                })
+                .ToListAsync(cancellationToken);
+
+            var commentsByPost = commentRows
+                .OrderByDescending(c => c.CreatedAt)
+                .GroupBy(c => c.PostId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(c => new PostCommentViewModel
+                    {
+                        Id = c.Id,
+                        Content = c.Content,
+                        CreatedAt = c.CreatedAt,
+                        AuthorId = c.AuthorId,
+                        AuthorName = c.AuthorName!,
+                        AuthorProfilePicture = c.AuthorProfilePicture!,
+                        TimeAgo = GetTimeAgo(c.CreatedAt),
+                        LikeCount = c.LikeCount,
+                        IsAuthor = c.AuthorId == userId,
+                        IsDeleted = false,
+                        PostId = c.PostId!.Value,
+                        IsLiked = c.IsLiked
+                    }).ToList() as IEnumerable<PostCommentViewModel>
+                );
+
+            // Materialize into view models and attach comments
             List<PostCardViewModel> results
                 = rows
                 .Select(r => new PostCardViewModel
@@ -155,15 +202,17 @@ namespace ActioNator.Services.Implementations.Community
                     IsAuthor = r.UserId == userId,
                     IsPublic = r.IsPublic,
                     IsDeleted = r.IsDeleted,
-                    Comments = new List<PostCommentViewModel>(), // load on-demand or via separate query when client requests
+                    Comments = commentsByPost.TryGetValue(r.Id, out var list)
+                        ? list
+                        : new List<PostCommentViewModel>(),
                     Images = r
-                    .Images
-                    .Select(i => new PostImageViewModel
-                    {
-                        Id = i.Id,
-                        PostId = r.Id,
-                        ImageUrl = i.ImageUrl,
-                    }).ToList()
+                        .Images
+                        .Select(i => new PostImageViewModel
+                        {
+                            Id = i.Id,
+                            PostId = r.Id,
+                            ImageUrl = i.ImageUrl,
+                        }).ToList()
                 }).ToList();
 
             return results;
@@ -367,6 +416,17 @@ namespace ActioNator.Services.Implementations.Community
             if (string.IsNullOrWhiteSpace(content))
                 throw new ArgumentNullException(nameof(content), "Comment content cannot be empty or whitespace.");
 
+            // Sanitize and validate content length
+            string sanitized = _inputSanitizationService
+                .SanitizeString(content)
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(sanitized))
+                throw new ArgumentNullException(nameof(content), "Comment content cannot be empty after sanitization.");
+
+            if (sanitized.Length < ContentMinLength || sanitized.Length > ContentMaxLength)
+                throw new ArgumentOutOfRangeException(nameof(content), $"Comment must be between {ContentMinLength} and {ContentMaxLength} characters.");
+
             // Verify that the post exists and is not deleted
             Post? post
                 = await
@@ -394,7 +454,7 @@ namespace ActioNator.Services.Implementations.Community
                 Id = Guid.NewGuid(),
                 PostId = postId,
                 AuthorId = userId,
-                Content = content.Trim(),
+                Content = sanitized,
                 CreatedAt = DateTime.UtcNow,
                 IsDeleted = false
             };

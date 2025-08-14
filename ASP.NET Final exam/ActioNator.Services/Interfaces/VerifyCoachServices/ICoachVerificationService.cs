@@ -16,6 +16,12 @@ namespace ActioNator.Services.Interfaces.VerifyCoachServices
         Task<List<CoachVerificationUserViewModel>> GetAllVerificationRequestsAsync();
 
         /// <summary>
+        /// Gets the number of users awaiting coach verification.
+        /// </summary>
+        /// <returns>Count of pending coach verifications</returns>
+        Task<int> GetPendingVerificationsCountAsync();
+
+        /// <summary>
         /// Gets documents for a specific user
         /// </summary>
         /// <param name="userId">User ID</param>

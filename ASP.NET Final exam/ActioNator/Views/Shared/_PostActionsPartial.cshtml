@@ -6,10 +6,10 @@
         </svg>
         <span :class="liked ? 'text-facebook-blue font-medium text-sm' : 'text-gray-600 text-sm'" x-text="liked ? 'Liked' : 'Like'" class="hidden sm:inline"></span>
     </button>
-    <button @@click ="toggleComments()" class="flex items-center justify-center flex-1 py-2 hover:bg-gray-50 rounded-md" :class="{ 'text-facebook-blue': commentsVisible }">
-        <svg class="h-5 w-5 mr-1" xmlns="http://www.w3.org/2000/svg" :class="commentsVisible ? 'text-facebook-blue' : 'text-gray-500'" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <button @@click ="toggleComments()" class="flex items-center justify-center flex-1 py-2 hover:bg-gray-50 rounded-md" :class="{ 'text-facebook-blue': (typeof commentsVisible !== 'undefined' && commentsVisible) }">
+        <svg class="h-5 w-5 mr-1" xmlns="http://www.w3.org/2000/svg" :class="(typeof commentsVisible !== 'undefined' && commentsVisible) ? 'text-facebook-blue' : 'text-gray-500'" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
         </svg>
-        <span :class="commentsVisible ? 'text-facebook-blue font-medium text-sm' : 'text-gray-600 text-sm'" class="hidden sm:inline">Comment</span>
+        <span :class="(typeof commentsVisible !== 'undefined' && commentsVisible) ? 'text-facebook-blue font-medium text-sm' : 'text-gray-600 text-sm'" class="hidden sm:inline">Comments</span>
     </button>
 </div>

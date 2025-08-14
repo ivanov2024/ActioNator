@@ -121,9 +121,8 @@ namespace ActioNator.Services.Implementations.VerifyCoach
                         ErrorDetailsModel.FromException(ex));
                 }
 
-                // Save files
-                // Combine base path with coach-verifications subfolder
-                string uploadDir = _fileSystem.CombinePaths(_options.BasePath, "coach-verifications");
+                // Save files to configured base path (already includes 'App_Data/coach-verifications')
+                string uploadDir = _fileSystem.CombinePaths(_options.BasePath);
                 IEnumerable<string> savedFilePaths 
                     = await _fileStorageService.SaveFilesAsync(files, uploadDir, userId, cancellationToken);
 
