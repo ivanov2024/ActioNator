@@ -32,6 +32,21 @@ connection.onclose(error => {
 
 // Event handlers for receiving messages
 connection.on("ReceiveNewPost", post => {
+    // Normalize payload: sometimes comes as [post] from certain server calls
+    if (Array.isArray(post)) {
+        if (post.length > 0) {
+            post = post[0];
+        } else {
+            console.error("Received empty post array");
+            return;
+        }
+    }
+
+    // If payload has PascalCase Id, normalize to id for downstream checks
+    if (post && !post.id && post.Id) {
+        post.id = post.Id;
+    }
+
     console.log("New post received:", post);
     addNewPostToFeed(post);
 });
@@ -997,17 +1012,17 @@ window.reportComment = function(commentId, postId) {
                 console.log('Comment reported successfully:', data);
                 // Show success message
                 if (window.$store && window.$store.toast) {
-                    window.$store.toast.show('Comment reported successfully', 'success');
+                    window.$store.toast.show('Successfully reported a comment', 'success');
                 } else {
-                    alert('Comment reported successfully');
+                    alert('Successfully reported a comment');
                 }
             })
             .catch(error => {
                 console.error('Error reporting comment:', error);
                 if (window.$store && window.$store.toast) {
-                    window.$store.toast.show('Error reporting comment', 'error');
+                    window.$store.toast.show('Unsuccessfully reported a comment', 'error');
                 } else {
-                    alert('Error reporting comment');
+                    alert('Unsuccessfully reported a comment');
                 }
             });
         };

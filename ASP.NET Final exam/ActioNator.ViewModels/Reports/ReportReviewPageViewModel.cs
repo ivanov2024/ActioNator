@@ -6,5 +6,6 @@ namespace ActioNator.ViewModels.Reports
     {
         public List<ReportedPostViewModel> ReportedPosts { get; set; }
         public List<ReportedCommentViewModel> ReportedComments { get; set; }
+        public List<ReportedUserViewModel> ReportedUsers { get; set; }
     }
 }

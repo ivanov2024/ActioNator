@@ -23,6 +23,12 @@ namespace ActioNator.Services.Interfaces.ReportVerificationService
         Task<List<ReportedCommentViewModel>> GetReportedCommentsAsync();
         
         /// <summary>
+        /// Gets all reported users
+        /// </summary>
+        /// <returns>List of reported users</returns>
+        Task<List<ReportedUserViewModel>> GetReportedUsersAsync();
+        
+        /// <summary>
         /// Gets the number of distinct posts that currently have pending reports.
         /// Excludes deleted posts.
         /// </summary>
@@ -51,6 +57,13 @@ namespace ActioNator.Services.Interfaces.ReportVerificationService
         Task<bool> DeleteCommentAsync(Guid commentId);
         
         /// <summary>
+        /// Soft-deletes a user (marks as deleted) and removes associated user reports
+        /// </summary>
+        /// <param name="userId">ID of the user to delete</param>
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> DeleteUserAsync(Guid userId);
+        
+        /// <summary>
         /// Dismisses reports for a post without deleting the post
         /// </summary>
         /// <param name="postId">ID of the post</param>
@@ -63,5 +76,12 @@ namespace ActioNator.Services.Interfaces.ReportVerificationService
         /// <param name="commentId">ID of the comment</param>
         /// <returns>True if successful, false otherwise</returns>
         Task<bool> DismissCommentReportAsync(Guid commentId);
+
+        /// <summary>
+        /// Dismisses reports for a user without deleting the user
+        /// </summary>
+        /// <param name="userId">ID of the user</param>
+        /// <returns>True if successful, false otherwise</returns>
+        Task<bool> DismissUserReportAsync(Guid userId);
     }
 }

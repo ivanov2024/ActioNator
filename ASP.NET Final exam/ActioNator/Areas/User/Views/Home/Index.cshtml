@@ -12,13 +12,6 @@
 	</style>
 }
 
-@section Scripts {
-	<!-- Tailwind CSS v3 CDN -->
-	<script src="https://cdn.tailwindcss.com/3.3.0"></script>
-	<!-- Alpine.js CDN -->
-	<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-}
-
 <div>
 	<!-- Main Content -->
 	<main class="pt-20 pb-8 px-2 md:px-6 max-w-7xl mx-auto">
@@ -66,9 +59,9 @@
 						@foreach (var workout in Model.RecentWorkouts)
 						{
 							<div class="bg-gray-50 rounded-lg p-4 shadow flex flex-col gap-2">
-								<div class="flex items-center gap-2">
-									<span class="font-semibold text-gray-800">@workout.Title</span>
-									<span class="ml-auto text-xs text-gray-400">@workout.Duration</span>
+								<div class="flex items-start gap-2 min-w-0">
+									<span class="block flex-1 min-w-0 font-semibold text-gray-800 whitespace-pre-wrap break-all sm:break-words leading-snug">@workout.Title</span>
+									<span class="ml-auto text-xs text-gray-400 whitespace-nowrap">@workout.Duration</span>
 								</div>
 							</div>
 						}
@@ -98,7 +91,7 @@
 					}
 				</div>
 				<div class="mt-4 text-right max-w-3xl mx-auto">
-					<a href="#" class="text-blue-600 hover:underline font-medium text-sm">View All Posts</a>
+					<a asp-controller="Community" asp-action="Index" asp-area="User" class="text-blue-600 hover:underline font-medium text-sm">View All Posts</a>
 				</div>
 			}
 			else if (Model.RecentPosts != null && Model.RecentPosts.Any())

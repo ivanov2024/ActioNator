@@ -27,6 +27,28 @@ namespace ActioNator.Services.Interfaces.Community
         );
 
         /// <summary>
+        /// Gets posts authored by a specific user for use on profile pages.
+        /// </summary>
+        /// <param name="currentUserId">Current user ID (used for personalization, e.g., like status).</param>
+        /// <param name="authorId">The author/user ID whose posts to fetch.</param>
+        /// <param name="status">Optional filter by post status (null for active public posts only unless admin).</param>
+        /// <param name="pageNumber">Page number (1-based).</param>
+        /// <param name="pageSize">Page size (1-100).</param>
+        /// <param name="isAdmin">Whether current user is admin (controls visibility of deleted posts when requested).</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Collection of post view models by the specified author.</returns>
+        Task<IReadOnlyList<PostCardViewModel>> GetPostsByAuthorAsync
+        (
+            Guid currentUserId,
+            Guid authorId,
+            string status = null,
+            int pageNumber = 1,
+            int pageSize = 20,
+            bool isAdmin = false,
+            CancellationToken cancellationToken = default
+        );
+
+        /// <summary>
         /// Gets a post by ID.
         /// </summary>
         /// <param name="postId">Post ID.</param>
@@ -120,6 +142,23 @@ namespace ActioNator.Services.Interfaces.Community
         Task<bool> ReportCommentAsync
         (
             Guid commentId,
+            string reason,
+            Guid userId,
+            CancellationToken
+            cancellationToken = default,
+            string details = ""
+        );
+
+        /// <summary>
+        /// Reports a user.
+        /// </summary>
+        /// <param name="reportedUserId">ID of the user being reported.</param>
+        /// <param name="reason">Report reason.</param>
+        /// <param name="userId">User ID submitting the report.</param>
+        /// <returns>Success status.</returns>
+        Task<bool> ReportUserAsync
+        (
+            Guid reportedUserId,
             string reason,
             Guid userId,
             CancellationToken

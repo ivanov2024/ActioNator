@@ -25,5 +25,8 @@ namespace FinalExamUI.ViewModels.UserProfile
 
         // Indicates whether this user is a verified coach
         public bool IsVerifiedCoach { get; set; }
+
+        // Indicates whether this user is an administrator
+        public bool IsAdmin { get; set; }
     }
 }

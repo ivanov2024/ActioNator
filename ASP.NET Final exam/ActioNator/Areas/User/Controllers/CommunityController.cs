@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Identity;
+using ActioNator.Data.Models;
 
 namespace ActioNator.Areas.User.Controllers
 {
@@ -16,15 +18,18 @@ namespace ActioNator.Areas.User.Controllers
         private readonly ICommunityService _communityService;
         private readonly IHubContext<CommunityHub> _hubContext;
         private readonly ILogger<CommunityController> _logger;
+        private readonly UserManager<ApplicationUser> _userManager;
 
         public CommunityController(
             ICommunityService communityService,
             IHubContext<CommunityHub> hubContext,
-            ILogger<CommunityController> logger)
+            ILogger<CommunityController> logger,
+            UserManager<ApplicationUser> userManager)
         {
             _communityService = communityService;
             _hubContext = hubContext;
             _logger = logger;
+            _userManager = userManager;
         }
 
         public async Task<IActionResult> Index(string status = null)
@@ -41,6 +46,10 @@ namespace ActioNator.Areas.User.Controllers
             // Pass isAdmin to the view to control visibility of the filter
             ViewBag.IsAdmin = isAdmin;
             ViewBag.CurrentStatus = status ?? "all";
+            
+             // Pass current user's profile picture URL for avatar display in Create Post UI
+            var currentUser = await _userManager.FindByIdAsync(userIdString);
+            ViewBag.CurrentUserProfilePictureUrl = currentUser?.ProfilePictureUrl;
             
             return View(posts);
         }
@@ -82,17 +91,19 @@ namespace ActioNator.Areas.User.Controllers
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> CreatePost(string content, List<IFormFile> images)
+        public async Task<IActionResult> CreatePost([FromForm] string content, [FromForm] List<IFormFile> images)
         {
-            if (string.IsNullOrEmpty(content))
+            // Allow posts with text and/or images
+            if (string.IsNullOrWhiteSpace(content) && (images == null || images.Count == 0))
             {
-                return BadRequest(new { success = false, message = "Content is required" });
+                return BadRequest(new { success = false, message = "Please provide text or at least one image." });
             }
 
             try
             {
                 var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
                 var userId = Guid.Parse(userIdString);
+                _logger.LogInformation("CreatePost received {Count} images", images?.Count ?? 0);
                 
                 // Validate images before sending to service
                 if (images != null && images.Count > 0)
@@ -121,12 +132,7 @@ namespace ActioNator.Areas.User.Controllers
                     = await _communityService
                     .CreatePostAsync(content, userId, cancelationToken,  images);
                 
-                // Broadcast the new post to all connected clients
-                if (post != null)
-                {
-                    await _hubContext.Clients.All.SendAsync("ReceiveNewPost", post);
-                }
-
+                // Service already broadcasts the new post via SignalR; no need to broadcast here again
                 return Json(new { success = true, postId = post?.Id, message = "Post created successfully" });
             }
             catch (ArgumentException ex)
@@ -326,12 +332,23 @@ namespace ActioNator.Areas.User.Controllers
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ReportPost(Guid postId, string reason)
+        [ValidateAntiForgeryTokenFromJson]
+        public async Task<IActionResult> ReportPost(Guid postId, string reason, [FromRoute(Name = "id")] Guid? routeId = null)
         {
-            if (postId == Guid.Empty || string.IsNullOrEmpty(reason))
+            // Support both /.../ReportPost/{postId} (named parameter) and conventional {id?} route
+            if (postId == Guid.Empty && routeId.HasValue)
             {
-                return BadRequest("Valid Post ID and reason are required");
+                postId = routeId.Value;
+            }
+
+            if (postId == Guid.Empty)
+            {
+                return BadRequest("Valid Post ID is required");
+            }
+
+            if (string.IsNullOrEmpty(reason))
+            {
+                reason = "Inappropriate content"; // Default reason if none provided
             }
 
             var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
@@ -362,6 +379,45 @@ namespace ActioNator.Areas.User.Controllers
             var success = await _communityService.ReportCommentAsync(commentId, reason, userId);
 
             return Json(new { success });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryTokenFromJson]
+        public async Task<IActionResult> ReportUser(Guid reportedUserId, [FromBody] UserReportRequest request, [FromRoute(Name = "id")] Guid? routeId = null)
+        {
+            // Support conventional areas route that uses {id?}
+            if (reportedUserId == Guid.Empty && routeId.HasValue)
+            {
+                reportedUserId = routeId.Value;
+            }
+
+            if (reportedUserId == Guid.Empty)
+            {
+                return BadRequest("Valid User ID is required");
+            }
+
+            var reason = request?.Reason;
+            if (string.IsNullOrEmpty(reason))
+            {
+                reason = "Inappropriate content"; // Default reason if none provided
+            }
+
+            var currentUserIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (string.IsNullOrEmpty(currentUserIdString))
+            {
+                return Unauthorized(new { success = false, message = "User not authenticated" });
+            }
+
+            var currentUserId = Guid.Parse(currentUserIdString);
+            var success = await _communityService.ReportUserAsync(reportedUserId, reason, currentUserId);
+
+            if (!success)
+            {
+                // Common reasons: already reported by this user, self-report attempt, or target user deleted/non-existent
+                return Json(new { success = false, message = "You have already reported this user or you are not allowed to report this user." });
+            }
+
+            return Json(new { success = true });
         }
 
         // TODO: Add methods for image upload functionality

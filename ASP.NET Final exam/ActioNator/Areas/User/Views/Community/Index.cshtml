@@ -14,7 +14,10 @@
             <!-- Create post card -->
             <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg shadow p-4">
                 <div class="flex items-center">
-                    <div class="h-10 w-10 rounded-full bg-purple-300 flex-shrink-0"></div>
+                    <img src="@((ViewBag.CurrentUserProfilePictureUrl as string) ?? "/images/placeholder-image.png")"
+                         alt="Your profile"
+                         class="h-10 w-10 rounded-full object-cover flex-shrink-0"
+                         onerror="this.src='/images/placeholder-image.png'" />
                     <button type="button" class="create-post-trigger ml-3 bg-gray-100 hover:bg-gray-200 text-gray-600 px-4 py-2 rounded-full flex-grow text-left">
                         What's on your mind?
                     </button>
@@ -46,7 +49,6 @@
                         </div>
                     }
                     
-                    
                     <div>
                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date Range</label>
                         <div class="flex space-x-2">
@@ -76,11 +78,6 @@
                 }
             </div>
         </div>
-
-        <!-- Smaller sidebar for layout balance -->
-        <div class="w-full md:w-1/4 lg:w-1/5">
-            <!-- Empty sidebar for layout balance -->
-        </div>
     </div>
 </div>
 
@@ -92,9 +89,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@@microsoft/signalr@7.0.5/dist/browser/signalr.min.js" crossorigin="anonymous"></script>
     
     <!-- Community hub client -->
-    <script src="~/js/communityHub.js"></script>
+    <script src="~/js/communityHub.js" asp-append-version="true"></script>
 
-    <script src="~/js/createPost.js"></script>
+    <script>
+        // Expose current user's avatar URL for the Create Post modal
+        window.currentUserAvatarUrl = '@(((ViewBag.CurrentUserProfilePictureUrl as string) ?? "/images/placeholder-image.png").Replace("'", "\\'"))';
+    </script>
+
+    <script src="~/js/createPost.js" asp-append-version="true"></script>
 }
 
 @section Styles {

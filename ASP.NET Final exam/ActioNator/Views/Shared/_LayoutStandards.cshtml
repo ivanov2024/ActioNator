@@ -12,6 +12,9 @@
     <link rel="stylesheet" href="~/css/post.css" asp-append-version="true" />
         <link rel="stylesheet" href="~/css/goal.css" asp-append-version="true" />
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Ensure global utilities and Alpine components are available before Alpine loads -->
+    <script src="~/js/global-functions.js" asp-append-version="true"></script>
+    <script src="~/js/alpine-init.js" asp-append-version="true"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
 </head>
@@ -40,11 +43,16 @@
     <!-- Global Toast Notification System -->
     @await Html.PartialAsync("_ToastPartial")
     
+    <!-- Global Modal and Image Gallery overlays required by post components -->
+    @await Html.PartialAsync("_ModalPartial")
+    @await Html.PartialAsync("_ImageGalleryOverlay")
+    
     <script src="~/lib/jquery/dist/jquery.min.js"></script>
     <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     <script src="~/js/site.js" asp-append-version="true"></script>
     <script src="~/js/navigation.js"></script>
     <script src="~/js/post.js" asp-append-version="true"></script>
+    <script src="~/js/postComments.js" asp-append-version="true"></script>
     @await RenderSectionAsync("Scripts", required: false)
     <partial name="_BrowserRefresh" />
 </body>

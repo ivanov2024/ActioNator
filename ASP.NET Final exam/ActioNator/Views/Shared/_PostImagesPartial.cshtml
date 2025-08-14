@@ -3,7 +3,7 @@
 
 @if (Model != null && Model.Any())
 {
-    <div class="post-media-container bg-gray-200" x-data="postImagesHandler()" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+    <div class="post-media-container bg-gray-200" x-data="postImagesHandler()" data-images='@Html.Raw(Json.Serialize(Model))' x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
         <div class="dynamic-image-grid" :class="getGridClass()">
             <template x-for="(image, index) in displayedImages" :key="index">
                 <div class="relative overflow-hidden bg-gray-200 cursor-pointer group" @@click ="openImageModal(index)" :class="getImageContainerClass(index)">
@@ -27,33 +27,4 @@
         </div>
     </div>
 }
-
-@* Initialize the postImages array with the model data *@
-<script>
-    document.addEventListener('alpine:init', () => {
-        // Instead of redefining postCard, we extend it with image handling functionality
-        Alpine.data('postImagesHandler', () => ({
-            init() {
-                // Initialize postImages from the server-side model if not already initialized
-                if (!this.postImages) {
-                    this.postImages = @Html.Raw(Json.Serialize(Model));
-                }
-                
-                // Other initialization code...
-                this.$nextTick(() => {
-                    const gridElement = this.$el.querySelector('.dynamic-image-grid');
-                    if (gridElement && this.postImages && this.postImages.length > 0) {
-                        gridElement.style.opacity = '0';
-                        gridElement.style.transform = 'scale(0.95)';
-
-                        setTimeout(() => {
-                            gridElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-                            gridElement.style.opacity = '1';
-                            gridElement.style.transform = 'scale(1)';
-                        }, 100);
-                    }
-                });
-            }
-        }));
-    });
-</script>
+ 

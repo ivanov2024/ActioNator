@@ -115,7 +115,7 @@
     </template>
     <div class="border-t border-gray-100 my-1"></div>
     <template x-if="!comment.isDeleted && !comment.isOwner && !($root.closest('[data-is-admin]') && $root.closest('[data-is-admin]').dataset.isAdmin === 'true') && !($root.closest('[data-is-coach]') && $root.closest('[data-is-coach]').dataset.isCoach === 'true')">
-        <button @@click="showMenu = false; $store.modal.modalTitle = 'Report Comment'; $store.modal.modalMessage = 'Do you want to report this comment for inappropriate content?'; $store.modal.modalConfirmText = 'Report'; $store.modal.modalCancelText = 'Cancel'; $store.modal.modalConfirmAction = () => { alert('Comment reported!'); }; $store.modal.modalType = 'default'; $store.modal.modalOpen = true;"
+        <button @@click="showMenu = false; window.showReportCommentModal(comment.id);"
             class="block w-full px-4 py-2.5 text-sm text-left text-gray-700 hover:bg-gray-100 transition-colors">
             <div class="flex items-center">
                 <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">

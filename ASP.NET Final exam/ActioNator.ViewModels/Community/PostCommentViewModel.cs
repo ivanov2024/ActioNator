@@ -22,6 +22,10 @@ namespace ActioNator.ViewModels.Community
         // Alias for view compatibility
         public string ProfilePictureUrl { get => AuthorProfilePicture; set => AuthorProfilePicture = value; }
         
+        // Author role flags for UI badges
+        public bool AuthorIsAdmin { get; set; }
+        public bool AuthorIsCoach { get; set; }
+
         [Display(Name = "Created At")]
         public DateTime CreatedAt { get; set; }
         

@@ -777,6 +777,13 @@ document.addEventListener("alpine:init", () => {
             }));
         });
     }
+
+    // Expose AJAX functions globally for modal confirmAction usage in Razor views
+    if (typeof window !== 'undefined') {
+        window.reportPostAjax = reportPost;
+        window.reportCommentAjax = reportComment;
+        window.reportUserAjax = reportUser;
+    }
     
     // Make likeComment function globally accessible (do not override if provided elsewhere)
     if (typeof window.likeComment !== 'function') {
@@ -995,13 +1002,30 @@ document.addEventListener("alpine:init", () => {
     }
 
     function reportPost(postId) {
+        const token = document.querySelector('input[name="__RequestVerificationToken"]');
+        if (!token) {
+            console.error('Anti-forgery token not found');
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: { type: 'error', message: 'Unsuccessfully reported a post' }
+            }));
+            return;
+        }
+
+        const reason = 'Inappropriate content';
+
         // Call the API to report the post
         fetch(`/User/Community/ReportPost/${postId}`, {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]').value
-            }
+                'X-CSRF-TOKEN': token.value,
+                'RequestVerificationToken': token.value
+            },
+            body: JSON.stringify({
+                reason: reason,
+                __RequestVerificationToken: token.value
+            })
         })
         .then(response => {
             if (!response.ok) {
@@ -1015,7 +1039,7 @@ document.addEventListener("alpine:init", () => {
                 window.dispatchEvent(new CustomEvent('show-toast', {
                     detail: {
                         type: 'success',
-                        message: 'Post reported successfully.'
+                        message: 'Successfully reported a post'
                     }
                 }));
             } else {
@@ -1027,7 +1051,7 @@ document.addEventListener("alpine:init", () => {
             window.dispatchEvent(new CustomEvent('show-toast', {
                 detail: {
                     type: 'error',
-                    message: 'Failed to report post. Please try again.'
+                    message: 'Unsuccessfully reported a post'
                 }
             }));
         });
@@ -1142,8 +1166,11 @@ document.addEventListener("alpine:init", () => {
         // Call the API to report the comment
         fetch(`/User/Community/ReportComment/${commentId}`, {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': token.value,
+                'RequestVerificationToken': token.value
             },
             body: JSON.stringify({
                 reason: reason,
@@ -1162,7 +1189,7 @@ document.addEventListener("alpine:init", () => {
                 window.dispatchEvent(new CustomEvent('show-toast', {
                     detail: {
                         type: 'success',
-                        message: 'Comment reported successfully.'
+                        message: 'Successfully reported a comment'
                     }
                 }));
             } else {
@@ -1174,20 +1201,41 @@ document.addEventListener("alpine:init", () => {
             window.dispatchEvent(new CustomEvent('show-toast', {
                 detail: {
                     type: 'error',
-                    message: 'Failed to report comment. Please try again.'
+                    message: 'Unsuccessfully reported a comment'
                 }
             }));
         });
     }
 
     function reportUser(userId) {
+        const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+        const tokenVal = tokenEl ? tokenEl.value : '';
+
+        // Ensure anti-forgery token exists
+        if (!tokenEl || !tokenVal) {
+            console.error('Anti-forgery token not found');
+            window.dispatchEvent(new CustomEvent('show-toast', {
+                detail: {
+                    type: 'error',
+                    message: 'Failed to report user. Security token missing.'
+                }
+            }));
+            return;
+        }
+
         // Call the API to report the user
         fetch(`/User/Community/ReportUser/${userId}`, {
             method: 'POST',
+            credentials: 'same-origin',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('input[name="__RequestVerificationToken"]').value
-            }
+                'X-CSRF-TOKEN': tokenVal,
+                'RequestVerificationToken': tokenVal
+            },
+            body: JSON.stringify({
+                reason: 'Inappropriate content',
+                __RequestVerificationToken: tokenVal
+            })
         })
         .then(response => {
             if (!response.ok) {
@@ -1201,7 +1249,7 @@ document.addEventListener("alpine:init", () => {
                 window.dispatchEvent(new CustomEvent('show-toast', {
                     detail: {
                         type: 'success',
-                        message: 'User reported successfully.'
+                        message: 'Successfully reported a user'
                     }
                 }));
             } else {
@@ -1213,7 +1261,7 @@ document.addEventListener("alpine:init", () => {
             window.dispatchEvent(new CustomEvent('show-toast', {
                 detail: {
                     type: 'error',
-                    message: 'Failed to report user. Please try again.'
+                    message: error && error.message ? error.message : 'Unsuccessfully reported a user'
                 }
             }));
         });
@@ -1272,32 +1320,16 @@ document.addEventListener("alpine:init", () => {
         });
     };
 
-    // Listen for modal confirmation events
+    // Listen for modal confirmation events (fallback only for delete)
     window.addEventListener('modal-confirmed', function(event) {
         const detail = event.detail;
         console.log('Modal confirmed:', detail);
         
-        // Handle different modal confirmations based on the title
+        // Only keep delete fallback; report flows use onConfirm provided to openModal
         if (detail.title === 'Delete Post' && detail.type === 'delete') {
-            // The postId should be stored in a data attribute or closure
             const postId = document.querySelector('[data-post-id]')?.dataset.postId;
             if (postId) {
                 deletePost(postId);
-            }
-        } else if (detail.title === 'Report Post' && detail.type === 'report') {
-            const postId = document.querySelector('[data-post-id]')?.dataset.postId;
-            if (postId) {
-                reportPost(postId);
-            }
-        } else if (detail.title === 'Report Comment' && detail.type === 'report') {
-            const commentId = document.querySelector('[data-comment-id]')?.dataset.commentId;
-            if (commentId) {
-                reportComment(commentId);
-            }
-        } else if (detail.title === 'Report User' && detail.type === 'report') {
-            const userId = document.querySelector('[data-user-id]')?.dataset.userId;
-            if (userId) {
-                reportUser(userId);
             }
         }
     });

@@ -1,0 +1,15 @@
+@model IEnumerable<ActioNator.ViewModels.Community.PostCardViewModel>
+
+@if (Model == null || !Model.Any())
+{
+    <div class="bg-white rounded-lg shadow p-8 text-center">
+        <h3 class="text-lg font-semibold text-gray-600">No posts yet.</h3>
+    </div>
+}
+else
+{
+    foreach (var post in Model)
+    {
+        @await Html.PartialAsync("~/Views/Shared/_PostCardPartial.cshtml", post)
+    }
+}

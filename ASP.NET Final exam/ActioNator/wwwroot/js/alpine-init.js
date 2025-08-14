@@ -393,6 +393,238 @@ window.alpineComponentQueue.push({
     component: postCommentsHandlerComponent
 });
 
+// Define the postImagesHandler component
+const postImagesHandlerComponent = function(initial = []) {
+    return {
+        postImages: [],
+        displayedImages: [],
+        
+        init() {
+            try {
+                let raw = initial;
+                // Prefer data-images attribute on the container if present
+                if (!Array.isArray(raw) || raw.length === 0) {
+                    const dataAttr = this.$el?.dataset?.images;
+                    if (dataAttr) {
+                        try { raw = JSON.parse(dataAttr); } catch { raw = []; }
+                    }
+                }
+                this.setImages(raw);
+                
+                // Subtle entrance animation for the grid
+                this.$nextTick(() => {
+                    const gridElement = this.$el.querySelector('.dynamic-image-grid');
+                    if (gridElement && this.postImages && this.postImages.length > 0) {
+                        gridElement.style.opacity = '0';
+                        gridElement.style.transform = 'scale(0.95)';
+                        setTimeout(() => {
+                            gridElement.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                            gridElement.style.opacity = '1';
+                            gridElement.style.transform = 'scale(1)';
+                        }, 100);
+                    }
+                });
+            } catch (e) {
+                console.warn('postImagesHandler init failed', e);
+            }
+        },
+        
+        setImages(list) {
+            const norm = Array.isArray(list)
+                ? list.map((it) => {
+                    const url = (it && (it.url || it.imageUrl || it.ImageUrl)) || '';
+                    return url ? { url, alt: it?.alt || 'Post image', loading: false } : null;
+                }).filter(Boolean)
+                : [];
+            this.postImages = norm;
+            this.displayedImages = norm.length <= 3 ? norm : [norm[0], norm[1], norm[2]];
+        },
+        
+        getGridClass() {
+            const c = this.postImages.length;
+            if (c <= 1) return 'grid grid-cols-1';
+            if (c === 2) return 'grid grid-cols-2 gap-2 md:gap-3';
+            // 3 or more
+            return 'grid grid-cols-2 grid-rows-2 gap-2 md:gap-3';
+        },
+        
+        getImageContainerClass(index) {
+            const c = this.postImages.length;
+            if (c <= 2) return 'col-span-1 row-span-1';
+            // 3 or more: make the first image tall
+            return index === 0 ? 'row-span-2 col-span-1' : 'col-span-1 row-span-1';
+        },
+        
+        openImageModal(startIndex) {
+            try {
+                document.dispatchEvent(new CustomEvent('open-image-modal', {
+                    detail: { images: this.postImages, index: startIndex }
+                }));
+            } catch {}
+        },
+        
+        handleImageError(event, index) {
+            try {
+                if (this.displayedImages[index]) {
+                    this.displayedImages[index].url = '/images/placeholder-image.png';
+                    this.displayedImages[index].loading = false;
+                }
+            } catch {}
+        }
+    };
+};
+
+// Register postImagesHandler in the queue
+window.alpineComponentQueue.push({
+    name: 'postImagesHandler',
+    component: postImagesHandlerComponent
+});
+
+// Define the imageGalleryOverlay component
+const imageGalleryOverlayComponent = function() {
+    return {
+        open: false,
+        images: [],
+        index: 0,
+        animating: false,
+        phase: 'in', // 'out'|'in'
+        transitionDir: 0, // -1 left, 1 right
+        _prevOverflow: '',
+
+        init() {
+            // Listen for global open event dispatched by postImagesHandler
+            document.addEventListener('open-image-modal', (e) => {
+                try {
+                    const arr = (e.detail && Array.isArray(e.detail.images)) ? e.detail.images : [];
+                    const idx = (e.detail && typeof e.detail.index === 'number') ? e.detail.index : 0;
+                    this.openWith(arr, idx);
+                } catch {}
+            });
+
+            // Keyboard controls when gallery is open
+            window.addEventListener('keydown', (ev) => {
+                if (!this.open) return;
+                if (ev.key === 'Escape') {
+                    ev.preventDefault();
+                    this.close();
+                } else if (ev.key === 'ArrowRight') {
+                    ev.preventDefault();
+                    this.next();
+                } else if (ev.key === 'ArrowLeft') {
+                    ev.preventDefault();
+                    this.prev();
+                }
+            });
+        },
+
+        openWith(arr, startIndex) {
+            const mapped = Array.isArray(arr)
+                ? arr.map((it) => {
+                    const url = (it && (it.url || it.imageUrl || it.ImageUrl)) || '';
+                    const alt = (it && (it.alt || it.Alt)) || 'Image';
+                    return url ? { url, alt } : null;
+                }).filter(Boolean)
+                : [];
+            if (mapped.length === 0) return;
+
+            this.images = mapped;
+            const idx = Number.isFinite(startIndex) ? startIndex : 0;
+            this.index = Math.min(Math.max(0, idx), this.images.length - 1);
+            this.open = true;
+            this._lockScroll();
+            this.$nextTick(() => this.preloadAround());
+        },
+
+        close() {
+            this.open = false;
+            this._unlockScroll();
+        },
+
+        currentImage() {
+            return this.images[this.index] || { url: '', alt: '' };
+        },
+
+        next() {
+            if (this.images.length <= 1) return;
+            this._goto(this.index + 1, 1);
+        },
+
+        prev() {
+            if (this.images.length <= 1) return;
+            this._goto(this.index - 1, -1);
+        },
+
+        _goto(nextIndex, dir) {
+            if (this.animating) return;
+            const len = this.images.length;
+            this.transitionDir = dir >= 0 ? 1 : -1;
+            const normalized = (nextIndex % len + len) % len;
+
+            this.animating = true;
+            this.phase = 'out';
+            // Allow CSS to apply the out transition first
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    this.index = normalized;
+                    this.phase = 'in';
+                    this.$nextTick(() => {
+                        this.preloadAround();
+                        setTimeout(() => { this.animating = false; }, 180);
+                    });
+                }, 180);
+            });
+        },
+
+        preloadAround() {
+            try {
+                const len = this.images.length;
+                if (len <= 1) return;
+                const left = this.images[(this.index - 1 + len) % len]?.url;
+                const right = this.images[(this.index + 1) % len]?.url;
+                [left, right].forEach(u => {
+                    if (!u) return;
+                    const img = new Image();
+                    img.src = u;
+                });
+            } catch {}
+        },
+
+        imageTransitionClass() {
+            if (!this.animating) return 'opacity-100 translate-x-0';
+            if (this.phase === 'out') {
+                return this.transitionDir > 0 ? 'opacity-0 -translate-x-6' : 'opacity-0 translate-x-6';
+            }
+            // phase === 'in'
+            return this.transitionDir > 0 ? 'opacity-0 translate-x-6' : 'opacity-0 -translate-x-6';
+        },
+
+        counterText() {
+            return `${this.index + 1}/${this.images.length}`;
+        },
+
+        _lockScroll() {
+            try {
+                const el = document.documentElement;
+                this._prevOverflow = el.style.overflow || '';
+                el.style.overflow = 'hidden';
+            } catch {}
+        },
+
+        _unlockScroll() {
+            try {
+                const el = document.documentElement;
+                el.style.overflow = this._prevOverflow || '';
+            } catch {}
+        }
+    };
+};
+
+// Register imageGalleryOverlay in the queue
+window.alpineComponentQueue.push({
+    name: 'imageGalleryOverlay',
+    component: imageGalleryOverlayComponent
+});
+
 // Function to register all components
 function registerAlpineComponents() {
     if (!window.Alpine || !window.Alpine.data) {
@@ -415,6 +647,8 @@ function registerAlpineComponents() {
 // CRITICAL: Make the components available globally for direct access
 window.postCard = postCardComponent;
 window.postCommentsHandler = postCommentsHandlerComponent;
+window.postImagesHandler = postImagesHandlerComponent;
+window.imageGalleryOverlay = imageGalleryOverlayComponent;
 
 // Register components when Alpine initializes
 document.addEventListener('alpine:init', () => {

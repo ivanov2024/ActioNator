@@ -117,8 +117,11 @@ namespace ActioNator.Infrastructure.Attributes
 
                         if (!string.IsNullOrEmpty(token))
                         {
-                            // Normalize into the configured header for antiforgery validation
-                            request.Headers[_options.HeaderName] = token;
+                            // Normalize into headers used by antiforgery validation
+                            // Our app is configured with HeaderName = "X-CSRF-TOKEN" (Program.cs)
+                            // but also support the conventional "RequestVerificationToken" header.
+                            request.Headers["RequestVerificationToken"] = token;
+                            request.Headers["X-CSRF-TOKEN"] = token;
                             try
                             {
                                 await _antiforgery.ValidateRequestAsync(httpContext);

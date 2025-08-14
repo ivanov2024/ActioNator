@@ -46,45 +46,12 @@ public class CloudinaryService : ICloudinaryService
         CancellationToken cancellationToken = default
     )
     {
-        ValidateFile(file);
+        // Upload single file and set Post.ImageUrl
+        string imageUrl = await UploadToCloudinaryAsync(file, postId, folder, cancellationToken);
 
-        string publicId = GeneratePublicId(folder, postId);
-
-        await using Stream stream = file.OpenReadStream();
-
-        ImageUploadParams uploadParams
-            = new()
-            {
-                File = new FileDescription(file.FileName, stream),
-                PublicId = publicId,
-                UseFilename = false,
-                UniqueFilename = false,
-                Overwrite = true,
-                Transformation = new Transformation()
-                .Quality("auto")
-                .FetchFormat("auto")
-            };
-
-        ImageUploadResult uploadResult
-            = await _cloudinary
-            .UploadAsync(uploadParams, cancellationToken);
-
-        if (uploadResult.Error != null)
-        {
-            _logger.LogCritical(
-                "Image uploading failed for postId {PostId}. Error: {ErrorMessage}",
-                postId,
-                uploadResult.Error.Message);
-
-            throw new ArgumentException($"Failed to upload image: {uploadResult.Error.Message}");
-        }
-
-        Post? post
-            = await
-            _dbContext
+        Post? post = await _dbContext
             .Posts
-            .FirstOrDefaultAsync
-            (p => p.Id == postId, cancellationToken);
+            .FirstOrDefaultAsync(p => p.Id == postId, cancellationToken);
 
         if (post == null)
         {
@@ -92,10 +59,7 @@ public class CloudinaryService : ICloudinaryService
             throw new ArgumentNullException($"Post with ID {postId} not found.");
         }
 
-        string imageUrl
-            = uploadResult.SecureUrl.ToString();
         post.ImageUrl = imageUrl;
-
         await _dbContext.SaveChangesAsync(cancellationToken);
 
         return imageUrl;
@@ -106,16 +70,25 @@ public class CloudinaryService : ICloudinaryService
         if (files == null || !files.Any())
             throw new ArgumentException("No files were provided", nameof(files));
 
-        List<string> uploadedUrls
-            = [];
+        // Normalize to list to evaluate count once
+        List<IFormFile> fileList = files.Where(f => f != null).ToList();
+        if (fileList.Count == 0)
+            throw new ArgumentException("No files were provided", nameof(files));
 
-        foreach (IFormFile file in files)
+        // Single image: set Post.ImageUrl, do not create PostImages
+        if (fileList.Count == 1)
         {
-            uploadedUrls
-                .Add(
-                await
-                UploadImageAsync
-                (file, postId, folder, cancellationToken));
+            string singleUrl = await UploadImageAsync(fileList[0], postId, folder, cancellationToken);
+            return new List<string> { singleUrl };
+        }
+
+        // Multiple images: upload each and create PostImage entities
+        List<string> uploadedUrls = new();
+
+        foreach (IFormFile file in fileList)
+        {
+            string url = await UploadToCloudinaryAsync(file, postId, folder, cancellationToken);
+            uploadedUrls.Add(url);
         }
 
         foreach (string url in uploadedUrls)
@@ -127,15 +100,10 @@ public class CloudinaryService : ICloudinaryService
                 PostId = postId,
             };
 
-            await 
-                _dbContext
-                .PostImages
-                .AddAsync(postImage, cancellationToken);
+            await _dbContext.PostImages.AddAsync(postImage, cancellationToken);
         }
 
-        await
-            _dbContext
-            .SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
         return uploadedUrls;
     }
@@ -199,6 +167,44 @@ public class CloudinaryService : ICloudinaryService
     }
 
     #region Private Helper Methods
+    private async Task<string> UploadToCloudinaryAsync(
+        IFormFile file,
+        Guid postId,
+        string folder,
+        CancellationToken cancellationToken)
+    {
+        ValidateFile(file);
+
+        string publicId = GeneratePublicId(folder, postId);
+
+        await using Stream stream = file.OpenReadStream();
+
+        ImageUploadParams uploadParams = new()
+        {
+            File = new FileDescription(file.FileName, stream),
+            PublicId = publicId,
+            UseFilename = false,
+            UniqueFilename = false,
+            Overwrite = true,
+            Transformation = new Transformation()
+                .Quality("auto")
+                .FetchFormat("auto")
+        };
+
+        ImageUploadResult uploadResult = await _cloudinary.UploadAsync(uploadParams, cancellationToken);
+
+        if (uploadResult.Error != null)
+        {
+            _logger.LogCritical(
+                "Image uploading failed for postId {PostId}. Error: {ErrorMessage}",
+                postId,
+                uploadResult.Error.Message);
+
+            throw new ArgumentException($"Failed to upload image: {uploadResult.Error.Message}");
+        }
+
+        return uploadResult.SecureUrl.ToString();
+    }
     private static void ValidateFile(IFormFile image)
     {
         if (image == null || image.Length == 0)

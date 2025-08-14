@@ -22,10 +22,12 @@ namespace ActioNator.Areas.Admin.Controllers
         {
             var reportedPosts = await _reportService.GetReportedPostsAsync();
             var reportedComments = await _reportService.GetReportedCommentsAsync();
+            var reportedUsers = await _reportService.GetReportedUsersAsync();
             var model = new ReportReviewPageViewModel
             {
                 ReportedPosts = reportedPosts,
-                ReportedComments = reportedComments
+                ReportedComments = reportedComments,
+                ReportedUsers = reportedUsers
             };
             return View(model);
         }
@@ -59,6 +61,22 @@ namespace ActioNator.Areas.Admin.Controllers
         public async Task<IActionResult> DismissCommentReport(Guid id)
         {
             var result = await _reportService.DismissCommentReportAsync(id);
+            return Json(new { success = result });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteUser(Guid id)
+        {
+            var result = await _reportService.DeleteUserAsync(id);
+            return Json(new { success = result });
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DismissUserReport(Guid id)
+        {
+            var result = await _reportService.DismissUserReportAsync(id);
             return Json(new { success = result });
         }
 

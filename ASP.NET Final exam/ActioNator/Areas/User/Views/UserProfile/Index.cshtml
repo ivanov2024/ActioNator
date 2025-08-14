@@ -24,6 +24,7 @@
             <div class="text-center md:text-left md:ml-48">
                 <div class="flex items-center gap-2 justify-center md:justify-start">
                     <h1 id="profileFullName" class="text-3xl font-bold">@Model.FullName</h1>
+                    @await Html.PartialAsync("_UserRoleBadgePartial", new ActioNator.ViewModels.Shared.UserRoleBadgeViewModel { IsAdmin = Model.IsAdmin, IsCoach = false, ExtraClasses = "ml-1" })
                     @if (Model.IsVerifiedCoach)
                     {
                         <span class="inline-flex items-center gap-1 text-xs font-semibold bg-green-100 text-green-700 px-2 py-1 rounded-full" title="Verified Coach">
@@ -69,10 +70,13 @@
     <div class="max-w-7xl mx-auto p-4">
         <!-- Posts Tab -->
         <div id="posts-tab" class="tab-content hidden">
-    <div class="bg-white rounded-lg shadow p-8 text-center">
-        <h3 class="text-xl font-semibold text-gray-700">No posts sended yet!</h3>
-    </div>
-</div>
+            <!-- Anti-forgery token for AJAX actions (likes, etc.) -->
+            <form id="__af_form" method="post" class="hidden">@Html.AntiForgeryToken()</form>
+            <div id="loading-skeleton" class="bg-white rounded-lg shadow p-8 text-center">
+                <h3 class="text-lg font-semibold text-gray-600">Loading posts...</h3>
+            </div>
+            <div id="posts-container" class="hidden"></div>
+        </div>
         <!-- About Tab -->
         <div id="about-tab" class="tab-content block">
             <div id="aboutContainer">
@@ -119,6 +123,31 @@
                     a.classList.toggle('border-transparent', !isActive);
                     a.classList.toggle('text-gray-500', !isActive);
                 });
+                if (tab === 'Posts') {
+                    ensurePostsLoadedOnce();
+                }
+            }
+            let postsLoaded = false;
+            async function ensurePostsLoadedOnce() {
+                if (postsLoaded) return;
+                postsLoaded = true;
+                const container = document.getElementById('posts-container');
+                const skeleton = document.getElementById('loading-skeleton');
+                try {
+                    const authorId = '@Model.UserId';
+                    const resp = await fetch(`/User/UserProfile/GetUserPosts?userId=${authorId}&pageNumber=1&pageSize=20`, {
+                        headers: { 'Accept': 'text/html' }
+                    });
+                    if (!resp.ok) throw new Error(`Failed to load posts (${resp.status})`);
+                    const html = await resp.text();
+                    container.innerHTML = html;
+                } catch (err) {
+                    container.innerHTML = `<div class="bg-white rounded-lg shadow p-8 text-center text-red-600">Failed to load posts. Please try again.</div>`;
+                    console.error(err);
+                } finally {
+                    skeleton?.classList.add('hidden');
+                    container?.classList.remove('hidden');
+                }
             }
             links.forEach(a => {
                 a.addEventListener('click', function(e) {

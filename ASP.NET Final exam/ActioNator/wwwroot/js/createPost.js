@@ -25,6 +25,9 @@ function escKeyHandler(e) {
 // Function to open the Create Post modal
 function openCreatePostModal() {
     // Create a custom modal that matches the Facebook-style design
+    const avatarUrl = (window.currentUserAvatarUrl && typeof window.currentUserAvatarUrl === 'string' && window.currentUserAvatarUrl.length > 0)
+        ? window.currentUserAvatarUrl
+        : '/images/placeholder-image.png';
     const modalHtml = `
     <div id="createPostModal" class="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div class="flex items-center justify-center min-h-screen p-4 text-center sm:block sm:p-0">
@@ -48,19 +51,12 @@ function openCreatePostModal() {
                 <!-- User info -->
                 <div class="px-4 sm:px-6">
                     <div class="flex items-center space-x-3 mb-4">
-                        <div class="h-10 w-10 rounded-full bg-purple-300 flex-shrink-0"></div>
+                        <img src="${avatarUrl}"
+                             alt="Your profile"
+                             class="h-10 w-10 rounded-full object-cover flex-shrink-0"
+                             onerror="this.src='/images/placeholder-image.png'" />
                         <div>
                             <div class="font-medium">You</div>
-                            <div class="flex items-center text-sm text-gray-500">
-                                <svg class="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"></path>
-                                </svg>
-                                <select id="postVisibility" class="bg-transparent border-none text-sm focus:ring-0 p-0 pr-6">
-                                    <option value="Public">Public</option>
-                                    <option value="Friends">Friends</option>
-                                    <option value="Private">Private</option>
-                                </select>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -91,30 +87,10 @@ function openCreatePostModal() {
                                 </svg>
                             </button>
                             <input type="file" id="imageUpload" class="hidden" accept="image/*" multiple />
-                            
-                            <!-- Tag people button -->
-                            <button type="button" id="tagPeopleBtn" class="text-blue-600 hover:bg-gray-100 p-2 rounded-full">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                            </button>
                         </div>
                     </div>
                 </div>
-                
-                <!-- User tagging dropdown (initially hidden) -->
-                <div id="tagPeopleDropdown" class="hidden px-4 sm:px-6 py-3 border-b">
-                    <div class="mb-2">
-                        <input type="text" id="tagSearchInput" placeholder="Search for friends" class="w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                    </div>
-                    <div id="taggedPeopleList" class="flex flex-wrap gap-2 mb-2">
-                        <!-- Tagged people will appear here -->
-                    </div>
-                    <div id="tagSuggestionsList" class="max-h-32 overflow-y-auto">
-                        <!-- Friend suggestions will appear here -->
-                    </div>
-                </div>
-                
+                 
                 <!-- Post button -->
                 <div class="px-4 py-3 sm:px-6 sm:flex">
                     <button type="button" id="submitPostBtn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:w-auto sm:text-sm">
@@ -147,11 +123,6 @@ function setupCreatePostEventListeners() {
     const postContent = document.getElementById('postContent');
     const imagePreviewContainer = document.getElementById('imagePreviewContainer');
     const submitPostBtn = document.getElementById('submitPostBtn');
-    const tagPeopleBtn = document.getElementById('tagPeopleBtn');
-    const tagPeopleDropdown = document.getElementById('tagPeopleDropdown');
-    const tagSearchInput = document.getElementById('tagSearchInput');
-    const taggedPeopleList = document.getElementById('taggedPeopleList');
-    const tagSuggestionsList = document.getElementById('tagSuggestionsList');
     
     // Close modal button
     closeBtn.addEventListener('click', function() {
@@ -167,6 +138,13 @@ function setupCreatePostEventListeners() {
     
     // Close modal with Escape key
     document.addEventListener('keydown', escKeyHandler);
+
+    // Guard: prevent any accidental native form submissions inside the modal
+    modal.addEventListener('submit', function(e) {
+        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
+        return false;
+    });
     
     // Image upload button
     uploadImageBtn.addEventListener('click', function() {
@@ -214,106 +192,29 @@ function setupCreatePostEventListeners() {
         }
     });
     
-    // Tag people button toggle
-    tagPeopleBtn.addEventListener('click', function() {
-        tagPeopleDropdown.classList.toggle('hidden');
-    });
-    
-    // Mock friend data for tagging
-    const mockFriends = [
-        { id: 1, name: 'John Doe', avatar: 'bg-blue-300' },
-        { id: 2, name: 'Jane Smith', avatar: 'bg-green-300' },
-        { id: 3, name: 'Mike Johnson', avatar: 'bg-yellow-300' },
-        { id: 4, name: 'Sarah Williams', avatar: 'bg-red-300' },
-        { id: 5, name: 'David Brown', avatar: 'bg-purple-300' },
-    ];
-    
-    // Populate friend suggestions
-    function renderFriendSuggestions(query = '') {
-        tagSuggestionsList.innerHTML = '';
-        
-        const filteredFriends = mockFriends.filter(friend => 
-            friend.name.toLowerCase().includes(query.toLowerCase())
-        );
-        
-        filteredFriends.forEach(friend => {
-            const friendEl = document.createElement('div');
-            friendEl.className = 'flex items-center p-2 hover:bg-gray-100 cursor-pointer';
-            friendEl.innerHTML = `
-                <div class="h-8 w-8 rounded-full ${friend.avatar} mr-2"></div>
-                <span>${friend.name}</span>
-            `;
-            
-            friendEl.addEventListener('click', function() {
-                addTaggedPerson(friend);
-            });
-            
-            tagSuggestionsList.appendChild(friendEl);
-        });
-    }
-    
-    // Search for friends to tag
-    tagSearchInput.addEventListener('input', function() {
-        renderFriendSuggestions(this.value);
-    });
-    
-    // Initialize friend suggestions
-    renderFriendSuggestions();
-    
-    // Add tagged person
-    function addTaggedPerson(friend) {
-        // Check if already tagged
-        if (document.querySelector(`[data-friend-id="${friend.id}"]`)) {
-            return;
-        }
-        
-        const tagEl = document.createElement('div');
-        tagEl.className = 'flex items-center bg-blue-100 rounded-full px-3 py-1';
-        tagEl.setAttribute('data-friend-id', friend.id);
-        tagEl.innerHTML = `
-            <span class="mr-1">${friend.name}</span>
-            <button type="button" class="text-gray-500 hover:text-gray-700">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        `;
-        
-        taggedPeopleList.appendChild(tagEl);
-        
-        // Remove tag functionality
-        const removeBtn = tagEl.querySelector('button');
-        removeBtn.addEventListener('click', function() {
-            tagEl.remove();
-        });
-        
-        // Clear search input
-        tagSearchInput.value = '';
-        renderFriendSuggestions();
-    }
+    // Tagging and visibility features removed per requirements
     
     // Submit post button
-    submitPostBtn.addEventListener('click', function() {
+    submitPostBtn.addEventListener('click', function(e) {
+        // In case the modal is rendered within a form context, avoid native form submission
+        if (e && typeof e.preventDefault === 'function') e.preventDefault();
+        if (e && typeof e.stopPropagation === 'function') e.stopPropagation();
         const content = postContent.value.trim();
-        const visibility = document.getElementById('postVisibility').value;
+        const hasImages = imagePreviewContainer && imagePreviewContainer.querySelectorAll('img').length > 0;
         
-        // Validate post content
-        if (!content) {
-            alert('Please enter some content for your post.');
+        // Validate: allow text and/or images
+        if (!content && !hasImages) {
+            alert('Please add text or at least one image to your post.');
             return;
         }
         
-        // Get tagged friends
-        const taggedFriends = Array.from(taggedPeopleList.querySelectorAll('[data-friend-id]'))
-            .map(el => parseInt(el.getAttribute('data-friend-id')));
-        
         // Submit the post
-        submitPost(content, visibility, taggedFriends);
+        submitPost(content);
     });
 }
 
 // Function to submit the post to the server
-function submitPost(content, visibility, taggedFriends) {
+function submitPost(content) {
     // Show loading state
     const submitBtn = document.getElementById('submitPostBtn');
     const originalBtnText = submitBtn.innerHTML;
@@ -329,14 +230,6 @@ function submitPost(content, visibility, taggedFriends) {
     // Create FormData object for file uploads
     const postFormData = new FormData();
     postFormData.append('Content', content);
-    postFormData.append('Visibility', visibility || 'Public');
-    
-    // Add tagged friends
-    if (taggedFriends && taggedFriends.length > 0) {
-        taggedFriends.forEach((friendId, index) => {
-            postFormData.append(`TaggedFriends[${index}]`, friendId);
-        });
-    }
     
     // Get images from preview container
     const imagePreviewContainer = document.getElementById('imagePreviewContainer');
@@ -353,7 +246,8 @@ function submitPost(content, visibility, taggedFriends) {
                         // Get file extension from mime type
                         const mimeType = compressedBlob.type;
                         const extension = mimeType.split('/')[1] || 'jpg';
-                        postFormData.append(`Images[${index}]`, compressedBlob, `image${index}.${extension}`);
+                        // Use repeated 'images' keys (no index) for robust ASP.NET Core binding
+                        postFormData.append('images', compressedBlob, `image${index}.${extension}`);
                     });
                 imagePromises.push(promise);
             }
@@ -374,7 +268,8 @@ function submitPost(content, visibility, taggedFriends) {
             // Send the form data
             return fetch('/User/Community/CreatePost', {
                 method: 'POST',
-                body: postFormData
+                body: postFormData,
+                credentials: 'same-origin'
             });
         })
         .then(async response => {
@@ -397,10 +292,16 @@ function submitPost(content, visibility, taggedFriends) {
             closeCreatePostModal();
             
             // Refresh the posts list or add the new post to the DOM
-            // This could be handled by SignalR or by manually adding the post
-            setTimeout(() => {
-                window.location.reload();
-            }, 500);
+            // This can be handled by SignalR or by manually adding the post.
+            // Avoid auto-reloading so you can see success/errors without losing context.
+            const reloadAfterPost = false;
+            if (reloadAfterPost) {
+                setTimeout(() => {
+                    window.location.reload();
+                }, 500);
+            } else {
+                console.log('Post created successfully; not reloading the page. Await SignalR update or implement DOM insertion.');
+            }
         })
         .catch(error => {
             console.error('Error creating post:', error);

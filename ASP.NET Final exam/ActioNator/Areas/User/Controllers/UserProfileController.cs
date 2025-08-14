@@ -23,6 +23,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using System.Text.Encodings.Web;
 using ActioNator.GCommon;
 using ActioNator.Services.Interfaces.InputSanitizationService;
+using ActioNator.Services.Interfaces.Community;
 using System.Collections.Generic;
 using System.Linq;
 using System.IO;
@@ -43,6 +44,7 @@ namespace ActioNator.Areas.User.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly IDropboxTokenProvider _dropboxTokenProvider;
         private readonly IInputSanitizationService _inputSanitizationService;
+        private readonly ICommunityService _communityService;
 
         public UserProfileController(
             IUserProfileService userProfileService,
@@ -56,7 +58,8 @@ namespace ActioNator.Areas.User.Controllers
             ILogger<UserProfileController> logger,
             IAntiforgery antiforgery,
             IDropboxTokenProvider dropboxTokenProvider,
-            IInputSanitizationService inputSanitizationService) : base(userManager)
+            IInputSanitizationService inputSanitizationService,
+            ICommunityService communityService) : base(userManager)
         {
             _userProfileService = userProfileService;
             _userManager = userManager;
@@ -70,6 +73,7 @@ namespace ActioNator.Areas.User.Controllers
             _antiforgery = antiforgery;
             _dropboxTokenProvider = dropboxTokenProvider;
             _inputSanitizationService = inputSanitizationService;
+            _communityService = communityService;
         }
 
         // Detect Dropbox expired access token errors from wrapped exceptions
@@ -136,6 +140,13 @@ namespace ActioNator.Areas.User.Controllers
             if (profileViewModel == null)
             {
                 return NotFound();
+            }
+
+            // Populate role flags for badge rendering
+            var appUser = await _userManager.FindByIdAsync(userId.Value.ToString());
+            if (appUser != null)
+            {
+                profileViewModel.IsAdmin = await _userManager.IsInRoleAsync(appUser, RoleConstants.Admin);
             }
 
             return View(profileViewModel);
@@ -216,6 +227,41 @@ namespace ActioNator.Areas.User.Controllers
             }
 
             return PartialView("_AboutPartial", profile.AboutText ?? string.Empty);
+        }
+
+        /// <summary>
+        /// Returns the Posts tab partial with posts authored by the specified user.
+        /// </summary>
+        /// <param name="userId">Profile user's ID (author)</param>
+        /// <param name="pageNumber">Page number (1-based)</param>
+        /// <param name="pageSize">Page size</param>
+        /// <param name="status">Optional status filter (admins only)</param>
+        [HttpGet]
+        public async Task<IActionResult> GetUserPosts(string userId, int pageNumber = 1, int pageSize = 20, string status = null)
+        {
+            if (string.IsNullOrEmpty(userId) || !Guid.TryParse(userId, out Guid authorId))
+            {
+                return NotFound();
+            }
+
+            var currentUserId = GetUserId();
+            if (currentUserId == null)
+            {
+                return Unauthorized();
+            }
+
+            var currentUser = await _userManager.FindByIdAsync(currentUserId.Value.ToString());
+            var isAdmin = currentUser != null && await _userManager.IsInRoleAsync(currentUser, RoleConstants.Admin);
+
+            var posts = await _communityService.GetPostsByAuthorAsync(
+                currentUserId.Value,
+                authorId,
+                status,
+                pageNumber,
+                pageSize,
+                isAdmin);
+
+            return PartialView("_PostsListPartial", posts);
         }
 
         /// <summary>

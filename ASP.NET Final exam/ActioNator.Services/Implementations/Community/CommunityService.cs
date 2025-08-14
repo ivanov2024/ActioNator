@@ -123,6 +123,8 @@ namespace ActioNator.Services.Implementations.Community
                         .Count(c => !c.IsDeleted),
                     p.IsPublic,
                     p.IsDeleted,
+                    // Single image URL support
+                    ImageUrl = p.ImageUrl,
                     // Images: pull URL + id (EF will perform a subquery)
                     Images = p
                         .PostImages
@@ -163,6 +165,28 @@ namespace ActioNator.Services.Implementations.Community
                 })
                 .ToListAsync(cancellationToken);
 
+            // Build author role map (Administrator/Coach) for distinct authors in posts and comments
+            var distinctAuthorIds = rows.Select(r => r.UserId)
+                .Concat(commentRows.Select(c => c.AuthorId))
+                .Distinct()
+                .ToList();
+
+            var authorRoleMap = new Dictionary<Guid, (bool IsAdmin, bool IsCoach)>();
+            foreach (var authorId in distinctAuthorIds)
+            {
+                try
+                {
+                    var user = await _userManager.FindByIdAsync(authorId.ToString());
+                    if (user != null)
+                    {
+                        bool adminRole = await _userManager.IsInRoleAsync(user, "Administrator");
+                        bool coachRole = await _userManager.IsInRoleAsync(user, "Coach");
+                        authorRoleMap[authorId] = (adminRole, coachRole);
+                    }
+                }
+                catch { /* ignore role resolution failures */ }
+            }
+
             var commentsByPost = commentRows
                 .OrderByDescending(c => c.CreatedAt)
                 .GroupBy(c => c.PostId!.Value)
@@ -181,7 +205,9 @@ namespace ActioNator.Services.Implementations.Community
                         IsAuthor = c.AuthorId == userId,
                         IsDeleted = false,
                         PostId = c.PostId!.Value,
-                        IsLiked = c.IsLiked
+                        IsLiked = c.IsLiked,
+                        AuthorIsAdmin = authorRoleMap.TryGetValue(c.AuthorId, out var cRoles) && cRoles.IsAdmin,
+                        AuthorIsCoach = authorRoleMap.TryGetValue(c.AuthorId, out var cRoles2) && cRoles2.IsCoach
                     }).ToList() as IEnumerable<PostCommentViewModel>
                 );
 
@@ -202,6 +228,8 @@ namespace ActioNator.Services.Implementations.Community
                     IsAuthor = r.UserId == userId,
                     IsPublic = r.IsPublic,
                     IsDeleted = r.IsDeleted,
+                    AuthorIsAdmin = authorRoleMap.TryGetValue(r.UserId, out var pRoles) && pRoles.IsAdmin,
+                    AuthorIsCoach = authorRoleMap.TryGetValue(r.UserId, out var pRoles2) && pRoles2.IsCoach,
                     Comments = commentsByPost.TryGetValue(r.Id, out var list)
                         ? list
                         : new List<PostCommentViewModel>(),
@@ -214,6 +242,164 @@ namespace ActioNator.Services.Implementations.Community
                             ImageUrl = i.ImageUrl,
                         }).ToList()
                 }).ToList();
+
+            return results;
+        }
+
+        public async Task<IReadOnlyList<PostCardViewModel>> GetPostsByAuthorAsync
+        (
+            Guid currentUserId,
+            Guid authorId,
+            string status = null,
+            int pageNumber = 1,
+            int pageSize = 20,
+            bool isAdmin = false,
+            CancellationToken cancellationToken = default
+        )
+        {
+            if (currentUserId == Guid.Empty) throw new ArgumentException("User ID cannot be empty", nameof(currentUserId));
+            if (authorId == Guid.Empty) throw new ArgumentException("Author ID cannot be empty", nameof(authorId));
+
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1 || pageSize > 100) pageSize = 20;
+
+            IQueryable<Post> query = _dbContext
+                .Posts
+                .AsNoTracking()
+                .Where(p => p.UserId == authorId);
+
+            // Authorization aware status handling
+            if (!string.IsNullOrWhiteSpace(status))
+            {
+                string s = status.Trim().ToLowerInvariant();
+                if (s == "deleted")
+                {
+                    if (!isAdmin)
+                        query = query.Where(p => p.IsPublic && !p.IsDeleted);
+                    else
+                        query = query.Where(p => p.IsDeleted);
+                }
+                else if (s == "active")
+                {
+                    query = query.Where(p => !p.IsDeleted && p.IsPublic);
+                }
+                // else "all" -> no extra filter (admin only recommended)
+            }
+            else
+            {
+                query = query.Where(p => p.IsPublic && !p.IsDeleted);
+            }
+
+            var projected = query
+                .OrderByDescending(p => p.CreatedAt)
+                .Skip((pageNumber - 1) * pageSize)
+                .Take(pageSize)
+                .Select(p => new
+                {
+                    p.Id,
+                    p.Content,
+                    p.CreatedAt,
+                    p.UserId,
+                    AuthorName = p.ApplicationUser!,
+                    AuthorProfilePicture = p.ApplicationUser.ProfilePictureUrl,
+                    LikeCount = p.LikesCount,
+                    CommentCount = p.Comments.Count(c => !c.IsDeleted),
+                    p.IsPublic,
+                    p.IsDeleted,
+                    ImageUrl = p.ImageUrl,
+                    Images = p.PostImages.Select(pi => new { pi.Id, pi.ImageUrl }).ToList(),
+                    IsLiked = p.Likes.Any(l => l.UserId == currentUserId && l.IsActive),
+                });
+
+            var rows = await projected.ToListAsync(cancellationToken);
+
+            List<Guid> postIds = rows.Select(r => r.Id).ToList();
+
+            var commentRows = await _dbContext
+                .Comments
+                .AsNoTracking()
+                .Where(c => c.PostId != null && postIds.Contains(c.PostId.Value) && !c.IsDeleted)
+                .Select(c => new
+                {
+                    c.Id,
+                    c.Content,
+                    c.CreatedAt,
+                    c.AuthorId,
+                    AuthorName = c.Author!.UserName,
+                    AuthorProfilePicture = c.Author!.ProfilePictureUrl,
+                    LikeCount = c.LikesCount,
+                    IsDeleted = c.IsDeleted,
+                    PostId = c.PostId,
+                    IsLiked = c.Likes.Any(l => l.UserId == currentUserId && l.IsActive)
+                })
+                .ToListAsync(cancellationToken);
+
+            var distinctAuthorIds = rows.Select(r => r.UserId)
+                .Concat(commentRows.Select(c => c.AuthorId))
+                .Distinct()
+                .ToList();
+
+            var authorRoleMap = new Dictionary<Guid, (bool IsAdmin, bool IsCoach)>();
+            foreach (var aId in distinctAuthorIds)
+            {
+                try
+                {
+                    var user = await _userManager.FindByIdAsync(aId.ToString());
+                    if (user != null)
+                    {
+                        bool adminRole = await _userManager.IsInRoleAsync(user, "Administrator");
+                        bool coachRole = await _userManager.IsInRoleAsync(user, "Coach");
+                        authorRoleMap[aId] = (adminRole, coachRole);
+                    }
+                }
+                catch { }
+            }
+
+            var commentsByPost = commentRows
+                .OrderByDescending(c => c.CreatedAt)
+                .GroupBy(c => c.PostId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(c => new PostCommentViewModel
+                    {
+                        Id = c.Id,
+                        Content = c.Content,
+                        CreatedAt = c.CreatedAt,
+                        AuthorId = c.AuthorId,
+                        AuthorName = c.AuthorName!,
+                        AuthorProfilePicture = c.AuthorProfilePicture!,
+                        TimeAgo = GetTimeAgo(c.CreatedAt),
+                        LikeCount = c.LikeCount,
+                        IsAuthor = c.AuthorId == currentUserId,
+                        IsDeleted = false,
+                        PostId = c.PostId!.Value,
+                        IsLiked = c.IsLiked,
+                        AuthorIsAdmin = authorRoleMap.TryGetValue(c.AuthorId, out var cRoles) && cRoles.IsAdmin,
+                        AuthorIsCoach = authorRoleMap.TryGetValue(c.AuthorId, out var cRoles2) && cRoles2.IsCoach
+                    }).ToList() as IEnumerable<PostCommentViewModel>
+                );
+
+            List<PostCardViewModel> results = rows
+                .Select(r => new PostCardViewModel
+                {
+                    Id = r.Id,
+                    Content = r.Content,
+                    CreatedAt = r.CreatedAt,
+                    AuthorId = r.UserId,
+                    AuthorName = r.AuthorName.UserName!,
+                    AuthorProfilePicture = r.AuthorProfilePicture,
+                    LikeCount = r.LikeCount,
+                    CommentCount = r.CommentCount,
+                    IsLiked = r.IsLiked,
+                    IsAuthor = r.UserId == currentUserId,
+                    IsPublic = r.IsPublic,
+                    IsDeleted = r.IsDeleted,
+                    AuthorIsAdmin = authorRoleMap.TryGetValue(r.UserId, out var pRoles) && pRoles.IsAdmin,
+                    AuthorIsCoach = authorRoleMap.TryGetValue(r.UserId, out var pRoles2) && pRoles2.IsCoach,
+                    Comments = commentsByPost.TryGetValue(r.Id, out var list) ? list : new List<PostCommentViewModel>(),
+                    Images = r.Images.Select(i => new PostImageViewModel { Id = i.Id, PostId = r.Id, ImageUrl = i.ImageUrl }).ToList()
+                })
+                .ToList();
 
             return results;
         }
@@ -299,6 +485,7 @@ namespace ActioNator.Services.Implementations.Community
 
             try
             {
+                List<string> uploadedUrlsList = new();
                 Post post = new()
                 {
                     Id = Guid.NewGuid(),
@@ -315,50 +502,24 @@ namespace ActioNator.Services.Implementations.Community
 
                 await _dbContext
                     .SaveChangesAsync(cancellationToken);
-
-                IEnumerable<Task> uploadTasks
-                    = images
-                    .Where(img => img != null && img.Length > 0)
-                    .Select(async image =>
+                
+                // Upload images safely using the Cloudinary service helper
+                if (images != null && images.Count > 0)
+                {
+                    try
                     {
-                        try
-                        {
-                            // Optional: Add image validation here (file type, size)
-                            if (IsSupported(image.ContentType)
-                                && image.Length <= 10 * 1024 * 1024)
-                            {
-                                string imageUrl
-                                    = await
-                                    _cloudinaryService
-                                    .UploadImageAsync(image, post.Id, "community", cancellationToken);
+                        var uploadedUrls = await _cloudinaryService
+                            .UploadImagesAsync(images, post.Id, "community", cancellationToken);
 
-                                PostImage postImage = new()
-                                {
-                                    Id = Guid.NewGuid(),
-                                    PostId = post.Id,
-                                    ImageUrl = imageUrl,
-                                };
-
-                                await
-                                _dbContext
-                                .PostImages
-                                .AddAsync(postImage, cancellationToken);
-                            }
-                            else
-                            {
-                                _logger
-                                .LogError("Unsupported image type or size for post {PostId}", post.Id);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            _logger
-                            .LogError(ex, "Failed to upload image for post {PostId}", post.Id);
-                        }
-                    });
-
-                await Task
-                    .WhenAll(uploadTasks);
+                        uploadedUrlsList = uploadedUrls?.ToList() ?? new List<string>();
+                        _logger.LogInformation("Uploaded {Count} images for post {PostId}", uploadedUrlsList.Count, post.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "One or more images failed to upload for post {PostId}", post.Id);
+                        // Continue without images
+                    }
+                }
 
                 await _dbContext
                     .SaveChangesAsync(cancellationToken);
@@ -375,11 +536,60 @@ namespace ActioNator.Services.Implementations.Community
                     .Collection(p => p.PostImages)
                     .LoadAsync(cancellationToken);
 
+                // Debug: verify PostImages are loaded and contain URLs
+                int loadedImagesCount = post.PostImages?.Count ?? 0;
+                if (loadedImagesCount == 0)
+                {
+                    _logger.LogWarning("No PostImages loaded for post {PostId} after upload.", post.Id);
+
+                    // Fallback: if service returned uploaded URLs but the collection is empty, persist PostImages here
+                    if (uploadedUrlsList.Count > 0 && (images?.Count ?? 0) > 1)
+                    {
+                        foreach (var url in uploadedUrlsList)
+                        {
+                            _dbContext.PostImages.Add(new PostImage
+                            {
+                                Id = Guid.NewGuid(),
+                                PostId = post.Id,
+                                ImageUrl = url
+                            });
+                        }
+
+                        await _dbContext.SaveChangesAsync(cancellationToken);
+                        _logger.LogInformation("Fallback created {Count} PostImages for post {PostId}", uploadedUrlsList.Count, post.Id);
+
+                        // Reload collection after fallback
+                        await _dbContext.Entry(post).Collection(p => p.PostImages).LoadAsync(cancellationToken);
+                        loadedImagesCount = post.PostImages?.Count ?? 0;
+                    }
+                }
+                else
+                {
+                    List<string> loadedUrls = post
+                        .PostImages
+                        .Select(pi => pi.ImageUrl)
+                        .ToList();
+                    _logger.LogInformation("Loaded {Count} PostImages for post {PostId}: {Urls}", loadedImagesCount, post.Id, string.Join(", ", loadedUrls));
+                }
+
                 await transaction
                     .CommitAsync(cancellationToken);
+                    
+                Post? freshPost = await _dbContext
+                    .Posts
+                    .AsNoTracking()
+                    .Include(p => p.ApplicationUser)
+                    .Include(p => p.PostImages)
+                    .FirstOrDefaultAsync(p => p.Id == post.Id, cancellationToken);
+
+                if (freshPost == null)
+                {
+                    _logger.LogWarning("Fresh post query returned null for post {PostId}. Falling back to in-memory entity.", post.Id);
+                    freshPost = post;
+                }
 
                 PostCardViewModel? postViewModel
-                    = MapPostToViewModel(post, userId);
+                    = MapPostToViewModel(freshPost, userId);
 
                 await
                     _signalRService
@@ -911,6 +1121,7 @@ namespace ActioNator.Services.Implementations.Community
                         ReportedByUserId = userId,
                         Reason = reason,
                         Details = details ?? string.Empty,
+                        ReviewNotes = string.Empty,
                         CreatedAt = DateTime.UtcNow,
                         Status = "Pending" // Default status for new reports
                     };
@@ -1023,6 +1234,7 @@ namespace ActioNator.Services.Implementations.Community
                     ReportedByUserId = userId,
                     Reason = reason,
                     Details = details ?? string.Empty,
+                    ReviewNotes = string.Empty,
                     CreatedAt = DateTime.UtcNow,
                     Status = "Pending",
                 };
@@ -1060,6 +1272,98 @@ namespace ActioNator.Services.Implementations.Community
             }
         }
 
+        public async Task<bool> ReportUserAsync
+        (
+            Guid reportedUserId,
+            string reason,
+            Guid userId,
+            CancellationToken
+            cancellationToken = default,
+            string details = ""
+        )
+        {
+            if (reportedUserId == Guid.Empty)
+            {
+                _logger.LogError("Reported User ID cannot be empty when reporting a user.");
+                throw new ArgumentException("Reported User ID cannot be empty", nameof(reportedUserId));
+            }
+
+            if (string.IsNullOrWhiteSpace(reason))
+            {
+                _logger.LogError("Reason cannot be empty when reporting a user.");
+                throw new ArgumentException("Reason cannot be empty", nameof(reason));
+            }
+
+            if (userId == Guid.Empty)
+            {
+                _logger.LogError("User ID cannot be empty when reporting a user.");
+                throw new ArgumentException("User ID cannot be empty", nameof(userId));
+            }
+
+            if (reportedUserId == userId)
+            {
+                _logger.LogWarning("User {UserId} attempted to report themselves.", userId);
+                return false; // Prevent self-reporting
+            }
+
+            _inputSanitizationService.SanitizeString(reason);
+
+            try
+            {
+                ApplicationUser? reportedUser =
+                    await _dbContext
+                        .Users
+                        .FindAsync(reportedUserId);
+
+                if (reportedUser == null || reportedUser.IsDeleted)
+                {
+                    _logger.LogWarning("Attempted to report non-existent or deleted user {ReportedUserId} by user {UserId}", reportedUserId, userId);
+                    return false;
+                }
+
+                bool alreadyReported = await _dbContext
+                    .UserReports
+                    .AnyAsync(r => r.ReportedUserId == reportedUserId
+                                   && r.ReportedByUserId == userId
+                                   && r.Status == "Sent", cancellationToken);
+
+                if (alreadyReported)
+                {
+                    _logger.LogWarning("User {UserId} has already reported user {ReportedUserId}", userId, reportedUserId);
+                    return false;
+                }
+
+                UserReport report = new()
+                {
+                    Id = Guid.NewGuid(),
+                    ReportedUserId = reportedUserId,
+                    ReportedByUserId = userId,
+                    Reason = reason,
+                    Details = details ?? string.Empty,
+                    ReviewNotes = string.Empty,
+                    CreatedAt = DateTime.UtcNow,
+                    Status = "Pending",
+                };
+
+                await _dbContext.UserReports.AddAsync(report, cancellationToken);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+
+                _logger.LogInformation("User {ReportedUserId} reported by user {UserId} for reason: {Reason}", reportedUserId, userId, reason);
+
+                report.Status = "Sent";
+                await _dbContext.SaveChangesAsync(cancellationToken);
+
+                await _signalRService.SendToGroupAsync("Admins", "ReceiveNewUserReport", report);
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error reporting user {ReportedUserId} by user {UserId}", reportedUserId, userId);
+                throw;
+            }
+        }
+
         #region Private Helper Methods
         private PostCardViewModel? MapPostToViewModel(Post post, Guid userId)
         {
@@ -1071,6 +1375,16 @@ namespace ActioNator.Services.Implementations.Community
                 .Where(c => !c.IsDeleted)
                 .OrderByDescending(c => c.CreatedAt)
                 .ToList();
+
+            // Prefer the explicit single ImageUrl; otherwise fallback to the first PostImage if available.
+            string? primaryImageUrl = post.ImageUrl;
+            if (string.IsNullOrWhiteSpace(primaryImageUrl))
+            {
+                primaryImageUrl = post
+                    .PostImages?
+                    .FirstOrDefault()?
+                    .ImageUrl;
+            }
 
             return new PostCardViewModel
             {
@@ -1090,6 +1404,7 @@ namespace ActioNator.Services.Implementations.Community
                 IsAuthor = post.UserId == userId,
                 IsPublic = post.IsPublic,
                 IsDeleted = post.IsDeleted,
+                ImageUrl = primaryImageUrl,
                 Comments = filteredComments?
                     .Select(c => MapCommentToViewModel(c, userId))
                     .ToList()!,

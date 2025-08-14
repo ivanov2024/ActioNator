@@ -163,5 +163,13 @@ namespace ActioNator.GCommon
             public const int AboutTextMinLength = 0;
             public const int AboutTextMaxLength = 1000;
         }
+
+        public static class Report
+        {
+            public const int ReasonMaxLength = 100;
+            public const int DetailsMaxLength = 1000;
+            public const int StatusMaxLength = 50;
+            public const int ReviewNotesMaxLength = 1000;
+        }
     }
 }

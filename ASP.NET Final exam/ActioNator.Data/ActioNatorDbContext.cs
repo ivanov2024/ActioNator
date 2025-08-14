@@ -47,6 +47,8 @@ namespace ActioNator.Data
 
         public DbSet<CommentReport> CommentReports { get; set; } = null!;
 
+        public DbSet<UserReport> UserReports { get; set; } = null!;
+
         public DbSet<CommentLike> CommentLikes { get; set; } = null!;
 
         public DbSet<Workout> Workouts { get; set; } = null!;

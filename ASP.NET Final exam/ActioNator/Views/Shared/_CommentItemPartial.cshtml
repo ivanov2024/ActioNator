@@ -25,16 +25,7 @@
             <div>
                 <p class="text-sm font-medium text-gray-900 dark:text-white">
                     @Model.AuthorName
-                    <!-- Administrator Badge -->
-                    @if (User.IsInRole("Administrator"))
-                    {
-                        <span class="admin-badge inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 ml-1">
-                            <svg class="h-3 w-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-6-3a2 2 0 11-4 0 2 2 0 014 0zm-2 4a5 5 0 00-4.546 2.916A5.986 5.986 0 005 10a6 6 0 0012 0c0-.352-.035-.696-.1-1.028A5.001 5.001 0 0010 11z" clip-rule="evenodd"></path>
-                            </svg>
-                            Admin
-                        </span>
-                    }
+                    @await Html.PartialAsync("_UserRoleBadgePartial", new ActioNator.ViewModels.Shared.UserRoleBadgeViewModel { IsAdmin = Model.AuthorIsAdmin, IsCoach = Model.AuthorIsCoach, ExtraClasses = " ml-1" })
                     <!-- Deleted Badge -->
                     @if (Model.IsDeleted)
                     {

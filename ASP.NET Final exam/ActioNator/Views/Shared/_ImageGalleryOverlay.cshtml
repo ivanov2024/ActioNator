@@ -1,0 +1,39 @@
+@* Full-screen Image Gallery Overlay (Alpine.js) *@
+<div x-data="imageGalleryOverlay()" x-cloak>
+    <template x-if="open">
+        <div class="fixed inset-0 z-[10000] bg-black/90 flex items-center justify-center select-none" @@click.self="close()">
+            <!-- Centered image with smooth transitions, fully contained -->
+            <img :src="currentImage().url"
+                 :alt="currentImage().alt || 'Image'"
+                 class="max-w-[95vw] max-h-[85vh] w-auto h-auto object-contain transition-all duration-200 ease-in-out will-change-transform will-change-opacity drop-shadow-2xl"
+                 :class="imageTransitionClass()"
+                 draggable="false" />
+
+            <!-- Counter bottom-center -->
+            <div class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-black/50 text-white text-sm px-3 py-1 rounded-full backdrop-blur-sm">
+                <span x-text="counterText()"></span>
+            </div>
+
+            <!-- Left navigation -->
+            <button type="button"
+                    class="absolute left-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/40 text-white hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    aria-label="Previous image" x-show="images.length > 1" @@click.stop="prev()">
+                <i class="fa-solid fa-chevron-left text-2xl"></i>
+            </button>
+
+            <!-- Right navigation -->
+            <button type="button"
+                    class="absolute right-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-black/40 text-white hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    aria-label="Next image" x-show="images.length > 1" @@click.stop="next()">
+                <i class="fa-solid fa-chevron-right text-2xl"></i>
+            </button>
+
+            <!-- Close button -->
+            <button type="button"
+                    class="absolute top-3 right-3 p-3 rounded-full bg-black/40 text-white hover:bg-black/60 focus:outline-none focus:ring-2 focus:ring-white/50"
+                    aria-label="Close gallery" @@click.stop="close()">
+                <i class="fa-solid fa-xmark text-2xl"></i>
+            </button>
+        </div>
+    </template>
+</div>

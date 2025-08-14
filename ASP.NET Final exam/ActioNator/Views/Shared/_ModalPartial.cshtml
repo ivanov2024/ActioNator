@@ -91,6 +91,7 @@
                 message: '',
                 confirmText: 'Confirm',
                 cancelText: 'Cancel',
+                confirmAction: null,
 
                 init() {
                     // Store reference to this component instance globally
@@ -135,14 +136,13 @@
                         }
                     }
 
-                    // Show toast for report type
-                    if (this.type === 'report') {
-                        window.dispatchEvent(new CustomEvent('show-toast', {
-                            detail: {
-                                type: 'success',
-                                message: 'Content has been reported successfully.'
-                            }
-                        }));
+                    // Execute optional confirm action provided by openModal config
+                    try {
+                        if (typeof this.confirmAction === 'function') {
+                            this.confirmAction();
+                        }
+                    } catch (err) {
+                        console.error('Error executing modal confirm action:', err);
                     }
 
                     this.close();
@@ -163,6 +163,7 @@
                 modalInstance.message = config.message || 'Are you sure?';
                 modalInstance.confirmText = config.confirmText || 'Confirm';
                 modalInstance.cancelText = config.cancelText || 'Cancel';
+                modalInstance.confirmAction = (typeof config.onConfirm === 'function') ? config.onConfirm : null;
                 modalInstance.isOpen = true;
                 document.body.style.overflow = 'hidden';
                 console.log('Modal opened successfully using global reference');
@@ -178,9 +179,10 @@
                 modalData.message = config.message || 'Are you sure?';
                 modalData.confirmText = config.confirmText || 'Confirm';
                 modalData.cancelText = config.cancelText || 'Cancel';
+                modalData.confirmAction = (typeof config.onConfirm === 'function') ? config.onConfirm : null;
                 modalData.isOpen = true;
                 document.body.style.overflow = 'hidden';
-                console.log('Modal opened using direct element reference');
+                console.log('Modal opened successfully using fallback reference');
                 return;
             }
             

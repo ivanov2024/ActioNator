@@ -3,6 +3,7 @@ using ActioNator.Data.Models;
 using ActioNator.Services.Interfaces.UserDashboard;
 using ActioNator.ViewModels.Community;
 using ActioNator.ViewModels.Dashboard;
+using ActioNator.Services.Interfaces.Community;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -15,18 +16,22 @@ namespace ActioNator.Areas.User.Controllers
     {
         private readonly IUserDashboardService _dashboardService;
         private readonly ILogger<HomeController> _logger;
+        private readonly ICommunityService _communityService;
 
         // Pass UserManager to base constructor
         public HomeController(
             IUserDashboardService dashboardService,
             UserManager<ApplicationUser> userManager,
-            ILogger<HomeController> logger)
+            ILogger<HomeController> logger,
+            ICommunityService communityService)
             : base(userManager)
         {
             _dashboardService = dashboardService
                 ?? throw new ArgumentNullException(nameof(dashboardService));
             _logger = logger
                 ?? throw new ArgumentNullException(nameof(logger));
+            _communityService = communityService
+                ?? throw new ArgumentNullException(nameof(communityService));
         }
 
         [HttpGet]
@@ -58,17 +63,16 @@ namespace ActioNator.Areas.User.Controllers
                     _dashboardService
                     .GetDashboardDataAsync(userId.Value, user);
 
-                if (dashboardViewModel.RecentPosts != null
-                    && dashboardViewModel.RecentPosts.Any())
-                {
-                    List<PostCardViewModel> convertedPosts
-                        = dashboardViewModel
-                        .RecentPosts
-                        .Select(post => ConvertToCommunityPostCardViewModel(post))
-                        .ToList();
+                // Fetch the latest 3 posts using the Community service to ensure
+                // identical data mapping/behavior as the Community page
+                var recentCommunityPosts = await _communityService.GetAllPostsAsync(
+                    userId.Value,
+                    status: null,
+                    pageNumber: 1,
+                    pageSize: 3,
+                    isAdmin: User.IsInRole("Administrator"));
 
-                    dashboardViewModel.ConvertedRecentPosts = convertedPosts;
-                }
+                dashboardViewModel.ConvertedRecentPosts = recentCommunityPosts;
 
                 return View(dashboardViewModel);
             }
