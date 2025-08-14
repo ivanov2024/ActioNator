@@ -42,6 +42,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Routing.Constraints;
+using Microsoft.AspNetCore.Http;
 
 namespace ActioNator
 {
@@ -292,10 +293,13 @@ namespace ActioNator
 
             builder.Services.AddAntiforgery(options => 
             {
-                // Set the cookie name and header name
-                options.HeaderName = "X-CSRF-TOKEN";
-                options.Cookie.Name = "CSRF-TOKEN";
-                options.FormFieldName = "__RequestVerificationToken";
+                // Use a single, consistent antiforgery configuration across the app
+                options.HeaderName = "X-CSRF-TOKEN";               // what clients send in headers
+                options.Cookie.Name = "CSRF-TOKEN";                // the antiforgery cookie name
+                options.FormFieldName = "__RequestVerificationToken"; // hidden input name
+                options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest; // dev-friendly
+                options.Cookie.SameSite = SameSiteMode.Lax;        // allow normal navigation + XHR
+                // HttpOnly default is true; we don't need JS to read this cookie
             });
 
             // Session for OAuth (store PKCE verifier/state; optionally tokens in dev)

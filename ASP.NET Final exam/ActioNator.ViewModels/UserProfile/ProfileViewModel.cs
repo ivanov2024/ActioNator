@@ -22,5 +22,8 @@ namespace FinalExamUI.ViewModels.UserProfile
         public OverviewTabViewModel Overview { get; set; }
         public AboutTabViewModel About { get; set; }
         public FriendsTabViewModel Friends { get; set; }
+
+        // Indicates whether this user is a verified coach
+        public bool IsVerifiedCoach { get; set; }
     }
 }

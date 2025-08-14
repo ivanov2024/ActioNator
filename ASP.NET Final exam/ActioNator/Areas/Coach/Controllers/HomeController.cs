@@ -18,7 +18,8 @@ namespace ActioNator.Areas.Coach.Controllers
         [HttpGet]
         public IActionResult Index()
         {
-            return View();
+            // Redirect Coach landing to the shared User area Home/Index
+            return RedirectToAction("Index", "Home", new { area = "User" });
         }
     }
 }

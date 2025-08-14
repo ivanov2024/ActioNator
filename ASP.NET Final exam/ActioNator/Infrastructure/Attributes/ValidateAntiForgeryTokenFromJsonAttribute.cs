@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Http;
 using System.IO;
 using System.Linq;
 using System.Text;
+using Microsoft.Extensions.Options;
 
 namespace ActioNator.Infrastructure.Attributes
 {
@@ -22,13 +23,16 @@ namespace ActioNator.Infrastructure.Attributes
         {
             private readonly IAntiforgery _antiforgery;
             private readonly ILogger<ValidateAntiForgeryTokenFromJsonFilter> _logger;
+            private readonly AntiforgeryOptions _options;
 
             public ValidateAntiForgeryTokenFromJsonFilter(
                 IAntiforgery antiforgery,
-                ILogger<ValidateAntiForgeryTokenFromJsonFilter> logger)
+                ILogger<ValidateAntiForgeryTokenFromJsonFilter> logger,
+                IOptions<AntiforgeryOptions> options)
             {
                 _antiforgery = antiforgery;
                 _logger = logger;
+                _options = options.Value;
             }
 
             public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
@@ -45,6 +49,10 @@ namespace ActioNator.Infrastructure.Attributes
                         if (string.IsNullOrEmpty(token))
                         {
                             token = request.Headers["RequestVerificationToken"].FirstOrDefault();
+                        }
+                        if (string.IsNullOrEmpty(token))
+                        {
+                            token = request.Headers["CSRF-TOKEN"].FirstOrDefault();
                         }
 
                         // If not present in headers, try to read from JSON body
@@ -109,8 +117,8 @@ namespace ActioNator.Infrastructure.Attributes
 
                         if (!string.IsNullOrEmpty(token))
                         {
-                            // Normalize into the expected header for antiforgery validation
-                            request.Headers["RequestVerificationToken"] = token;
+                            // Normalize into the configured header for antiforgery validation
+                            request.Headers[_options.HeaderName] = token;
                             try
                             {
                                 await _antiforgery.ValidateRequestAsync(httpContext);
@@ -133,9 +141,43 @@ namespace ActioNator.Infrastructure.Attributes
                     }
                     else
                     {
-                        // Fallback to standard validation for non-JSON requests
+                        // Fallback to standard validation for non-JSON requests (e.g., multipart/form-data)
                         try
                         {
+                            // Basic diagnostics: check cookie and header presence
+                            var cookieKey = httpContext.Request.Cookies.Keys.FirstOrDefault(k => k.StartsWith(".AspNetCore.Antiforgery", StringComparison.OrdinalIgnoreCase));
+                            bool hasCookie = !string.IsNullOrEmpty(cookieKey);
+                            string? headerToken = request.Headers["RequestVerificationToken"].FirstOrDefault();
+                            if (string.IsNullOrEmpty(headerToken)) headerToken = request.Headers["X-CSRF-TOKEN"].FirstOrDefault();
+                            if (string.IsNullOrEmpty(headerToken)) headerToken = request.Headers["CSRF-TOKEN"].FirstOrDefault();
+
+                            // If header is missing, try to read from form and normalize into header
+                            if (string.IsNullOrEmpty(headerToken) && request.HasFormContentType)
+                            {
+                                try
+                                {
+                                    var form = await request.ReadFormAsync();
+                                    string? formToken = form["__RequestVerificationToken"].FirstOrDefault();
+                                    if (!string.IsNullOrEmpty(formToken))
+                                    {
+                                        request.Headers["RequestVerificationToken"] = formToken;
+                                        headerToken = formToken;
+                                    }
+                                }
+                                catch (Exception formEx)
+                                {
+                                    _logger.LogDebug(formEx, "Failed to read form while extracting anti-forgery token");
+                                }
+                            }
+
+                            // Normalize any discovered token into the configured header name used by antiforgery options
+                            if (!string.IsNullOrEmpty(headerToken))
+                            {
+                                request.Headers[_options.HeaderName] = headerToken;
+                            }
+
+                            _logger.LogDebug("Antiforgery diagnostics (non-JSON): hasCookie={HasCookie}, hasHeader={HasHeader}", hasCookie, !string.IsNullOrEmpty(headerToken));
+
                             await _antiforgery.ValidateRequestAsync(httpContext);
                             _logger.LogInformation("Anti-forgery token validated via standard method");
                             return;

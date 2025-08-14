@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using ActioNator.Services.Models;
 using Microsoft.AspNetCore.Http;
 using ActioNator.Services.Interfaces.FileServices;
+using System;
 
 using static ActioNator.GCommon.FileConstants.ContentTypes;
 using static ActioNator.GCommon.FileConstants.ErrorMessages;
@@ -245,14 +246,14 @@ namespace ActioNator.Services.Validators
 
             // Check if first file is an image or PDF
             bool isFirstImage = firstContentType.StartsWith("image/");
-            bool isFirstPdf = firstContentType == Supported.First();
+            bool isFirstPdf = string.Equals(firstContentType, "application/pdf", StringComparison.OrdinalIgnoreCase);
 
             // Check all other files
             foreach (IFormFile file in files.Skip(1))
             {
                 string contentType = file.ContentType.ToLowerInvariant();
                 bool isImage = contentType.StartsWith("image/");
-                bool isPdf = contentType == Supported.First();
+                bool isPdf = string.Equals(contentType, "application/pdf", StringComparison.OrdinalIgnoreCase);
 
                 // If file types don't match the first file's type, return false
                 if ((isFirstImage && !isImage) || (isFirstPdf && !isPdf))

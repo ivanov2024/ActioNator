@@ -1,4 +1,5 @@
 using ActioNator.Data;
+using ActioNator.Data.Models.Enums;
 using ActioNator.Services.Interfaces.VerifyCoachServices;
 using ActioNator.ViewModels.CoachVerification;
 using Microsoft.EntityFrameworkCore;
@@ -70,16 +71,21 @@ namespace ActioNator.Services.Implementations.VerifyCoach
 
                 foreach (var dir in Directory.EnumerateDirectories(verificationsRoot))
                 {
-                    string folderName = new DirectoryInfo(dir).Name;
+                    string folderName = Path.GetFileName(dir);
                     if (!Guid.TryParse(folderName, out Guid userGuid))
                     {
                         _logger.LogWarning("Skipping non-GUID folder in coach-verifications: {Folder}", folderName);
                         continue;
                     }
 
-                    // Only include real users that are active and not already verified
-                    var user = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == userGuid && !u.IsDeleted && !u.IsVerifiedCoach);
+                    var user = await _dbContext.Users.FindAsync(userGuid);
                     if (user == null)
+                    {
+                        continue;
+                    }
+
+                    // Skip users already approved as coach
+                    if (user.IsVerifiedCoach)
                     {
                         continue;
                     }
@@ -189,8 +195,27 @@ namespace ActioNator.Services.Implementations.VerifyCoach
                 }
 
                 user.IsVerifiedCoach = true;
-                
+                user.Role = Role.Coach;
+                // Clear stored degree path since verification is complete
+                user.CoachDegreeFilePath = null;
+
                 await _dbContext.SaveChangesAsync();
+
+                // Best-effort: delete verification folder to remove from pending list
+                try
+                {
+                    string userFolder = Path.Combine(_env.ContentRootPath, "App_Data", "coach-verifications", userId);
+                    if (Directory.Exists(userFolder))
+                    {
+                        Directory.Delete(userFolder, recursive: true);
+                        _logger.LogInformation("Deleted verification folder for approved coach {UserId}", userId);
+                    }
+                }
+                catch (Exception delEx)
+                {
+                    _logger.LogWarning(delEx, "Failed to delete verification folder for approved coach {UserId}", userId);
+                }
+
                 return true;
             }
             catch (Exception ex)
@@ -223,9 +248,25 @@ namespace ActioNator.Services.Implementations.VerifyCoach
                     return false;
                 }
 
-                // Clear the coach degree file path
+                // Clear the coach degree file path flag
                 user.CoachDegreeFilePath = null;
-                
+
+                // Delete the verification documents folder from disk
+                try
+                {
+                    string userFolder = Path.Combine(_env.ContentRootPath, "App_Data", "coach-verifications", userId);
+                    if (Directory.Exists(userFolder))
+                    {
+                        Directory.Delete(userFolder, recursive: true);
+                        _logger.LogInformation("Deleted coach verification folder for user {UserId}: {Folder}", userId, userFolder);
+                    }
+                }
+                catch (Exception delEx)
+                {
+                    // Log but continue - we still save the DB changes and return false to indicate partial failure
+                    _logger.LogError(delEx, "Error deleting verification folder for user {UserId}", userId);
+                }
+
                 await _dbContext.SaveChangesAsync();
                 return true;
             }

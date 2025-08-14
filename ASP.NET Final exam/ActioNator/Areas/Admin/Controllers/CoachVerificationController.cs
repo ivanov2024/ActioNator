@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 using ActioNator.Services.Interfaces.FileServices;
 using System;
 using System.IO;
+using Microsoft.AspNetCore.Identity;
+using ActioNator.Data.Models;
+using ActioNator.GCommon;
+using System.Linq;
 
 namespace ActioNator.Areas.Admin.Controllers
 {
@@ -15,11 +19,16 @@ namespace ActioNator.Areas.Admin.Controllers
     {
         private readonly ICoachVerificationService _coachVerificationService;
         private readonly IFileStorageService _fileStorageService;
+        private readonly UserManager<ApplicationUser> _userManager;
 
-        public CoachVerificationController(ICoachVerificationService coachVerificationService, IFileStorageService fileStorageService)
+        public CoachVerificationController(
+            ICoachVerificationService coachVerificationService,
+            IFileStorageService fileStorageService,
+            UserManager<ApplicationUser> userManager)
         {
             _coachVerificationService = coachVerificationService;
             _fileStorageService = fileStorageService;
+            _userManager = userManager;
         }
 
         public async Task<IActionResult> Index()
@@ -90,8 +99,57 @@ namespace ActioNator.Areas.Admin.Controllers
                 return RedirectToAction("Index");
             }
 
-            bool success = await _coachVerificationService.ApproveVerificationAsync(userId);
-            TempData[success ? "Success" : "Error"] = success ? "Verification approved." : "Failed to approve verification.";
+            // Find user and assign Coach role if needed
+            var user = await _userManager.FindByIdAsync(userId);
+            if (user == null)
+            {
+                TempData["Error"] = "User not found.";
+                return RedirectToAction("Index");
+            }
+
+            // Ensure the user has ONLY the Coach role after approval
+            var currentRoles = await _userManager.GetRolesAsync(user);
+            var rolesToRemove = currentRoles
+                .Where(r => !string.Equals(r, RoleConstants.Coach, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+
+            IdentityResult roleResult = IdentityResult.Success;
+
+            if (rolesToRemove.Length > 0)
+            {
+                var removeResult = await _userManager.RemoveFromRolesAsync(user, rolesToRemove);
+                if (!removeResult.Succeeded)
+                {
+                    TempData["Error"] = string.Join("; ", removeResult.Errors.Select(e => e.Description));
+                    return RedirectToAction("Index");
+                }
+            }
+
+            if (!await _userManager.IsInRoleAsync(user, RoleConstants.Coach))
+            {
+                roleResult = await _userManager.AddToRoleAsync(user, RoleConstants.Coach);
+            }
+
+            bool flagUpdated = await _coachVerificationService.ApproveVerificationAsync(userId);
+
+            if (roleResult.Succeeded && flagUpdated)
+            {
+                TempData["Success"] = "User has been approved as Coach.";
+            }
+            else
+            {
+                var errors = roleResult.Succeeded
+                    ? string.Empty
+                    : string.Join("; ", roleResult.Errors.Select(e => e.Description));
+                if (!flagUpdated)
+                {
+                    errors = string.IsNullOrWhiteSpace(errors)
+                        ? "Failed to update verification status."
+                        : errors + "; Failed to update verification status.";
+                }
+                TempData["Error"] = string.IsNullOrWhiteSpace(errors) ? "Failed to approve verification." : errors;
+            }
+
             return RedirectToAction("Index");
         }
 

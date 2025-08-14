@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.AspNetCore.Http;
 using ActioNator.Services.Interfaces.FileServices;
+using System;
 
 using static ActioNator.GCommon.FileConstants.ContentTypes;
 using static ActioNator.GCommon.FileConstants.FileExtensions;
@@ -40,7 +41,8 @@ namespace ActioNator.Services.Validators
         /// <param name="contentType">Content type to check</param>
         /// <returns>True if this validator can handle the content type, false otherwise</returns>
         public override bool CanHandleFileType(string contentType)
-            => IsSupported(contentType);
+            => !string.IsNullOrWhiteSpace(contentType)
+               && string.Equals(contentType, "application/pdf", StringComparison.OrdinalIgnoreCase);
 
         /// <summary>
         /// Performs PDF-specific validation

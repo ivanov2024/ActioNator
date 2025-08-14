@@ -9,11 +9,23 @@
 
     @if (TempData["Success"] != null)
     {
-        <div class="mb-4 rounded-md border border-green-200 bg-green-50 p-4 text-green-700">@TempData["Success"]</div>
+        <script>
+            (function(msg){
+                if(!msg) return;
+                const show = () => window.dispatchEvent(new CustomEvent('show-toast', { detail: { type: 'success', message: msg } }));
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show); else show();
+            })("@TempData["Success"]");
+        </script>
     }
     @if (TempData["Error"] != null)
     {
-        <div class="mb-4 rounded-md border border-red-200 bg-red-50 p-4 text-red-700">@TempData["Error"]</div>
+        <script>
+            (function(msg){
+                if(!msg) return;
+                const show = () => window.dispatchEvent(new CustomEvent('show-toast', { detail: { type: 'error', message: msg } }));
+                if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', show); else show();
+            })("@TempData["Error"]");
+        </script>
     }
 
     @if (Model == null || !Model.Any())

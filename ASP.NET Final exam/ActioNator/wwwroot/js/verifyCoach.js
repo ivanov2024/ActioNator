@@ -115,28 +115,79 @@
                 });
                 
                 // Get the anti-forgery token
-                const token = document.querySelector('input[name="__RequestVerificationToken"]').value;
+                // Prefer the token rendered within this component's root to avoid picking tokens from other partials
+                const tokenInput = (this.$root || document).querySelector('input[name="__RequestVerificationToken"]');
+                const token = tokenInput ? tokenInput.value : '';
+                if (!token) {
+                    this.isUploading = false;
+                    alert('Security token not found. Please refresh the page and try again.');
+                    return;
+                }
+                // Also append token to form data for standard antiforgery validation on multipart/form-data
+                formData.append('__RequestVerificationToken', token);
                 
                 // Send the files to the server - using window.location.origin to ensure correct protocol and port
                 fetch(window.location.origin + '/User/CoachVerification/UploadDocuments', {
+                    credentials: 'same-origin',
                     method: 'POST',
                     headers: {
-                        'RequestVerificationToken': token
+                        'RequestVerificationToken': token,
+                        'X-CSRF-TOKEN': token,
+                        'CSRF-TOKEN': token,
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'Accept': 'application/json, application/problem+json'
                     },
                     body: formData,
                     credentials: 'include'
                 })
                 .then(async response => {
-                    // Parse JSON regardless of status code to get detailed error info
-                    const data = await response.json();
-                    
-                    if (!response.ok) {
-                        // Handle structured error response from backend
-                        const errorMessage = data.detail || data.message || 'Server validation failed';
-                        throw new Error(errorMessage);
+                    const contentType = response.headers.get('content-type') || '';
+
+                    // If redirected to login or another HTML page
+                    if (contentType.includes('text/html')) {
+                        if (response.redirected) {
+                            window.location.href = response.url;
+                            return Promise.reject(new Error('Redirecting...'));
+                        }
+                        // Treat unexpected HTML as an error
+                        const text = await response.text();
+                        throw new Error('Unexpected HTML response. Please refresh the page and try again.');
                     }
-                    
-                    return data;
+
+                    // No content response
+                    if (response.status === 204) {
+                        if (!response.ok) {
+                            throw new Error(response.statusText || 'Upload failed');
+                        }
+                        return { success: true, message: 'No content' };
+                    }
+
+                    // Prefer JSON when available
+                    if (contentType.includes('application/json')) {
+                        let data = null;
+                        try {
+                            data = await response.json();
+                        } catch (e) {
+                            // Fall back if body is empty or invalid JSON
+                            if (!response.ok) {
+                                throw new Error(response.statusText || 'Server error');
+                            }
+                            return { success: true };
+                        }
+
+                        if (!response.ok) {
+                            const errorMessage = data?.detail || data?.message || response.statusText || 'Server validation failed';
+                            throw new Error(errorMessage);
+                        }
+                        return data;
+                    }
+
+                    // Fallback: treat plain text as error on non-OK, or as success if OK
+                    const text = await response.text();
+                    if (!response.ok) {
+                        throw new Error(text || response.statusText || 'Upload failed');
+                    }
+                    return { success: true, message: text };
                 })
                 .then(data => {
                     if (data.success) {

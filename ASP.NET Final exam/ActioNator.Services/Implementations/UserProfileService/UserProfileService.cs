@@ -54,7 +54,8 @@ namespace ActioNator.Services.Implementations.UserProfileService
                 AboutText = profileData?.AboutText ?? string.Empty,
                 FriendsCount = 0, // We removed friends functionality
                 IsCurrentUser = false, // Set this based on context if needed
-                ActiveTab = "Overview"
+                ActiveTab = "Overview",
+                IsVerifiedCoach = user.IsVerifiedCoach
             };
 
             // Load data for each tab

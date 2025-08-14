@@ -234,9 +234,21 @@ namespace ActioNator.Services.Implementations.FileServices
                 string extension = _fileSystem
                     .GetExtension(fullPath)
                     .ToLowerInvariant();
-                
-                string contentType =
-                    Supported.First(s => s == extension);
+
+                // Map common extensions to MIME types
+                string contentType = extension switch
+                {
+                    ".pdf" => "application/pdf",
+                    ".jpg" => "image/jpeg",
+                    ".jpeg" => "image/jpeg",
+                    ".png" => "image/png",
+                    ".gif" => "image/gif",
+                    ".webp" => "image/webp",
+                    ".bmp" => "image/bmp",
+                    ".tif" => "image/tiff",
+                    ".tiff" => "image/tiff",
+                    _ => "application/octet-stream"
+                };
 
                 // Open file stream
                 Stream fileStream = _fileSystem.OpenRead(fullPath);

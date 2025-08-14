@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using ActioNator.Infrastructure.Attributes;
+using Microsoft.AspNetCore.Http;
+using System.Linq;
 
 namespace ActioNator.Areas.User.Controllers
 {
@@ -52,11 +55,13 @@ namespace ActioNator.Areas.User.Controllers
         /// <param name="cancellationToken">Cancellation token</param>
         /// <returns>JSON result with upload status and details</returns>
         [HttpPost]
-        [ValidateAntiForgeryToken]
+        [ValidateAntiForgeryTokenFromJson]
+        [Consumes("multipart/form-data")]
+        [Produces("application/json", "application/problem+json")]
         [RequestSizeLimit(104857600)] // 100MB in bytes - explicit limit at controller level
         [RequestFormLimits(MultipartBodyLengthLimit = 104857600)] // 100MB in bytes
         public async Task<IActionResult> UploadDocuments(
-            [FromForm] IFormFileCollection files,
+            [FromForm] List<IFormFile> files,
             CancellationToken cancellationToken)
         {
             try
@@ -89,14 +94,33 @@ namespace ActioNator.Areas.User.Controllers
                     });
                 }
                 
+                // Adapt List<IFormFile> to IFormFileCollection expected by the service
+                var formFiles = new FormFileCollection();
+                foreach (var f in files)
+                {
+                    formFiles.Add(f);
+                }
+
                 // Process the upload using the service
                 var result 
                     = await _documentUploadService
-                    .ProcessUploadAsync(files, userIdGuid.Value.ToString(), cancellationToken);
+                    .ProcessUploadAsync(formFiles, userIdGuid.Value.ToString(), cancellationToken);
                 
                 // Return appropriate response based on the result
                 if (result.Success)
                 {
+                    // On any new upload, ensure the user is marked as pending verification
+                    var user = await _userManager.FindByIdAsync(userIdGuid.Value.ToString());
+                    if (user != null)
+                    {
+                        user.IsVerifiedCoach = false;
+                        // Store any non-null reference to uploaded docs so counters work
+                        user.CoachDegreeFilePath = result.Files?.FirstOrDefault()?.FilePath
+                            ?? $"App_Data/coach-verifications/{userIdGuid.Value}";
+
+                        await _userManager.UpdateAsync(user);
+                    }
+
                     return Ok(result);
                 }
                 else

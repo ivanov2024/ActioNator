@@ -1,14 +1,37 @@
 @model ActioNator.ViewModels.CoachVerification.CoachVerificationUserViewModel
 
-<div class="space-y-4">
+<div class="space-y-4" x-data="{
+    confirmReject() {
+        // Open shared modal and on confirm submit this user's reject form
+        const submitReject = () => {
+            const form = document.getElementById('reject-form-@Model.UserId');
+            if (form) form.submit();
+        };
+        const onConfirmed = (e) => {
+            if (e && e.detail && e.detail.type === 'delete') {
+                submitReject();
+            }
+        };
+        window.addEventListener('modal-confirmed', onConfirmed, { once: true });
+        if (typeof window.openModal === 'function') {
+            window.openModal({
+                type: 'delete',
+                title: 'Reject Verification',
+                message: 'Are you sure you want to reject this verification request?',
+                confirmText: 'Reject',
+                cancelText: 'Cancel'
+            });
+        }
+    }
+}">
     <div>
         <h4 class="text-lg font-medium text-gray-900">Documents for User: @Model.UserId</h4>
     </div>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 justify-items-center">
         @foreach (var document in Model.Documents)
         {
-            <div class="h-full">
+            <div class="h-full w-full max-w-sm">
                 <div class="h-full bg-white shadow-sm rounded-lg border border-gray-100">
                     <div class="p-4">
                         @if (document.FileType == "image")
@@ -40,12 +63,7 @@
                     </div>
                     <div class="px-4 py-3 border-t border-gray-100">
                         <div class="flex items-center justify-between gap-2">
-                            <a asp-area="Admin" asp-controller="CoachVerification" asp-action="ViewDocument" asp-route-userId="@Model.UserId" asp-route-path="@document.RelativePath"
-                               target="_blank"
-                               class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md border border-indigo-200">
-                                <i class="fas fa-eye mr-2"></i> View
-                            </a>
-                            <a asp-area="Admin" asp-controller="CoachVerification" asp-action="ViewDocument" asp-route-userId="@Model.UserId" asp-route-path="@document.RelativePath" asp-route-download="true"
+                            <a href="@Url.Action("ViewDocument", "CoachVerification", new { area = "Admin", userId = Model.UserId, path = document.RelativePath, download = true })" download
                                class="inline-flex items-center px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-md border border-gray-200">
                                 <i class="fas fa-download mr-2"></i> Download
                             </a>
@@ -56,15 +74,17 @@
         }
     </div>
 
-    <div class="flex items-center justify-end gap-2 pt-2">
-        <form asp-action="RejectVerification" asp-route-userId="@Model.UserId" method="post">
+    <div class="flex flex-wrap items-center justify-center sm:justify-end gap-2 pt-2">
+        <form id="reject-form-@Model.UserId" asp-area="Admin" asp-controller="CoachVerification" asp-action="RejectVerification" asp-route-userId="@Model.UserId" method="post" class="hidden">
             @Html.AntiForgeryToken()
-            <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-red-200 text-red-700 bg-red-50 hover:bg-red-100">
-                <i class="fas fa-times-circle mr-2"></i> Reject
-            </button>
+            <input type="hidden" name="userId" value="@Model.UserId" />
         </form>
-        <form asp-action="ApproveVerification" asp-route-userId="@Model.UserId" method="post">
+        <button type="button" x-on:click="confirmReject()" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-red-200 text-red-700 bg-red-50 hover:bg-red-100">
+            <i class="fas fa-times-circle mr-2"></i> Reject
+        </button>
+        <form action="@Url.Action("ApproveVerification", "CoachVerification", new { area = "Admin", userId = Model.UserId })" method="post">
             @Html.AntiForgeryToken()
+            <input type="hidden" name="userId" value="@Model.UserId" />
             <button type="submit" class="inline-flex items-center px-4 py-2 text-sm font-medium rounded-md border border-green-200 text-green-700 bg-green-50 hover:bg-green-100">
                 <i class="fas fa-check-circle mr-2"></i> Approve
             </button>
