@@ -15,7 +15,7 @@ using static ActioNator.GCommon.FileConstants.ContentTypes;
 /// </summary>
 public class CloudinaryService : ICloudinaryService
 {
-    private readonly Cloudinary _cloudinary;
+    private readonly ICloudinaryClientAdapter _client;
     private readonly ICloudinaryUrlService _cloudinaryUrlService;
     private readonly ActioNatorDbContext _dbContext;
     private readonly ILogger<CloudinaryService> _logger;
@@ -25,8 +25,22 @@ public class CloudinaryService : ICloudinaryService
 
     public CloudinaryService(Cloudinary cloudinary, ActioNatorDbContext dbContext, ILogger<CloudinaryService> logger, ICloudinaryUrlService cloudinaryUrlService)
     {
-        _cloudinary = cloudinary 
-            ?? throw new ArgumentNullException(nameof(cloudinary));
+        if (cloudinary is null) throw new ArgumentNullException(nameof(cloudinary));
+        _client = new CloudinaryClientAdapter(cloudinary);
+
+        _cloudinaryUrlService = cloudinaryUrlService 
+            ?? throw new ArgumentNullException( nameof(cloudinaryUrlService));
+
+        _dbContext = dbContext 
+            ?? throw new ArgumentNullException(nameof(dbContext));
+
+        _logger = logger
+            ?? throw new ArgumentNullException(nameof(logger));
+    }
+
+    public CloudinaryService(ICloudinaryClientAdapter client, ActioNatorDbContext dbContext, ILogger<CloudinaryService> logger, ICloudinaryUrlService cloudinaryUrlService)
+    {
+        _client = client ?? throw new ArgumentNullException(nameof(client));
 
         _cloudinaryUrlService = cloudinaryUrlService 
             ?? throw new ArgumentNullException( nameof(cloudinaryUrlService));
@@ -122,7 +136,7 @@ public class CloudinaryService : ICloudinaryService
 
         DelResResult deleteResult 
             = await 
-            _cloudinary
+            _client
             .DeleteResourcesAsync(deleteParams, cancellationToken);
 
         bool allDeleted 
@@ -191,7 +205,7 @@ public class CloudinaryService : ICloudinaryService
                 .FetchFormat("auto")
         };
 
-        ImageUploadResult uploadResult = await _cloudinary.UploadAsync(uploadParams, cancellationToken);
+        ImageUploadResult uploadResult = await _client.UploadAsync(uploadParams, cancellationToken);
 
         if (uploadResult.Error != null)
         {

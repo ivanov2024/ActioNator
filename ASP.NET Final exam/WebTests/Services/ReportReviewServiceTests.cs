@@ -221,7 +221,8 @@ namespace WebTests.Services
             var sut = new ReportReviewService(db);
             var ok = await sut.DeletePostAsync(p.Id);
             Assert.That(ok, Is.True);
-            Assert.That(db.Posts.IgnoreQueryFilters().Any(x => x.Id == p.Id), Is.False);
+            var post = db.Posts.IgnoreQueryFilters().Single(x => x.Id == p.Id);
+            Assert.That(post.IsDeleted, Is.True);
             Assert.That(db.PostReports.Any(r => r.PostId == p.Id), Is.False);
         }
 
@@ -245,7 +246,8 @@ namespace WebTests.Services
             var sut = new ReportReviewService(db);
             var ok = await sut.DeleteCommentAsync(c.Id);
             Assert.That(ok, Is.True);
-            Assert.That(db.Comments.IgnoreQueryFilters().Any(x => x.Id == c.Id), Is.False);
+            var comment = db.Comments.IgnoreQueryFilters().Single(x => x.Id == c.Id);
+            Assert.That(comment.IsDeleted, Is.True);
             Assert.That(db.CommentReports.Any(r => r.CommentId == c.Id), Is.False);
         }
 
