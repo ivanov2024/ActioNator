@@ -7,6 +7,10 @@ using ActioNator.ViewModels.Journal;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
 
 namespace ActioNator.Areas.User.Controllers
 {
@@ -27,16 +31,37 @@ namespace ActioNator.Areas.User.Controllers
         /// Display all journal entries
         /// </summary>
         [HttpGet]
-        public async Task<IActionResult> Index(string searchTerm = null)
+        public async Task<IActionResult> Index(string? searchTerm = null, int page = 1, int pageSize = 3, CancellationToken cancellationToken = default)
         {
-            IEnumerable<JournalEntryViewModel>? entries 
-                = string.IsNullOrWhiteSpace(searchTerm)
-                ? await _journalService
-                    .GetAllEntriesAsync()
-                : await _journalService
-                    .SearchEntriesAsync(searchTerm);
+            // Sanitize and normalize search term to prevent injection and malformed input
+            var sanitizedSearch = SanitizeSearchTerm(searchTerm);
 
-            return View(entries);
+            IEnumerable<JournalEntryViewModel>? entries
+                = string.IsNullOrWhiteSpace(sanitizedSearch)
+                ? await _journalService.GetAllEntriesAsync()
+                : await _journalService.SearchEntriesAsync(sanitizedSearch);
+
+            page = Math.Max(1, page);
+            pageSize = Math.Max(1, pageSize);
+
+            int totalCount = entries?.Count() ?? 0;
+            int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+            var pagedEntries = (entries ?? Enumerable.Empty<JournalEntryViewModel>())
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var vm = new JournalEntriesListViewModel
+            {
+                Entries = pagedEntries,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                SearchTerm = sanitizedSearch
+            };
+
+            return View(vm);
         }
 
         /// <summary>
@@ -45,12 +70,48 @@ namespace ActioNator.Areas.User.Controllers
         [HttpGet]
         public async Task<IActionResult> List(string? searchTerm = null)
         {
+            var sanitizedSearch = SanitizeSearchTerm(searchTerm);
             IEnumerable<JournalEntryViewModel> entries =
-                string.IsNullOrWhiteSpace(searchTerm)
+                string.IsNullOrWhiteSpace(sanitizedSearch)
                     ? await _journalService.GetAllEntriesAsync()
-                    : await _journalService.SearchEntriesAsync(searchTerm);
+                    : await _journalService.SearchEntriesAsync(sanitizedSearch);
 
             return Json(entries);
+        }
+
+        /// <summary>
+        /// Return paginated journal entries partial for AJAX pagination
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetJournalPartial(string? searchTerm = null, int page = 1, int pageSize = 3, CancellationToken cancellationToken = default)
+        {
+            var sanitizedSearch = SanitizeSearchTerm(searchTerm);
+            IEnumerable<JournalEntryViewModel>? entries
+                = string.IsNullOrWhiteSpace(sanitizedSearch)
+                ? await _journalService.GetAllEntriesAsync()
+                : await _journalService.SearchEntriesAsync(sanitizedSearch);
+
+            page = Math.Max(1, page);
+            pageSize = Math.Max(1, pageSize);
+
+            int totalCount = entries?.Count() ?? 0;
+            int totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+            var pagedEntries = (entries ?? Enumerable.Empty<JournalEntryViewModel>())
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            var vm = new JournalEntriesListViewModel
+            {
+                Entries = pagedEntries,
+                Page = page,
+                PageSize = pageSize,
+                TotalCount = totalCount,
+                TotalPages = totalPages,
+                SearchTerm = sanitizedSearch
+            };
+
+            return PartialView("_JournalEntriesPartial", vm);
         }
 
         /// <summary>
@@ -61,6 +122,26 @@ namespace ActioNator.Areas.User.Controllers
         {
             // Deprecated: modal is embedded on Index; keep endpoint for backward-compatibility
             return RedirectToAction(nameof(Index));
+        }
+
+        // Centralized sanitization for search queries.
+        // - Trims whitespace
+        // - Uses input sanitization service to strip/normalize dangerous content
+        // - Removes control characters
+        // - Enforces a conservative max length to mitigate abuse
+        private string? SanitizeSearchTerm(string? input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return null;
+            // Trim and sanitize via shared service
+            var cleaned = _sanitizationService.SanitizeString(input.Trim());
+            if (string.IsNullOrEmpty(cleaned)) return null;
+            // Remove control chars
+            cleaned = new string(cleaned.Where(c => !char.IsControl(c)).ToArray());
+            if (string.IsNullOrWhiteSpace(cleaned)) return null;
+            // Limit length (defensive)
+            const int MaxLen = 100;
+            if (cleaned.Length > MaxLen) cleaned = cleaned.Substring(0, MaxLen);
+            return cleaned;
         }
 
         /// <summary>

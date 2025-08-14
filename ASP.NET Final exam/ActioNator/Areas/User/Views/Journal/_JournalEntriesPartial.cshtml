@@ -1,0 +1,116 @@
+@using ActioNator.ViewModels.Journal
+@model JournalEntriesListViewModel
+
+<!-- Pagination Controls -->
+<div class="w-full basis-full">
+    @if (Model.TotalPages > 1)
+    {
+        <nav class="w-full mt-2 mb-2 flex items-center justify-center space-x-2 select-none mx-auto" aria-label="Pagination">
+            <button type="button"
+                    class="px-3 py-1 rounded border text-sm disabled:opacity-50"
+                    data-action="prev"
+                    @@click="prevPage()" @(Model.Page <= 1 ? "disabled" : null)>
+                Prev
+            </button>
+
+            @for (int p = 1; p <= Model.TotalPages; p++)
+            {
+                <button type="button"
+                        class="px-3 py-1 rounded border text-sm @(p == Model.Page ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-700")"
+                        data-page="@p"
+                        @@click="goToPage(@p)">
+                    @p
+                </button>
+            }
+
+            <button type="button"
+                    class="px-3 py-1 rounded border text-sm disabled:opacity-50"
+                    data-action="next"
+                    @@click="nextPage()" @(Model.Page >= Model.TotalPages ? "disabled" : null)>
+                Next
+            </button>
+        </nav>
+    }
+
+    <div id="journalPaginationContainer"
+         data-current-page="@Model.Page"
+         data-total-pages="@Model.TotalPages"
+         data-page-size="@Model.PageSize"
+         data-search-term="@Model.SearchTerm"
+         class="w-full hidden">
+    </div>
+</div>
+
+@if (Model?.Entries != null && Model.Entries.Any())
+{
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8 w-full" id="journal-cards">
+        @foreach (var entry in Model.Entries)
+        {
+            <div class="bg-white rounded-lg shadow-md p-6 journal-card goal-card relative" data-id="@entry.Id">
+                <div class="flex justify-between items-start mb-3">
+                    <h3 class="text-lg font-semibold text-gray-900 leading-tight whitespace-pre-line break-words flex-1 min-w-0 mr-3">@entry.Title</h3>
+
+                    <div class="relative">
+                        <button type="button" class="text-gray-400 hover:text-gray-600 focus:outline-none journal-menu-trigger">
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                            </svg>
+                        </button>
+                        <div class="journal-dropdown hidden absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                            <div class="py-1" role="menu" aria-orientation="vertical">
+                                <button type="button"
+                                        class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 journal-edit-btn"
+                                        role="menuitem"
+                                        data-id="@entry.Id"
+                                        data-title="@entry.Title"
+                                        data-content="@entry.Content"
+                                        data-mood="@entry.MoodTag"
+                                        data-created-at="@entry.CreatedAt.ToString("o")">
+                                    Edit
+                                </button>
+                                <button type="button"
+                                        class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 hover:text-red-700 journal-delete-btn"
+                                        role="menuitem"
+                                        data-id="@entry.Id">
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="goal-card-body mb-4">
+                    @if (!string.IsNullOrEmpty(entry.Content))
+                    {
+                        <div class="goal-description-container flex flex-col space-y-2">
+                            <p class="goal-description text-gray-600 text-sm whitespace-pre-wrap overflow-hidden transition-all duration-300 pb-6">@entry.Content</p>
+                            <button class="read-more-btn text-xs text-indigo-600 hover:text-indigo-800 self-start font-medium transition-all duration-200">
+                                <span class="read-more">Read More</span>
+                                <span class="read-less hidden">Show Less</span>
+                            </button>
+                        </div>
+                    }
+                </div>
+
+                <div class="flex flex-wrap justify-between items-center text-sm text-gray-500 mt-4">
+                    <div class="flex items-center">
+                        <svg class="h-4 w-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd" />
+                        </svg>
+                        <span>@entry.CreatedAt.ToString("MMM d, yyyy h:mm tt")</span>
+                    </div>
+                    <div class="flex items-start mt-2 sm:mt-0 max-w-full gap-1">
+                        <span class="mood-tag-prefix mr-0.5 select-none">#</span>
+                        <span class="block whitespace-pre-wrap break-words max-w-full overflow-hidden">@entry.MoodTag</span>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+else
+{
+    <div class="col-span-full text-center py-8">
+        <p class="text-gray-500 dark:text-gray-400">No journal entries match the current search.</p>
+    </div>
+}

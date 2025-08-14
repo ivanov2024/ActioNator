@@ -11,7 +11,6 @@ namespace ActioNator.Areas.User.Controllers
 {
     [Area("User")]
     [Authorize]
-    [Route("User/[controller]/[action]")]
     public class CommunityController : Controller
     {
         private readonly ICommunityService _communityService;
@@ -243,7 +242,7 @@ namespace ActioNator.Areas.User.Controllers
             }
         }
 
-        [HttpPost("/User/Community/DeletePost/{id}")]
+        [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePost(Guid id)
         {
@@ -278,12 +277,18 @@ namespace ActioNator.Areas.User.Controllers
             }
         }
 
-        [HttpPost("/User/Community/DeleteComment/{commentId}")]
+        [HttpPost]
         [ValidateAntiForgeryTokenFromJson]
-        public async Task<IActionResult> DeleteComment(Guid commentId, [FromBody] CommentDeleteRequest request)
+        public async Task<IActionResult> DeleteComment(Guid commentId, [FromBody] CommentDeleteRequest request, [FromRoute(Name = "id")] Guid? routeId = null)
         {
             try
             {
+                // Support both /.../DeleteComment/{commentId} (old) and conventional {id?} route
+                if (commentId == Guid.Empty && routeId.HasValue)
+                {
+                    commentId = routeId.Value;
+                }
+
                 if (commentId == Guid.Empty)
                 {
                     return BadRequest(new { success = false, message = "Valid Comment ID is required" });
@@ -364,7 +369,7 @@ namespace ActioNator.Areas.User.Controllers
         /// <summary>
         /// Gets a comment by ID for real-time updates
         /// </summary>
-        [HttpGet("/User/Community/GetComment/{id}")]
+        [HttpGet]
         public async Task<IActionResult> GetComment(Guid id)
         {
             if (id == Guid.Empty)

@@ -303,6 +303,67 @@
                 };
                 this.validationAttempted = false;
                 this.validationErrors = {};
+            },
+
+            // Client-side validation matching server-side constraints
+            validateForm() {
+                this.validationAttempted = true;
+                const title = this.currentEntry.title || '';
+                const content = this.currentEntry.content || '';
+                const mood = this.currentEntry.mood || '';
+                if (title.length < 3 || title.length > 20) return false;
+                if (content.length < 1 || content.length > 150) return false;
+                if (mood.length < 1 || mood.length > 50) return false;
+                return true;
+            },
+
+            // Save entry via AJAX to /User/Journal/Save
+            async saveEntry() {
+                try {
+                    const tokenEl = document.querySelector('input[name="__RequestVerificationToken"]');
+                    const token = tokenEl ? tokenEl.value : '';
+                    const payload = {
+                        Id: this.isEditMode && this.currentEntry.id ? this.currentEntry.id : '00000000-0000-0000-0000-000000000000',
+                        Title: this.currentEntry.title,
+                        Content: this.currentEntry.content,
+                        MoodTag: this.currentEntry.mood,
+                        __RequestVerificationToken: token
+                    };
+                    const res = await fetch('/User/Journal/Save', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-Requested-With': 'XMLHttpRequest',
+                            'X-CSRF-TOKEN': token
+                        },
+                        credentials: 'same-origin',
+                        body: JSON.stringify(payload)
+                    });
+                    if (!res.ok) {
+                        let msg = 'Failed to save journal entry';
+                        try {
+                            const ct = res.headers.get('content-type');
+                            if (ct && ct.includes('application/json')) {
+                                const data = await res.json();
+                                msg = data.error || (Array.isArray(data.errors) ? data.errors.join('\n') : msg);
+                            } else {
+                                msg = await res.text();
+                            }
+                        } catch {}
+                        throw new Error(msg);
+                    }
+                    const data = await res.json();
+                    const actionText = this.isEditMode ? 'updated' : 'saved';
+                    if (window.showToast) showToast('success', data.message || `Journal entry ${actionText} successfully!`);
+                    // Close modal and reset
+                    this.closeModal();
+                    this.resetForm();
+                    // Inform pager to reload
+                    window.dispatchEvent(new CustomEvent('journal-entries-changed', { detail: { action: this.isEditMode ? 'update' : 'create' } }));
+                } catch (err) {
+                    console.error('Save failed:', err);
+                    if (window.showToast) showToast('error', err.message || 'An error occurred while saving the entry');
+                }
             }
         }));
     });

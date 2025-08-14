@@ -1,5 +1,5 @@
 @using ActioNator.ViewModels.Journal
-@model IEnumerable<JournalEntryViewModel>
+@model JournalEntriesListViewModel
 
 @{
     ViewData["Title"] = "Journal";
@@ -15,7 +15,7 @@
     <link rel="stylesheet" href="~/css/goal-animations.css" />
 }
 
-<div class="container mx-auto px-4 py-8" x-data="journalApp">
+<div class="container mx-auto px-4 py-8">
     <!-- Header -->
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
         <div>
@@ -28,8 +28,8 @@
                     type="text"
                     placeholder="Search entries..."
                     class="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    x-model="searchQuery"
-                    @@input="updateFilteredEntries"
+                    id="journal-search-input"
+                    value="@Model?.SearchTerm"
                 >
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <svg class="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -38,7 +38,7 @@
                 </div>
             </div>
             <button
-                @@click="openAddModal"
+                onclick="window.JournalUI && window.JournalUI.openAddModal && window.JournalUI.openAddModal()"
                 class="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >
                 <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
@@ -49,29 +49,9 @@
         </div>
     </div>
 
-    <!-- Journal Entries Grid -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 journal-grid">
-        <template x-for="(entry, index) in filteredEntries" :key="entry.id">
-            <partial name="_JournalEntryCard" />
-        </template>
-        
-        <!-- Empty State -->
-        <div x-show="filteredEntries.length === 0" class="col-span-full flex flex-col items-center justify-center py-12 text-center">
-            <svg class="h-16 w-16 text-gray-400 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            <h3 class="text-lg font-medium text-gray-900 mb-1">No journal entries found</h3>
-            <p class="text-gray-600 mb-4" x-text="searchQuery ? 'No entries match your search.' : 'Create your first journal entry to get started.'"></p>
-            <button
-                @@click="openAddModal"
-                class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-                <svg class="h-5 w-5 mr-2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" />
-                </svg>
-                Create Entry
-            </button>
-        </div>
+    <!-- Journal Entries + Pagination Partial -->
+    <div id="journal-partial-container">
+        @await Html.PartialAsync("_JournalEntriesPartial", Model)
     </div>
 
     <!-- Add/Edit Entry Modal - Using custom journal-specific modal -->
@@ -83,11 +63,5 @@
     <script src="~/js/journal.js" asp-append-version="true"></script>
     <!-- Enable shared Read More / Show Less behavior -->
     <script src="~/js/read-more.js" asp-append-version="true"></script>
-    <script>
-        // Initialize Alpine.js component when the page loads
-        document.addEventListener('DOMContentLoaded', function() {
-            // If using server-side data, we can initialize it here
-            window.initialJournalEntries = @Html.Raw(Json.Serialize(Model));
-        });
-    </script>
+    <script src="~/js/journal.page.js" asp-append-version="true"></script>
 }

@@ -91,7 +91,7 @@
                 <div class="goal-card-footer flex items-center justify-between pt-3 border-t border-gray-100">
                     <div class="goal-due-date text-sm @(goal.IsOverdue ? "text-red-600" : "text-gray-500")">
                         <i class="far fa-calendar-alt mr-1"></i>
-                        <span>@goal.DueDate.ToString("MMM d, yyyy")</span>
+                        <span>@goal.DueDateDisplay</span>
                         @if (goal.IsOverdue)
                         {
                             <span class="ml-1 text-xs font-medium">(Overdue)</span>

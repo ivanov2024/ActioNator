@@ -226,9 +226,9 @@
     }
 
     function parseDisplayDate(text) {
-      // Parses "MMM d, yyyy" -> "yyyy-MM-dd"; returns empty string on failure
+      // Parses "MMM d, yyyy" or "MMM d, yyyy h:mm tt" -> "yyyy-MM-dd"; returns empty string on failure
       if (!text) return '';
-      const m = text.match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})/);
+      const m = text.match(/([A-Za-z]+)\s+(\d{1,2}),\s*(\d{4})(?:\s+(\d{1,2}):(\d{2})\s*([APap][Mm]))?/);
       if (!m) return '';
       const monthMap = {
         Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06',

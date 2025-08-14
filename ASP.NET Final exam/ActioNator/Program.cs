@@ -40,6 +40,8 @@ using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.Routing.Constraints;
 
 namespace ActioNator
 {
@@ -87,6 +89,25 @@ namespace ActioNator
 
             builder.Services
                 .AddControllersWithViews();
+
+            // Ensure built-in inline route constraints like 'regex' are registered
+            builder.Services.AddRouting(options =>
+            {
+                // Map the 'regex' inline constraint to the framework implementation
+                options.ConstraintMap["regex"] = typeof(RegexRouteConstraint);
+            });
+
+            // Centralized authorization policies for role-based alias routing
+            builder.Services.AddAuthorization(options =>
+            {
+                // Coaches (and Admins) can access User area via /Coach/* aliases
+                options.AddPolicy("CoachAreaAliasAccess", policy =>
+                    policy.RequireRole("Coach", "Admin"));
+
+                // Admins can access User area via /Admin/* aliases (without duplicating controllers)
+                options.AddPolicy("AdminAreaAliasAccess", policy =>
+                    policy.RequireRole("Admin"));
+            });
 
             builder.Services
                 .AddRazorPages()
@@ -388,7 +409,38 @@ namespace ActioNator
             app.UseAuthentication();
             app.UseAuthorization();
 
-            // Map area route with higher priority
+            // Role-based alias routes to reuse User area controllers for Coach/Admin without duplication
+
+            // Ensure genuine Coach area Home is not shadowed by alias
+            app.MapControllerRoute(
+                name: "coach_area_home",
+                pattern: "Coach/Home/{action=Index}/{id?}",
+                defaults: new { area = "Coach", controller = "Home" });
+
+            // Coaches: access all other User-area controllers via Coach prefix (no regex)
+            app.MapControllerRoute(
+                name: "coach_user_alias",
+                pattern: "Coach/{controller}/{action=Index}/{id?}",
+                defaults: new { area = "User" })
+               .WithMetadata(new SuppressLinkGenerationMetadata())
+               .RequireAuthorization("CoachAreaAliasAccess");
+
+            // Admins: explicit aliases for selected User-area controllers
+            app.MapControllerRoute(
+                name: "admin_user_alias_community",
+                pattern: "Admin/Community/{action=Index}/{id?}",
+                defaults: new { area = "User", controller = "Community" })
+               .WithMetadata(new SuppressLinkGenerationMetadata())
+               .RequireAuthorization("AdminAreaAliasAccess");
+
+            app.MapControllerRoute(
+                name: "admin_user_alias_userprofile",
+                pattern: "Admin/UserProfile/{action=Index}/{id?}",
+                defaults: new { area = "User", controller = "UserProfile" })
+               .WithMetadata(new SuppressLinkGenerationMetadata())
+               .RequireAuthorization("AdminAreaAliasAccess");
+
+            // Map area route with lower priority than alias routes
             app.MapControllerRoute(
                 name: "areas",
                 pattern: "{area:exists}/{controller=Home}/{action=Index}/{id?}");

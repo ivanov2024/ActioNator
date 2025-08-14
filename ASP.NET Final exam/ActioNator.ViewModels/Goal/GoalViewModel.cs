@@ -1,5 +1,6 @@
 using ActioNator.GCommon;
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 
 using static ActioNator.GCommon.ValidationConstants.Goal;
 
@@ -33,5 +34,8 @@ namespace ActioNator.ViewModels.Goal
 
         [Display(Name = "Overdue")]
         public bool IsOverdue => !Completed && DueDate < DateTime.Today;
+
+        // Consistent display string for DueDate to match Journal and Workouts
+        public string DueDateDisplay => DueDate.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture);
     }
 }

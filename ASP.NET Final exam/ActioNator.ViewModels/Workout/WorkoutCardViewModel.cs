@@ -65,7 +65,7 @@ namespace ActioNator.ViewModels.Workouts
         /// </summary>
         [Display(Name = "Completed On")]
         [DataType(DataType.Date)]
-        public string? CompletedDateDisplay => CompletedAt?.ToString("MMM d, yyyy, h:mm tt", CultureInfo.InvariantCulture);
+        public string? CompletedDateDisplay => CompletedAt?.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture);
 
         [Display(Name = "Completed")]
         public bool IsCompleted { get; set; }
@@ -79,7 +79,7 @@ namespace ActioNator.ViewModels.Workouts
         [Display(Name = "Created On")]
         [DataType(DataType.Date)]
         public string? DateDisplay 
-            => Date?.ToString("MMM d, yyyy, h:mm tt", CultureInfo.InvariantCulture);
+            => Date?.ToString("MMM d, yyyy h:mm tt", CultureInfo.InvariantCulture);
 
         /// <summary>
         /// Additional notes about the workout
