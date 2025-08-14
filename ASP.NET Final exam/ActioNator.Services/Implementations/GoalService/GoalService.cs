@@ -56,7 +56,8 @@ namespace ActioNator.Services.Implementations.GoalService
                 {
                     case "active":
                         query 
-                            = query.Where(g => !g.IsCompleted);
+                            = query.Where(g => !g.IsCompleted 
+                                && g.DueDate >= _clock.UtcNow);
                         break;
                     case "completed":
                         query 

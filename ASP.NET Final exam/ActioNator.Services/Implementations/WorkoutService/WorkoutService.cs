@@ -492,6 +492,11 @@ namespace ActioNator.Services.Implementations.WorkoutService
             existingExercise.Notes = exercise.Notes;
             existingExercise.Duration = TimeSpan.FromMinutes(exercise.Duration);
 
+            // Persist the updated exercise first so the recalculation sees the new duration value
+            await
+                _dbContext
+                .SaveChangesAsync();
+
             // Recalculate workout duration by materializing durations then summing client-side to avoid EF translation issues
             var durationsUpdate = await _dbContext
                 .Exercises
@@ -610,7 +615,7 @@ namespace ActioNator.Services.Implementations.WorkoutService
             CancellationToken cancellationToken = default
         )
         {
-            if (userId is null || workoutId == Guid.Empty)
+            if (userId is null || userId == Guid.Empty || workoutId == Guid.Empty)
             {
                 _logger.LogCritical("Attempted to verify workout ownership with invalid parameters.");
 
@@ -634,7 +639,7 @@ namespace ActioNator.Services.Implementations.WorkoutService
             CancellationToken cancellationToken = default
         )
         {
-            if (userId is null || exerciseId == Guid.Empty)
+            if (userId is null || userId == Guid.Empty || exerciseId == Guid.Empty)
             {
                 _logger.LogCritical("Attempted to verify exercise ownership with invalid parameters.");
 

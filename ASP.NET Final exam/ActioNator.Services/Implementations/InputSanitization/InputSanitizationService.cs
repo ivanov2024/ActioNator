@@ -40,7 +40,7 @@ namespace ActioNator.Services.Implementations.InputSanitization
         /// which could be used to inject JavaScript payloads in HTML contexts.
         /// </summary>
         private static readonly Regex _onEventPattern 
-            = new (@"\s+(on\w+)\s*=\s*", RegexOptions.IgnoreCase);
+            = new (@"(?:^|\s)(on\w+)\s*=\s*", RegexOptions.IgnoreCase);
 
         /// <summary>
         /// Matches "javascript:" protocol usage, which may be used in href, src,

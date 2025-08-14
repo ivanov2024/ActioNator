@@ -20,6 +20,10 @@ namespace WebTests.Services
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            // Start with base model to ensure Identity/EF infrastructure is initialized,
+            // then slim it down to only what's needed for these tests.
+            base.OnModelCreating(modelBuilder);
+
             // Only include Goal, ignore everything else from the base context
             modelBuilder.Ignore<Achievement>();
             modelBuilder.Ignore<AchievementTemplate>();
